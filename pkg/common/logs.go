@@ -14,19 +14,7 @@ const (
 	LogfilePrefix = "/var/log/cds/"
 	// MBSIZE MB size
 	MBSIZE = 1024 * 1024
-	// Node metadata File
-	NodeMetaDataFile = "/host/etc/cds/node-meta"
 )
-
-func GetNodeId() string {
-	return func(path string) string {
-		panic("implement me")
-	}(NodeMetaDataFile)
-}
-
-func CreatePersistentStorage(persistentStoragePath string) error {
-	return os.MkdirAll(persistentStoragePath, os.FileMode(0755))
-}
 
 // rotate log file by 2M bytes
 // default print log to stdout and file both.
@@ -39,7 +27,9 @@ func SetLogAttribute(logType, driver string) {
 		return
 	}
 
-	os.MkdirAll(LogfilePrefix, os.FileMode(0755))
+	if err := os.MkdirAll(LogfilePrefix, os.FileMode(0755)); err != nil {
+		log.Errorf("failed to create the log directory %s: ", LogfilePrefix, err.Error())
+	}
 	logFile := LogfilePrefix + driver + ".log"
 	f, err := os.OpenFile(logFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
@@ -48,10 +38,14 @@ func SetLogAttribute(logType, driver string) {
 
 	// rotate the log file if too large
 	if fi, err := f.Stat(); err == nil && fi.Size() > 2*MBSIZE {
-		f.Close()
+		if err := f.Close(); err != nil {
+			log.Errorf("failed to close the log file %s: %s", f.Name(), err.Error())
+		}
 		timeStr := time.Now().Format("-2006-01-02-15:04:05")
 		timedLogfile := LogfilePrefix + driver + timeStr + ".log"
-		os.Rename(logFile, timedLogfile)
+		if err := os.Rename(logFile, timedLogfile); err != nil {
+			log.Errorf("failed to rename file from %s to %s: %s", logFile, timedLogfile, err.Error())
+		}
 		f, err = os.OpenFile(logFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 		if err != nil {
 			os.Exit(1)

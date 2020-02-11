@@ -7,6 +7,7 @@ import (
 
 	"github.com/capitalonline/cds-csi-driver/pkg/common"
 	"github.com/capitalonline/cds-csi-driver/pkg/driver/nas"
+	"github.com/capitalonline/cds-csi-driver/pkg/driver/utils"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -49,17 +50,17 @@ func main() {
 	common.SetLogAttribute(logType, driverName)
 
 	if nodeID == "" {
-		nodeID = common.GetNodeId()
+		nodeID = utils.GetNodeId()
 	}
 
 	log.Infof("CSI Driver Name: %s, %s", driverName, endpoint)
 	log.Infof("CSI Driver Version: %+v", common.GetVersion())
 
-	if err := common.CreatePersistentStorage(path.Join(rootDir, "plugins", driverName, "controller")); err != nil {
+	if err := os.MkdirAll(path.Join(rootDir, "plugins", driverName, "controller"), os.FileMode(0755)); err != nil {
 		log.Errorf("failed to create persistent storage for controller: %v", err)
 		os.Exit(1)
 	}
-	if err := common.CreatePersistentStorage(path.Join(rootDir, "plugins", driverName, "node")); err != nil {
+	if err := os.MkdirAll(path.Join(rootDir, "plugins", driverName, "node"), os.FileMode(0755)); err != nil {
 		log.Errorf("failed to create persistent storage for node: %v", err)
 		os.Exit(1)
 	}

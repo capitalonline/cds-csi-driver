@@ -2,7 +2,7 @@ package nas
 
 import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	csicommon "github.com/kubernetes-csi/drivers/pkg/csi-common"
+	"github.com/kubernetes-csi/drivers/pkg/csi-common"
 )
 
 type IdentityServer struct {
