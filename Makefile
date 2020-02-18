@@ -12,6 +12,10 @@ build:
 	mkdir -p bin
 	CGO_ENABLED=0 go build -ldflags ${LDFLAGS} -o bin/cds-csi-driver ./cmd/
 
+.PHONY: container-binary
+container-binary:
+	CGO_ENABLED=0 GOARCH="amd64" GOOS="linux" go build -ldflags ${LDFLAGS} -o /cds-csi-driver ./cmd/
+
 .PHONY: image-release
 image-release:
 	docker build -t $(IMAGE):$(VERSION) .

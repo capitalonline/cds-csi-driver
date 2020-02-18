@@ -15,7 +15,7 @@ import (
 const (
 	// TypePluginNAS NAS type plugin
 	DriverNasType     = "nas"
-	DriverNasTypeName = "nasplugin.csi.capitalonline.net"
+	DriverNasTypeName = "nas.csi.cds.net"
 )
 
 var (
