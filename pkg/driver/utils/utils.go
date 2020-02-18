@@ -55,11 +55,11 @@ func RunCommand(cmd string) (string, error) {
 }
 
 // CreateDir create the target directory with error handling
-func CreateDir(target string) error {
+func CreateDir(target string, mode int) error {
 	fi, err := os.Lstat(target)
 
 	if os.IsNotExist(err) {
-		if err := os.MkdirAll(target, 0777); err != nil {
+		if err := os.MkdirAll(target, os.FileMode(mode)); err != nil {
 			return err
 		}
 	} else if err != nil {

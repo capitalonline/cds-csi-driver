@@ -3,8 +3,9 @@ package nas
 import (
 	"errors"
 	"fmt"
-	"path"
+	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -12,6 +13,8 @@ import (
 	"github.com/capitalonline/cds-csi-driver/pkg/driver/utils"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	log "github.com/sirupsen/logrus"
+	core "k8s.io/api/core/v1"
+	storage "k8s.io/api/storage/v1"
 )
 
 const (
@@ -23,60 +26,47 @@ const (
 	defaultV4Opts    = "noresvport"
 	nasPortNumber    = "2049"
 	dialTimeout      = time.Duration(3) * time.Second
+	subpathLiteral   = "subpath"
+	systemLiteral    = "system"
 )
 
-func parseMountOptions(req *csi.NodePublishVolumeRequest) (options *MountOptions, err error) {
-	// parse parameters
-	mountPath := req.GetTargetPath()
-	opts := &MountOptions{}
-	for key, value := range req.VolumeContext {
-		if key == "server" {
-			opts.Server = value
-		} else if key == "path" {
-			opts.Path = value
-		} else if key == "vers" {
-			opts.Vers = value
-		} else if key == "mode" {
-			opts.Mode = value
-		} else if key == "options" {
-			opts.Options = value
-		} else if key == "modeType" {
-			opts.ModeType = value
-		}
+type NfsOpts struct {
+	Server   string
+	Path     string
+	Vers     string
+	Mode     string
+	ModeType string
+	Options  string
+}
+
+func (opts *NfsOpts) parsNfsOpts() error {
+	opts.versNormalization()
+	// parse path
+	if opts.Path == "" {
+		opts.Path = opts.getDefaultMountPath()
+	}
+	// remove / if path end with /;
+	for opts.Path != "/" && strings.HasSuffix(opts.Path, "/") {
+		opts.Path = opts.Path[0 : len(opts.Path)-1]
+	}
+	if !strings.HasPrefix(opts.Path, "/") {
+		return errors.New("the path format is illegal")
 	}
 
-	// version/options settings in mountOptions field will overwrite the options
-	if req.VolumeCapability != nil && req.VolumeCapability.GetMount() != nil {
-		mntOptions := req.VolumeCapability.GetMount().MountFlags
-		vers, options := parseMountOptionsField(mntOptions)
-		if vers != "" {
-			if opts.Vers != "" {
-				log.Warnf("nas, Vers(%s) (in volumeAttributes) is ignored as Vers(%s) also configured in mountOptions", opts.Vers, vers)
-			}
-			opts.Vers = vers
-		}
-		if options != "" {
-			if opts.Options != "" {
-				log.Warnf("nas, Options(%s) (in volumeAttributes) is ignored as Options(%s) also configured in mountOptions", opts.Options, options)
-			}
-			opts.Options = options
-		}
+	// parse options, config defaults for nas based on vers
+	if opts.Options == "" {
+		opts.Options = opts.getDefaultMountOptions()
+	} else if strings.ToLower(opts.Options) == "none" {
+		opts.Options = ""
 	}
 
-	// check parameters
-	if mountPath == "" {
-		return nil, errors.New("mountPath is empty")
+	if opts.Path == "/" && opts.Mode != "" {
+		return errors.New("nas: root directory cannot set mode: " + opts.Mode)
 	}
-	if opts.Server == "" {
-		return nil, errors.New("host is empty, should input nas domain")
-	}
-	// check network connection
-	if !utils.ServerReachable(opts.Server, nasPortNumber, dialTimeout) {
-		log.Errorf("nas, cannot connect to nas host: %s", opts.Server)
-		return nil, errors.New("nas, cannot connect to nas host: " + opts.Server)
-	}
+	return nil
+}
 
-	// parse nfs version
+func (opts *NfsOpts) versNormalization() {
 	if opts.Vers == "" {
 		opts.Vers = "3"
 	}
@@ -85,42 +75,26 @@ func parseMountOptions(req *csi.NodePublishVolumeRequest) (options *MountOptions
 	} else if opts.Vers == "4" {
 		opts.Vers = "4.0"
 	}
-	nfsV4 := false
-	if strings.HasPrefix(opts.Vers, "4") {
-		nfsV4 = true
-	}
+}
 
-	// parse path
-	if opts.Path == "" {
-		if nfsV4 {
-			opts.Path = defaultV4Path
-		} else {
-			opts.Path = defaultV3Path
-		}
-	}
-	// remove / if path end with /;
-	if opts.Path != "/" && strings.HasSuffix(opts.Path, "/") {
-		opts.Path = opts.Path[0 : len(opts.Path)-1]
-	}
+func (opts *NfsOpts) nfsV4() bool {
+	return strings.HasPrefix(opts.Vers, "4")
+}
 
-	if opts.Path == "/" && opts.Mode != "" {
-		return nil, errors.New("nas: root directory cannot set mode: " + opts.Mode)
+func (opts *NfsOpts) getDefaultMountPath() string {
+	if opts.nfsV4() {
+		return defaultV4Path
+	} else {
+		return defaultV3Path
 	}
-	if !strings.HasPrefix(opts.Path, "/") {
-		return nil, errors.New("the path format is illegal")
-	}
+}
 
-	// parse options, config defaults for aliyun nas
-	if opts.Options == "" {
-		if nfsV4 {
-			opts.Options = defaultV4Opts
-		} else {
-			opts.Options = defaultV3Opts
-		}
-	} else if strings.ToLower(opts.Options) == "none" {
-		opts.Options = ""
+func (opts *NfsOpts) getDefaultMountOptions() string {
+	if opts.nfsV4() {
+		return defaultV4Opts
+	} else {
+		return defaultV3Opts
 	}
-	return opts, nil
 }
 
 func parseMountOptionsField(mntOptions []string) (vers string, opts string) {
@@ -128,7 +102,7 @@ func parseMountOptionsField(mntOptions []string) (vers string, opts string) {
 		mntOptionsStr := strings.Join(mntOptions, ",")
 		// mntOptions should re-split, as some like ["a,b,c", "d"]
 		mntOptionsList := strings.Split(mntOptionsStr, ",")
-		tmpOptionsList := []string{}
+		var tmpOptionsList []string
 
 		if strings.Contains(mntOptionsStr, "vers=3.0") {
 			for _, tmpOptions := range mntOptionsList {
@@ -165,6 +139,108 @@ func parseMountOptionsField(mntOptions []string) (vers string, opts string) {
 	return
 }
 
+func newPublishOptions(req *csi.NodePublishVolumeRequest) *PublishOptions {
+	opts := &PublishOptions{}
+	opts.NodePublishPath = req.GetTargetPath()
+	for key, value := range req.VolumeContext {
+		if key == "server" {
+			opts.Server = value
+		} else if key == "path" {
+			opts.Path = value
+		} else if key == "vers" {
+			opts.Vers = value
+		} else if key == "mode" {
+			opts.Mode = value
+		} else if key == "options" {
+			opts.Options = value
+		} else if key == "modeType" {
+			opts.ModeType = value
+		}
+	}
+	return opts
+}
+
+func newSubpathVolumeContext(opts *VolumeCreateSubpathOptions, pvName string) map[string]string {
+	ctx := make(map[string]string)
+	ctx["volumeAs"] = opts.VolumeAs
+	ctx["server"] = opts.Server
+	ctx["path"] = filepath.Join(opts.Path, pvName)
+	ctx["mode"] = opts.Mode
+	ctx["modeType"] = opts.ModeType
+	ctx["options"] = opts.Options
+	return ctx
+}
+
+func parsePublishOptions(req *csi.NodePublishVolumeRequest) (*PublishOptions, error) {
+	opts := newPublishOptions(req)
+
+	if opts.NodePublishPath == "" {
+		return nil, errors.New("mountPath is empty")
+	}
+
+	if err := opts.parsNfsOpts(); err != nil {
+		return nil, err
+	}
+
+	// version/options settings in mountOptions field will overwrite the options
+	if req.VolumeCapability != nil && req.VolumeCapability.GetMount() != nil {
+		mntOptions := req.VolumeCapability.GetMount().MountFlags
+		vers, options := parseMountOptionsField(mntOptions)
+		if vers != "" {
+			if opts.Vers != "" {
+				log.Warnf("nas, Vers(%s) (in volumeAttributes) is ignored as Vers(%s) also configured in mountOptions", opts.Vers, vers)
+			}
+			opts.Vers = vers
+		}
+		if options != "" {
+			if opts.Options != "" {
+				log.Warnf("nas, Options(%s) (in volumeAttributes) is ignored as Options(%s) also configured in mountOptions", opts.Options, options)
+			}
+			opts.Options = options
+		}
+	}
+
+	if opts.Server == "" {
+		return nil, errors.New("host is empty, should input nas domain")
+	}
+	if !utils.ServerReachable(opts.Server, nasPortNumber, dialTimeout) {
+		log.Errorf("nas, cannot connect to nas host: %s", opts.Server)
+		return nil, errors.New("nas, cannot connect to nas host: " + opts.Server)
+	}
+
+	return opts, nil
+}
+
+func newVolumeCreateSubpathOptions(param map[string]string) *VolumeCreateSubpathOptions {
+	opts := &VolumeCreateSubpathOptions{}
+	opts.VolumeAs = subpathLiteral
+	opts.Server = param["server"]
+	opts.Path = param["path"]
+	opts.Vers = param["vers"]
+	opts.Options = param["options"]
+	opts.Mode = param["mode"]
+	opts.ModeType = param["modeType"]
+
+	return opts
+}
+
+func parseVolumeCreateSubpathOptions(req *csi.CreateVolumeRequest) (*VolumeCreateSubpathOptions, error) {
+	opts := newVolumeCreateSubpathOptions(req.GetParameters())
+	if opts.Server == "" {
+		return nil, fmt.Errorf("nas, fatel error, server is missing on volume as subpath")
+	}
+
+	if err := opts.parsNfsOpts(); err != nil {
+		return nil, err
+	}
+
+	if opts.ModeType == "" {
+		opts.ModeType = "non-recursive"
+	}
+
+	return opts, nil
+}
+
 // optimizeNfsSetting config tcp_slot_table_entries to 128 to improve NFS client performance
 func optimizeNasSetting() {
 	updateNasConfig := false
@@ -193,20 +269,21 @@ func optimizeNasSetting() {
 	}
 }
 
-func mountNasVolume(opts *MountOptions, volumeId string) error {
-	if !utils.FileExisted(opts.MountPath) {
-		utils.CreateDir(opts.MountPath)
+func mountNasVolume(opts *PublishOptions, volumeId string) error {
+	var versStr string
+	if opts.Options == "" {
+		versStr = opts.Vers
+	} else {
+		versStr = fmt.Sprintf("%s,%s", opts.Vers, opts.Options)
 	}
-	mntCmd := fmt.Sprintf("mount -t nfs -o vers=%s %s:%s %s", opts.Vers, opts.Server, opts.Path, opts.MountPath)
-	if opts.Options != "" {
-		mntCmd = fmt.Sprintf("mount -t nfs -o vers=%s,%s %s:%s %s", opts.Vers, opts.Options, opts.Server, opts.Path, opts.MountPath)
-	}
+
+	mntCmd := fmt.Sprintf("mount -t nfs -o vers=%s %s:%s %s", versStr, opts.Server, opts.Path, opts.NodePublishPath)
 	_, err := utils.RunCommand(mntCmd)
 	if err != nil && opts.Path != "/" {
 		if strings.Contains(err.Error(), "reason given by server: No such file or directory") ||
 			strings.Contains(err.Error(), "access denied by server while mounting") {
-			if err := createNasSubDir(opts, volumeId); err != nil {
-				log.Errorf("nas, create subPath error: %s", err.Error())
+			if err := opts.createNasSubDir(volumeId); err != nil {
+				log.Errorf("nas, create subpath error: %s", err.Error())
 				return err
 			}
 			if _, err := utils.RunCommand(mntCmd); err != nil {
@@ -223,66 +300,54 @@ func mountNasVolume(opts *MountOptions, volumeId string) error {
 	return nil
 }
 
-func createNasSubDir(opts *MountOptions, volumeId string) error {
+func (opts *NfsOpts) createNasSubDir(volumeDirName string) error {
 	// create local mount path
-	nasTmpPath := filepath.Join(nasTempMountPath, volumeId)
-	if err := utils.CreateDir(nasTmpPath); err != nil {
+	nasLocalTmpPath := filepath.Join(nasTempMountPath, volumeDirName)
+	if err := utils.CreateDir(nasLocalTmpPath, MountPointMode); err != nil {
 		log.Infof("nas, create temp Directory err: " + err.Error())
 		return err
 	}
-	if utils.Mounted(nasTmpPath) {
-		if err := utils.Unmount(nasTmpPath); err != nil {
-			log.Errorf("nas, failed to unmount path %s:", nasTmpPath, err)
+	// umount the nasLocalTmpPath if it has been mounted
+	if utils.Mounted(nasLocalTmpPath) {
+		if err := utils.Unmount(nasLocalTmpPath); err != nil {
+			log.Errorf("nas, failed to unmount path %s: %s", nasLocalTmpPath, err)
 		}
 	}
-
-	// mount local path to remote nfs server
-	usePath := opts.Path
-	mntCmd := fmt.Sprintf("mount -t nfs -o vers=%s %s:%s %s", opts.Vers, opts.Server, "/", nasTmpPath)
-	_, err := utils.RunCommand(mntCmd)
-	if err != nil {
-		if strings.Contains(err.Error(), "reason given by server: No such file or directory") ||
-			strings.Contains(err.Error(), "access denied by server while mounting") {
-			if strings.HasPrefix(opts.Path, defaultV3Path+"/") {
-				usePath = strings.TrimPrefix(usePath, defaultV3Path)
-				mntCmd = fmt.Sprintf("mount -t nfs -o vers=%s %s:%s %s", opts.Vers, opts.Server, defaultV3Path, nasTmpPath)
-				_, err := utils.RunCommand(mntCmd)
-				if err != nil {
-					log.Errorf("nas, mount to temp directory %s fail: %s ", usePath, err.Error())
-					return err
-				}
-			} else {
-				log.Errorf("nas, maybe use version 3, but path not start with %s: %s", defaultV3Path, err.Error())
-				return err
-			}
-		} else {
-			log.Errorf("nas, Mount to temp directory fail: %s" + err.Error())
-			return err
-		}
+	// mount nasLocalTmpPath to remote nfs server
+	//usePath := opts.Path
+	mntCmd := fmt.Sprintf("mount -t nfs -o vers=%s %s:%s %s", opts.Vers, opts.Server, opts.getDefaultMountPath(), nasLocalTmpPath)
+	if _, err := utils.RunCommand(mntCmd); err != nil {
+		log.Errorf("nas, failed mount to temp directory fail: %s" + err.Error())
+		return err
 	}
-
 	// create sub directory, which makes the folder on the remote nfs server at the same time
-	subPath := path.Join(nasTmpPath, usePath)
-	if err := utils.CreateDir(subPath); err != nil {
+	fullPath := filepath.Join(nasTempMountPath, strings.TrimPrefix(opts.Path, opts.getDefaultMountPath()))
+	if err := utils.CreateDir(fullPath, MountPointMode); err != nil {
 		log.Errorf("nas, create sub directory err: " + err.Error())
 		return err
 	}
 
+	if err := os.Chmod(fullPath, MountPointMode); err != nil {
+		log.Errorf("nas, failed to change the mode of %s to %d", fullPath, MountPointMode)
+	}
+
 	// unmount the local path after the remote folder is created
-	utils.Unmount(nasTmpPath)
+	if err := utils.Unmount(nasLocalTmpPath); err != nil {
+		log.Errorf("nas, failed to unmount path %s: %s", fullPath, err)
+	}
 	log.Infof("nas, create sub directory successful: %s", opts.Path)
 	return nil
 }
 
-func changeNasMode(opts *MountOptions) {
+func changeNasMode(opts *PublishOptions) {
 	if opts.Mode != "" && opts.Path != "/" {
 		wg1 := sync.WaitGroup{}
 		wg1.Add(1)
 
 		go func(*sync.WaitGroup) {
-			cmd := fmt.Sprintf("chmod %s %s", opts.Mode, opts.MountPath)
+			cmd := fmt.Sprintf("chmod %s %s", opts.Mode, opts.NodePublishPath)
 			if opts.ModeType == "recursive" {
-				cmd = fmt.Sprintf("chmod -R %s %s", opts.Mode, opts.MountPath)
+				cmd = fmt.Sprintf("chmod -R %s %s", opts.Mode, opts.NodePublishPath)
 			}
 			if _, err := utils.RunCommand(cmd); err != nil {
 				log.Errorf("nas, chmod cmd fail: %s %s", cmd, err)
@@ -294,7 +359,7 @@ func changeNasMode(opts *MountOptions) {
 
 		timeout := 1 // 1s
 		if utils.WaitTimeout(&wg1, timeout) {
-			log.Infof("nas, chmod runs more than %ds, continues to run in background: %s", timeout, opts.MountPath)
+			log.Infof("nas, chmod runs more than %ds, continues to run in background: %s", timeout, opts.NodePublishPath)
 		}
 	}
 }
@@ -320,4 +385,33 @@ func testIfNoOtherNasUser(nfsServer, mountPoint string) bool {
 		return false
 	}
 	return true
+}
+
+func getNasPathFromPvPath(pvPath string) (nasPath string) {
+	tmpPath := pvPath
+	if strings.HasSuffix(pvPath, "/") {
+		tmpPath = pvPath[0 : len(pvPath)-1]
+	}
+	pos := strings.LastIndex(tmpPath, "/")
+	nasPath = pvPath[0:pos]
+	if nasPath == "" {
+		nasPath = "/"
+	}
+	return
+}
+
+func getDeleteVolumeSubpathOptions(pv *core.PersistentVolume, sc *storage.StorageClass) *DeleteVolumeSubpathOptions {
+	opts := &DeleteVolumeSubpathOptions{}
+	opts.Server = pv.Spec.CSI.VolumeAttributes["server"]
+	opts.Path = pv.Spec.CSI.VolumeAttributes["path"]
+	opts.Vers = pv.Spec.CSI.VolumeAttributes["vers"]
+	if _, ok := sc.Parameters["archieveOnDelete"]; ok {
+		archiveBool, err := strconv.ParseBool("archiveOnDelete")
+		if err != nil {
+			log.Errorf("nas, failed to get archieveOnDelete value, setting to true by default")
+			opts.ArchiveOnDelete = true
+		}
+		opts.ArchiveOnDelete = archiveBool
+	}
+	return opts
 }
