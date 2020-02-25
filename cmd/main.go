@@ -8,13 +8,10 @@ import (
 	"github.com/capitalonline/cds-csi-driver/pkg/common"
 	"github.com/capitalonline/cds-csi-driver/pkg/driver/nas"
 	"github.com/capitalonline/cds-csi-driver/pkg/driver/utils"
-
 	log "github.com/sirupsen/logrus"
 )
 
 const (
-	// TypePluginNAS NAS type plugin
-	DriverNasType     = "nas"
 	DriverNasTypeName = "nas.csi.cds.net"
 )
 
@@ -49,12 +46,12 @@ func main() {
 	}
 	common.SetLogAttribute(logType, driverName)
 
+	log.Infof("CSI Driver Version: %+v", common.GetVersion())
 	if nodeID == "" {
 		nodeID = utils.GetNodeId()
 	}
-
-	log.Infof("CSI Driver Name: %s, %s", driverName, endpoint)
-	log.Infof("CSI Driver Version: %+v", common.GetVersion())
+	log.Infof("CSI Driver Name: %s", driverName)
+	log.Infof("CSI endpoint: %s", endpoint)
 
 	if err := os.MkdirAll(path.Join(rootDir, "plugins", driverName, "controller"), os.FileMode(0755)); err != nil {
 		log.Errorf("failed to create persistent storage for controller: %v", err)
@@ -66,11 +63,11 @@ func main() {
 	}
 
 	switch driverName {
-	case DriverNasType:
+	case DriverNasTypeName:
 		nasDriver := nas.NewDriver(DriverNasTypeName, nodeID, endpoint)
 		nasDriver.Run()
 	default:
-		log.Fatal("unsupported driver type: %s", driverName)
+		log.Fatalf("unsupported driver type: %s", driverName)
 	}
 
 }

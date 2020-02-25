@@ -20,7 +20,8 @@ const (
 // GetNodeId returns the id of the current node
 func GetNodeId() string {
 	return func(path string) string {
-		panic("implement me")
+		log.Info("implement me")
+		return ""
 	}(NodeMetaDataFile)
 }
 
@@ -72,7 +73,7 @@ func CreateDir(target string, mode int) error {
 	return nil
 }
 
-// FileExisted checks if a file exists
+// FileExisted checks if a file  or directory exists
 func FileExisted(filename string) bool {
 	_, err := os.Stat(filename)
 	if err == nil {
@@ -80,8 +81,9 @@ func FileExisted(filename string) bool {
 	}
 	if os.IsNotExist(err) {
 		return false
+	} else {
+		return true
 	}
-	return true
 }
 
 // IsDir checks if the target path is directory

@@ -95,8 +95,8 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 			return nil, fmt.Errorf("CreateVolume:: nas, unable to create directory: %s", mountPoint)
 		}
 		// make dir on the nas server
-		if err != opts.createNasSubDir(pvName) {
-			return nil, fmt.Errorf("CreateVolume:: nas, failed to create subpath on the nas server: %s", err)
+		if err := opts.createNasSubDir(MountPointRootPathForCreatingVolume, pvName); err != nil {
+			return nil, fmt.Errorf("CreateVolume:: nas, failed to create subpath on the nas server: %s", err.Error())
 		}
 		// assemble the response
 		volumeContext := newSubpathVolumeContext(opts, pvName)
@@ -171,6 +171,7 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 		if utils.IsDir(deletePath) {
 			if opts.ArchiveOnDelete {
 				archivePath := filepath.Join(mountPoint, "archived-"+filepath.Base(pvPath)+time.Now().Format(".2006-01-02-15:04:05"))
+				log.Infof("DeleteVolume:: nas, archiving %s to %s", deletePath, archivePath)
 				if err := os.Rename(deletePath, archivePath); err != nil {
 					log.Errorf("DeleteVolume:: nas, failed to archive volume %s from path %s to %s with error: %s",
 						req.VolumeId, deletePath, archivePath, err.Error())
@@ -178,13 +179,14 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 						req.VolumeId, deletePath, archivePath, err.Error())
 				}
 			} else {
+				log.Infof("DeleteVolume:: nas, deleting %s", deletePath)
 				if err := os.RemoveAll(deletePath); err != nil {
 					return nil, fmt.Errorf("DeleteVolume:: nas, failed to remove path %s: %s", deletePath, err)
 				}
 			}
+		} else {
+			log.Infof("DeleteVolume:: nas, path %s doesn't exist, skipping", deletePath)
 		}
-
-		log.Infof("DeleteVolume:: nas, path %s doesn't exist, skipping")
 		processedPvc.Delete(req.VolumeId)
 		return &csi.DeleteVolumeResponse{}, nil
 	} else if volumeAs == systemLiteral {

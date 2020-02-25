@@ -68,7 +68,7 @@ func (opts *NfsOpts) parsNfsOpts() error {
 
 func (opts *NfsOpts) versNormalization() {
 	if opts.Vers == "" {
-		opts.Vers = "3"
+		opts.Vers = "4.0"
 	}
 	if opts.Vers == "3.0" {
 		opts.Vers = "3"
@@ -168,6 +168,7 @@ func newSubpathVolumeContext(opts *VolumeCreateSubpathOptions, pvName string) ma
 	ctx["mode"] = opts.Mode
 	ctx["modeType"] = opts.ModeType
 	ctx["options"] = opts.Options
+	ctx["vers"] = opts.Vers
 	return ctx
 }
 
@@ -280,14 +281,14 @@ func mountNasVolume(opts *PublishOptions, volumeId string) error {
 	mntCmd := fmt.Sprintf("mount -t nfs -o vers=%s %s:%s %s", versStr, opts.Server, opts.Path, opts.NodePublishPath)
 	_, err := utils.RunCommand(mntCmd)
 	if err != nil && opts.Path != "/" {
-		if strings.Contains(err.Error(), "reason given by server: No such file or directory") ||
+		if strings.Contains(err.Error(), "No such file or directory") ||
 			strings.Contains(err.Error(), "access denied by server while mounting") {
-			if err := opts.createNasSubDir(volumeId); err != nil {
+			if err := opts.createNasSubDir(nasTempMountPath, volumeId); err != nil {
 				log.Errorf("nas, create subpath error: %s", err.Error())
 				return err
 			}
 			if _, err := utils.RunCommand(mntCmd); err != nil {
-				log.Errorf("nas, mount nfs sub directory fail: %s", err.Error())
+				log.Errorf("nas, mount nfs fail after creating the sub directory: %s", err.Error())
 				return err
 			}
 		} else {
@@ -300,9 +301,10 @@ func mountNasVolume(opts *PublishOptions, volumeId string) error {
 	return nil
 }
 
-func (opts *NfsOpts) createNasSubDir(volumeDirName string) error {
+func (opts *NfsOpts) createNasSubDir(mountRoot, volumeDirName string) error {
 	// create local mount path
-	nasLocalTmpPath := filepath.Join(nasTempMountPath, volumeDirName)
+	log.Infof("nas, creating sub folder on nfs server: %s", volumeDirName)
+	nasLocalTmpPath := filepath.Join(mountRoot, volumeDirName)
 	if err := utils.CreateDir(nasLocalTmpPath, MountPointMode); err != nil {
 		log.Infof("nas, create temp Directory err: " + err.Error())
 		return err
@@ -314,14 +316,15 @@ func (opts *NfsOpts) createNasSubDir(volumeDirName string) error {
 		}
 	}
 	// mount nasLocalTmpPath to remote nfs server
-	//usePath := opts.Path
-	mntCmd := fmt.Sprintf("mount -t nfs -o vers=%s %s:%s %s", opts.Vers, opts.Server, opts.getDefaultMountPath(), nasLocalTmpPath)
+	mntCmd := fmt.Sprintf("mount -t nfs -o vers=%s %s:%s %s", opts.Vers, opts.Server, opts.getDefaultMountPath(), mountRoot)
+	log.Infof("nas, mounting local temp: %s", mntCmd)
 	if _, err := utils.RunCommand(mntCmd); err != nil {
-		log.Errorf("nas, failed mount to temp directory fail: %s" + err.Error())
+		log.Errorf("nas, failed to mount to temp directory to nfs mountRoot: %s", err.Error())
 		return err
 	}
 	// create sub directory, which makes the folder on the remote nfs server at the same time
-	fullPath := filepath.Join(nasTempMountPath, strings.TrimPrefix(opts.Path, opts.getDefaultMountPath()))
+	fullPath := filepath.Join(mountRoot, strings.TrimPrefix(opts.Path, opts.getDefaultMountPath()), volumeDirName)
+	log.Infof("nas, create sub directory: %s", fullPath)
 	if err := utils.CreateDir(fullPath, MountPointMode); err != nil {
 		log.Errorf("nas, create sub directory err: " + err.Error())
 		return err
@@ -364,29 +367,6 @@ func changeNasMode(opts *PublishOptions) {
 	}
 }
 
-func parseServerHost(mountPoint string) string {
-	getNasServerPath := fmt.Sprintf("findmnt %s | grep %s | grep -v grep | awk '{print $2}'", mountPoint, mountPoint)
-	serverAndPath, _ := utils.RunCommand(getNasServerPath)
-	serverAndPath = strings.TrimSpace(serverAndPath)
-
-	serverInfoPartList := strings.Split(serverAndPath, ":")
-	if len(serverInfoPartList) != 2 {
-		log.Warnf("nas, failed to parse server host from mount point: %s", mountPoint)
-		return ""
-	}
-	return serverInfoPartList[0]
-}
-
-func testIfNoOtherNasUser(nfsServer, mountPoint string) bool {
-	checkCmd := fmt.Sprintf("mount | grep -v %s | grep %s | grep -v grep | wc -l", mountPoint, nfsServer)
-	if checkOut, err := utils.RunCommand(checkCmd); err != nil {
-		return false
-	} else if strings.TrimSpace(checkOut) != "0" {
-		return false
-	}
-	return true
-}
-
 func getNasPathFromPvPath(pvPath string) (nasPath string) {
 	tmpPath := pvPath
 	if strings.HasSuffix(pvPath, "/") {
@@ -405,13 +385,14 @@ func getDeleteVolumeSubpathOptions(pv *core.PersistentVolume, sc *storage.Storag
 	opts.Server = pv.Spec.CSI.VolumeAttributes["server"]
 	opts.Path = pv.Spec.CSI.VolumeAttributes["path"]
 	opts.Vers = pv.Spec.CSI.VolumeAttributes["vers"]
-	if _, ok := sc.Parameters["archieveOnDelete"]; ok {
-		archiveBool, err := strconv.ParseBool("archiveOnDelete")
+	if archiveOnDelete, ok := sc.Parameters["archiveOnDelete"]; ok {
+		archiveBool, err := strconv.ParseBool(archiveOnDelete)
 		if err != nil {
-			log.Errorf("nas, failed to get archieveOnDelete value, setting to true by default")
+			log.Errorf("nas, failed to get archieveOnDelete value, setting to true by default: %s", err.Error())
 			opts.ArchiveOnDelete = true
+		} else {
+			opts.ArchiveOnDelete = archiveBool
 		}
-		opts.ArchiveOnDelete = archiveBool
 	}
 	return opts
 }

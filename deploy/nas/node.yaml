@@ -28,9 +28,10 @@ spec:
           image: registry-bj.capitalonline.net/cck/cds-csi-driver:v0.1
           imagePullPolicy: "Always"
           args:
-            - "--endpoint=${CSI_ENDPOINT}"
+            - "--endpoint=$(CSI_ENDPOINT)"
             - "--v=5"
             - "--driver=nas.csi.cds.net"
+            - "--nodeid=dummy"
           env:
             - name: CSI_ENDPOINT
               value: unix://var/lib/kubelet/plugins/nas.csi.cds.net/csi.sock
@@ -51,16 +52,14 @@ spec:
                 command: ["/bin/sh", "-c", "rm -rf /registration/nas.csi.cds.net /registration/nas.csi.cds.net-reg.sock"]
           args:
             - "--v=5"
-            - "--csi-address=${ADDRESS}"
-            - "--kubelet-registration-path=${DRIVER_REG_SOCK_PATH}"
+            - "--csi-address=$(ADDRESS)"
+            - "--kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)"
           env:
             - name: ADDRESS
-              value: /csi/csi.sock
+              value: /var/lib/kubelet/plugins/nas.csi.cds.net/csi.sock
             - name: DRIVER_REG_SOCK_PATH
               value: /var/lib/kubelet/plugins/nas.csi.cds.net/csi.sock
           volumeMounts:
-            - name: socket-dir
-              mountPath: /csi
             - name: kubelet-dir
               mountPath: /var/lib/kubelet/
             - name: registration-dir
@@ -68,16 +67,14 @@ spec:
         - name: liveness-probe
           image: registry-bj.capitalonline.net/cck/csi-livenessprobe:v2.0.0
           args:
-            - "--csi-address=/csi/csi.sock"
+            - "--csi-address=/var/lib/kubelet/plugins/nas.csi.cds.net/csi.sock"
           volumeMounts:
-            - name: socket-dir
-              mountPath: /csi
+            - name: kubelet-dir
+              mountPath: /var/lib/kubelet/
       volumes:
-        - name: socket-dir
-          emptyDir: {}
         - name: kubelet-dir
           hostPath:
-            path: /var/lib/kubelet/
+            path: /var/lib/kubelet
             type: Directory
         - name: registration-dir
           hostPath:

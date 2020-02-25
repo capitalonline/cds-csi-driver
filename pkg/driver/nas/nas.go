@@ -1,9 +1,8 @@
 package nas
 
 import (
-	"github.com/kubernetes-csi/drivers/pkg/csi-common"
-
 	"github.com/capitalonline/cds-csi-driver/pkg/common"
+	"github.com/kubernetes-csi/drivers/pkg/csi-common"
 )
 
 type NasDriver struct {
@@ -17,7 +16,6 @@ type NasDriver struct {
 func NewDriver(driverName, nodeId, endpoint string) *NasDriver {
 	d := &NasDriver{}
 	d.endpoint = endpoint
-
 	d.csiDriver = csicommon.NewCSIDriver(driverName, common.GetVersion().Version, nodeId)
 	d.idServer = NewIdentityServer(d)
 	d.nodeServer = NewNodeServer(d)

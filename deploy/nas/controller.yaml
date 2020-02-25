@@ -1,10 +1,26 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: csi-provisioner
+  namespace: kube-system
+  labels:
+    name: csi-provisioner
+spec:
+  selector:
+    type: csi-provisioner
+  ports:
+    - name: healthz
+      port: 9808
+
+---
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: nas-csi-cds-controller
   namespace: kube-system
 spec:
-  replicas: 2
+  replicas: 1
+  serviceName: csi-provisioner
   selector:
     matchLabels:
       app: nas-csi-cds-controller
@@ -12,6 +28,7 @@ spec:
     metadata:
       labels:
         app: nas-csi-cds-controller
+        type: csi-provisioner
     spec:
       nodeSelector:
         beta.kubernetes.io/os: linux
@@ -25,12 +42,15 @@ spec:
           image: registry-bj.capitalonline.net/cck/cds-csi-driver:v0.1
           imagePullPolicy: "Always"
           args:
-            - "--endpoint=${CSI_ENDPOINT}"
+            - "--endpoint=$(CSI_ENDPOINT)"
             - "--v=5"
             - "--driver=nas.csi.cds.net"
+            - "--nodeid=dummy"
           env:
             - name: CSI_ENDPOINT
               value: unix://socketDir/csi.sock
+          securityContext:
+            privileged: true
           volumeMounts:
             - name: host-log
               mountPath: /var/log/
@@ -59,11 +79,8 @@ spec:
         - name: csi-provisioner
           image: registry-bj.capitalonline.net/cck/csi-provisioner:v1.5.0
           args:
-            - "--csi-address=${ADDRESS}"
+            - "--csi-address=$(ADDRESS)"
             - "--v=5"
-            - "--feature-gates=Topology=true"
-            - "--enable-leader-election"
-            - "--leader-election-type=leases"
           env:
             - name: ADDRESS
               value: /socketDir/csi.sock
@@ -86,8 +103,5 @@ spec:
         - name: etc
           hostPath:
             path: /etc
-  strategy:
-    type: "RollingUpdate"
-    rollingUpdate:
-      maxUnavailable: 0
-      maxSurge: 1
+  updateStrategy:
+    type: RollingUpdate

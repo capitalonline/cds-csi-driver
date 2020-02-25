@@ -3,7 +3,6 @@ package nas
 import (
 	"context"
 	"fmt"
-
 	"github.com/capitalonline/cds-csi-driver/pkg/driver/utils"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/kubernetes-csi/drivers/pkg/csi-common"
@@ -42,18 +41,16 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 
 	optimizeNasSetting()
 
-	// create the directory on the node
-	if !utils.FileExisted(opts.NodePublishPath) {
-		if err = utils.CreateDir(opts.NodePublishPath, MountPointMode); err != nil {
-			log.Errorf("NodePublishVolume:: nas, unable to create directory: %s", opts.NodePublishPath)
-			return nil, fmt.Errorf("NodePublishVolume:: nas, unable to create directory: %s", opts.NodePublishPath)
-		}
+	// try to create the mount point, in case it is not created
+	if err = utils.CreateDir(opts.NodePublishPath, MountPointMode); err != nil {
+		log.Errorf("NodePublishVolume:: nas, unable to create directory: %s", opts.NodePublishPath)
+		return nil, fmt.Errorf("NodePublishVolume:: nas, unable to create directory: %s", opts.NodePublishPath)
 	}
 
 	// mount the nas server path to the node published directory
 	if err := mountNasVolume(opts, req.VolumeId); err != nil {
 		log.Errorf("NodePublishVolume:: nas, mount nfs error: %s", err.Error())
-		return nil, fmt.Errorf("NodePublishVolume:: nas, mount nfs error: %s" + err.Error())
+		return nil, fmt.Errorf("NodePublishVolume:: nas, mount nfs error: %s", err.Error())
 	}
 
 	// changes the mode of the published directory
@@ -81,23 +78,8 @@ func (n *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpub
 
 	// unmount the volume, use force umount on network not reachable or no other pod used
 	unmoutCmd := fmt.Sprintf("umount %s", mountPoint)
-	if nfsServer := parseServerHost(mountPoint); nfsServer != "" {
-		networkUnReachable := false
-		noOtherPodUsed := false
-		if !utils.ServerReachable(nfsServer, nasPortNumber, dialTimeout) {
-			log.Warnf("NodeUnpublishVolume:: nas, connecting to server: %s failed, unmount to %s", nfsServer, mountPoint)
-			networkUnReachable = true
-		}
-		if testIfNoOtherNasUser(nfsServer, mountPoint) {
-			log.Warnf("NodeUnpublishVolume:: nas, there are other pods using the nas server %s, %s", nfsServer, mountPoint)
-			noOtherPodUsed = true
-		}
-		if networkUnReachable || noOtherPodUsed {
-			unmoutCmd = fmt.Sprintf("umount -f %s", mountPoint)
-		}
-	}
 	if _, err := utils.RunCommand(unmoutCmd); err != nil {
-		return nil, fmt.Errorf("NodeUnpublishVolume:: nas, Umount nfs Fail: %s", err.Error())
+		return nil, fmt.Errorf("NodeUnpublishVolume:: nas, Umount nfs fail: %s", err.Error())
 	}
 
 	log.Infof("NodeUnpublishVolume:: Unmount nas Successfully on: %s", mountPoint)
