@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: nas-csi-cds-pv
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  #persistentVolumeReclaimPolicy: Delete
+  csi:
+    driver: nas.csi.cds.net
+    # volumeHandle set same value as pvname
+    volumeHandle: nas-csi-cds-pv
+    volumeAttributes:
+      server: "140.210.75.195"
+      path: "/nas-csi-cds-pv"
+      vers: "4.0"

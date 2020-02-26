@@ -1,0 +1,13 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: nas-csi-csd-sc
+parameters:
+  volumeAs: subpath
+  server: "140.210.75.195"
+  path: "/"
+  vers: "4.0"
+  options: noresvport
+  archiveOnDelete: "true"
+provisioner: nas.csi.cds.net
+reclaimPolicy: Delete

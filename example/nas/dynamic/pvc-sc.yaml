@@ -1,0 +1,11 @@
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: nas-csi-cds-pvc-sc
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: nas-csi-csd-sc
+  resources:
+    requests:
+      storage: 1Gi
