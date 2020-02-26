@@ -1,0 +1,14 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: nas-csi-cds-node
+spec:
+  template:
+    spec:
+      containers:
+        - name: csi-node-server
+          args:
+            - "--endpoint=$(CSI_ENDPOINT)"
+            - "--v=5"
+            - "--driver=nas.csi.cds.net"
+            - "--nodeid=dummy"

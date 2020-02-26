@@ -25,7 +25,7 @@ spec:
             capabilities:
               add: ["SYS_ADMIN"]
             allowPrivilegeEscalation: true
-          image: registry-bj.capitalonline.net/cck/cds-csi-driver:v0.1
+          image: registry-bj.capitalonline.net/cck/cds-csi-driver:latest
           imagePullPolicy: "Always"
           args:
             - "--endpoint=$(CSI_ENDPOINT)"

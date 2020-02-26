@@ -1,0 +1,14 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: nas-csi-cds-controller
+spec:
+  template:
+    spec:
+      containers:
+        - name: csi-controller-server
+          args:
+            - "--endpoint=$(CSI_ENDPOINT)"
+            - "--v=5"
+            - "--driver=nas.csi.cds.net"
+            - "--nodeid=dummy"
