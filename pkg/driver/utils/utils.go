@@ -115,7 +115,7 @@ func ServerReachable(host, port string, timeout time.Duration) bool {
 	address := fmt.Sprintf("%s:%s", host, port)
 	conn, err := net.DialTimeout("tcp", address, timeout)
 	if err != nil {
-		log.Errorf("server %s is not reachable")
+		log.Errorf("server %s is not reachable", address)
 		return false
 	}
 	defer conn.Close()

@@ -28,7 +28,7 @@ func SetLogAttribute(logType, driver string) {
 	}
 
 	if err := os.MkdirAll(LogfilePrefix, os.FileMode(0755)); err != nil {
-		log.Errorf("failed to create the log directory %s: ", LogfilePrefix, err.Error())
+		log.Errorf("failed to create the log directory %s: %s", LogfilePrefix, err.Error())
 	}
 	logFile := LogfilePrefix + driver + ".log"
 	f, err := os.OpenFile(logFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
