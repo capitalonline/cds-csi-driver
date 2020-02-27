@@ -1,7 +1,9 @@
 package utils
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"os"
 	"os/exec"
@@ -13,16 +15,30 @@ import (
 )
 
 const (
-	// Node metadata File
 	NodeMetaDataFile = "/host/etc/cds/node-meta"
 )
 
-// GetNodeId returns the id of the current node
-func GetNodeId() string {
-	return func(path string) string {
-		log.Info("implement me")
-		return ""
+type NodeMeta struct {
+	NodeID string `json:"node_id"`
+}
+
+// GetNodeId reads node metadata from file
+func GetNodeMetadata() *NodeMeta {
+	return func(f string) *NodeMeta {
+		b, err := ioutil.ReadFile(f)
+		if err != nil {
+			log.Fatalf("cannot find metadata file %s: %s", f, err.Error())
+		}
+		var nodeMeta NodeMeta
+		if err := json.Unmarshal(b, &nodeMeta); err != nil {
+			log.Fatalf("failed to parse metadata file %s: %s", f, err.Error())
+		}
+		return &nodeMeta
 	}(NodeMetaDataFile)
+}
+
+func (n *NodeMeta) GetNodeID() string {
+	return n.NodeID
 }
 
 // Mounted checks whether a volume is mounted

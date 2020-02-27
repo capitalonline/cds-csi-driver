@@ -4,9 +4,9 @@ VERSION=v0.1.0
 GIT_COMMIT?=$(shell git rev-parse HEAD)
 BUILD_DATE?=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 LDFLAGS?="-X ${PKG}/pkg/common.version=${VERSION} -X ${PKG}/pkg/common.gitCommit=${GIT_COMMIT} -X ${PKG}/pkg/common.buildDate=${BUILD_DATE} -s -w"
-NAS_DEPLOY_PATH=deploy/nas
+NAS_DEPLOY_PATH=./deploy/nas
 NAS_KUSTOMIZATION_PATH=${NAS_DEPLOY_PATH}/overlays/release
-NAS_KUSTOMIZATION_FILE=${KUSTOMIZATION_PATH}/kustomization.yaml
+NAS_KUSTOMIZATION_FILE=${NAS_KUSTOMIZATION_PATH}/kustomization.yaml
 .EXPORT_ALL_VARIABLES:
 
 .PHONY: build
