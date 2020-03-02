@@ -15,5 +15,5 @@ spec:
     volumeHandle: nas-csi-cds-pv
     volumeAttributes:
       server: "140.210.75.195"
-      path: "/nas-csi-cds-pv"
+      path: "/nfsshare/nas-csi-cds-pv"
       vers: "4.0"

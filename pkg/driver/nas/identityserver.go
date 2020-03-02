@@ -5,10 +5,6 @@ import (
 	"github.com/kubernetes-csi/drivers/pkg/csi-common"
 )
 
-type IdentityServer struct {
-	*csicommon.DefaultIdentityServer
-}
-
 var (
 	volumeCap = []csi.VolumeCapability_AccessMode_Mode{
 		csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER,

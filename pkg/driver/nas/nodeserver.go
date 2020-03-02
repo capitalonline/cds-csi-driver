@@ -11,15 +11,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-type NodeServer struct {
-	*csicommon.DefaultNodeServer
-}
-
-type PublishOptions struct {
-	NfsOpts
-	NodePublishPath string
-}
-
 func NewNodeServer(d *NasDriver) *NodeServer {
 	return &NodeServer{
 		DefaultNodeServer: csicommon.NewDefaultNodeServer(d.csiDriver),
@@ -27,8 +18,9 @@ func NewNodeServer(d *NasDriver) *NodeServer {
 }
 
 func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
-	log.Infof("NodePublishVolume:: starting mount nas volume %s with: %v", req.VolumeId, req)
+	log.Infof("NodePublishVolume:: starting mount nas volume with req: %+v", req)
 	var opts, err = parsePublishOptions(req)
+	log.Infof("NodePublishVolume:: parsed PublishOptions options: %+v", opts)
 	if err != nil {
 		return nil, fmt.Errorf("nas, failed to parse mount options %+v: %s", opts, err)
 	}
@@ -42,14 +34,12 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 	optimizeNasSetting()
 
 	// try to create the mount point, in case it is not created
-	if err = utils.CreateDir(opts.NodePublishPath, MountPointMode); err != nil {
-		log.Errorf("NodePublishVolume:: nas, unable to create directory: %s", opts.NodePublishPath)
+	if err = utils.CreateDir(opts.NodePublishPath, mountPointMode); err != nil {
 		return nil, fmt.Errorf("NodePublishVolume:: nas, unable to create directory: %s", opts.NodePublishPath)
 	}
 
 	// mount the nas server path to the node published directory
 	if err := mountNasVolume(opts, req.VolumeId); err != nil {
-		log.Errorf("NodePublishVolume:: nas, mount nfs error: %s", err.Error())
 		return nil, fmt.Errorf("NodePublishVolume:: nas, mount nfs error: %s", err.Error())
 	}
 
@@ -58,7 +48,6 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 
 	// check if the directory is mounted
 	if !utils.Mounted(opts.NodePublishPath) {
-		log.Errorf("NodePublishVolume:: nas, mount check failed after the mount: %s", opts.NodePublishPath)
 		return nil, fmt.Errorf("NodePublishVolume:: nas, mount check failed after the mount: %s", opts.NodePublishPath)
 	}
 
@@ -72,7 +61,7 @@ func (n *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpub
 	// skip the unmount if the path is not mounted
 	mountPoint := req.TargetPath
 	if !utils.Mounted(mountPoint) {
-		log.Infof("NodeUnpublishVolume:: nas, unmount mountpoint not found, skipping: %s", mountPoint)
+		log.Warnf("NodeUnpublishVolume:: nas, unmount mountpoint not found, skipping: %s", mountPoint)
 		return &csi.NodeUnpublishVolumeResponse{}, nil
 	}
 

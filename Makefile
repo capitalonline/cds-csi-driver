@@ -26,8 +26,8 @@ image-release:
 image:
 	docker build -t $(IMAGE):latest .
 
-.PHONY: push-release
-push-release:
+.PHONY: release
+release: image-release
 	docker push $(IMAGE):$(VERSION)
 
 .PHONY: test

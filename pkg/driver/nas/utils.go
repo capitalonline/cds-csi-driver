@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/capitalonline/cds-csi-driver/pkg/driver/utils"
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -17,40 +16,19 @@ import (
 	storage "k8s.io/api/storage/v1"
 )
 
-const (
-	sunRPCFile       = "/etc/modprobe.d/sunrpc.conf"
-	nasTempMountPath = "/mnt/cds_mnt/k8s_nas/temp"
-	defaultV3Path    = "/nfsshare"
-	defaultV4Path    = "/"
-	defaultV3Opts    = "noresvport,nolock,tcp"
-	defaultV4Opts    = "noresvport"
-	nasPortNumber    = "2049"
-	dialTimeout      = time.Duration(3) * time.Second
-	subpathLiteral   = "subpath"
-	systemLiteral    = "system"
-)
-
-type NfsOpts struct {
-	Server   string
-	Path     string
-	Vers     string
-	Mode     string
-	ModeType string
-	Options  string
-}
-
 func (opts *NfsOpts) parsNfsOpts() error {
 	opts.versNormalization()
 	// parse path
 	if opts.Path == "" {
-		opts.Path = opts.getDefaultMountPath()
+		log.Warnf("nas, path is empty, using default root %s", defaultNFSRoot)
+		opts.Path = defaultNFSRoot
 	}
 	// remove / if path end with /;
 	for opts.Path != "/" && strings.HasSuffix(opts.Path, "/") {
 		opts.Path = opts.Path[0 : len(opts.Path)-1]
 	}
-	if !strings.HasPrefix(opts.Path, "/") {
-		return errors.New("the path format is illegal")
+	if !strings.HasPrefix(opts.Path, defaultNFSRoot) {
+		return fmt.Errorf("the path format is illegal, need start with %s, given: %s", defaultNFSRoot, opts.Path)
 	}
 
 	// parse options, config defaults for nas based on vers
@@ -58,10 +36,6 @@ func (opts *NfsOpts) parsNfsOpts() error {
 		opts.Options = opts.getDefaultMountOptions()
 	} else if strings.ToLower(opts.Options) == "none" {
 		opts.Options = ""
-	}
-
-	if opts.Path == "/" && opts.Mode != "" {
-		return errors.New("nas: root directory cannot set mode: " + opts.Mode)
 	}
 	return nil
 }
@@ -79,14 +53,6 @@ func (opts *NfsOpts) versNormalization() {
 
 func (opts *NfsOpts) nfsV4() bool {
 	return strings.HasPrefix(opts.Vers, "4")
-}
-
-func (opts *NfsOpts) getDefaultMountPath() string {
-	if opts.nfsV4() {
-		return defaultV4Path
-	} else {
-		return defaultV3Path
-	}
 }
 
 func (opts *NfsOpts) getDefaultMountOptions() string {
@@ -206,7 +172,7 @@ func parsePublishOptions(req *csi.NodePublishVolumeRequest) (*PublishOptions, er
 	}
 	if !utils.ServerReachable(opts.Server, nasPortNumber, dialTimeout) {
 		log.Errorf("nas, cannot connect to nas host: %s", opts.Server)
-		return nil, errors.New("nas, cannot connect to nas host: " + opts.Server)
+		return nil, fmt.Errorf("nas, cannot connect to nas host: %s", opts.Server)
 	}
 
 	return opts, nil
@@ -283,9 +249,8 @@ func mountNasVolume(opts *PublishOptions, volumeId string) error {
 	if err != nil && opts.Path != "/" {
 		if strings.Contains(err.Error(), "No such file or directory") ||
 			strings.Contains(err.Error(), "access denied by server while mounting") {
-			if err := opts.createNasSubDir(nasTempMountPath, volumeId); err != nil {
-				log.Errorf("nas, create subpath error: %s", err.Error())
-				return err
+			if err := opts.createNasSubDir(publishVolumeRoot, volumeId); err != nil {
+				return fmt.Errorf("nas, create subpath error: %s", err.Error())
 			}
 			if _, err := utils.RunCommand(mntCmd); err != nil {
 				log.Errorf("nas, mount nfs fail after creating the sub directory: %s", err.Error())
@@ -301,41 +266,45 @@ func mountNasVolume(opts *PublishOptions, volumeId string) error {
 	return nil
 }
 
-func (opts *NfsOpts) createNasSubDir(mountRoot, volumeDirName string) error {
-	// create local mount path
-	log.Infof("nas, creating sub folder on nfs server: %s", volumeDirName)
-	nasLocalTmpPath := filepath.Join(mountRoot, volumeDirName)
-	if err := utils.CreateDir(nasLocalTmpPath, MountPointMode); err != nil {
-		log.Infof("nas, create temp Directory err: " + err.Error())
-		return err
-	}
-	// umount the nasLocalTmpPath if it has been mounted
-	if utils.Mounted(nasLocalTmpPath) {
-		if err := utils.Unmount(nasLocalTmpPath); err != nil {
-			log.Errorf("nas, failed to unmount path %s: %s", nasLocalTmpPath, err)
+func (opts *NfsOpts) createNasSubDir(mountRoot, pvName string) error {
+	log.Infof("nas, running creatNasSubDir: root: %s, path: %s, pvName:%s", mountRoot, opts.Path, pvName)
+	localMountPath := filepath.Join(mountRoot, pvName)
+	fullPath := filepath.Join(localMountPath, strings.TrimPrefix(opts.Path, defaultNFSRoot), pvName)
+	// unmount the volume if it has been mounted
+	log.Infof("nas, unmount fullpath if is mounted: %s", localMountPath)
+	if utils.Mounted(localMountPath) {
+		if err := utils.Unmount(localMountPath); err != nil {
+			log.Errorf("nas, failed to unmount already mounted path %s: %s", localMountPath, err)
 		}
 	}
-	// mount nasLocalTmpPath to remote nfs server
-	mntCmd := fmt.Sprintf("mount -t nfs -o vers=%s %s:%s %s", opts.Vers, opts.Server, opts.getDefaultMountPath(), mountRoot)
-	log.Infof("nas, mounting local temp: %s", mntCmd)
-	if _, err := utils.RunCommand(mntCmd); err != nil {
-		log.Errorf("nas, failed to mount to temp directory to nfs mountRoot: %s", err.Error())
-		return err
-	}
-	// create sub directory, which makes the folder on the remote nfs server at the same time
-	fullPath := filepath.Join(mountRoot, strings.TrimPrefix(opts.Path, opts.getDefaultMountPath()), volumeDirName)
-	log.Infof("nas, create sub directory: %s", fullPath)
-	if err := utils.CreateDir(fullPath, MountPointMode); err != nil {
-		log.Errorf("nas, create sub directory err: " + err.Error())
-		return err
+
+	log.Infof("nas, creating localMountPath dir: %s", localMountPath)
+	if err := utils.CreateDir(localMountPath, mountPointMode); err != nil {
+		return fmt.Errorf("nas, create localMountPath %s err: %s", localMountPath, err.Error())
 	}
 
-	if err := os.Chmod(fullPath, MountPointMode); err != nil {
-		log.Errorf("nas, failed to change the mode of %s to %d", fullPath, MountPointMode)
+	// mount localMountPath to remote nfs server
+	mntCmd := fmt.Sprintf("mount -t nfs -o vers=%s %s:%s %s", opts.Vers, opts.Server, defaultNFSRoot, localMountPath)
+	log.Infof("nas, mount for sub dir: %s", mntCmd)
+	if _, err := utils.RunCommand(mntCmd); err != nil {
+		return fmt.Errorf("nas, failed to localMountPath %s: %s", mntCmd, err.Error())
+	}
+
+	// create sub directory, which makes the folder on the remote nfs server at the same time
+	log.Infof("nas, creating fullPath: %s", fullPath)
+	if err := utils.CreateDir(fullPath, mountPointMode); err != nil {
+		return fmt.Errorf("nas, create sub directory err: " + err.Error())
+	}
+	defer os.RemoveAll(localMountPath)
+
+	log.Infof("nas, changing mode for %s", fullPath)
+	if err := os.Chmod(fullPath, mountPointMode); err != nil {
+		log.Errorf("nas, failed to change the mode of %s to %d", fullPath, mountPointMode)
 	}
 
 	// unmount the local path after the remote folder is created
-	if err := utils.Unmount(nasLocalTmpPath); err != nil {
+	log.Infof("nas, unmount dir after the dir creation: %s", fullPath)
+	if err := utils.Unmount(localMountPath); err != nil {
 		log.Errorf("nas, failed to unmount path %s: %s", fullPath, err)
 	}
 	log.Infof("nas, create sub directory successful: %s", opts.Path)

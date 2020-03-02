@@ -5,7 +5,7 @@ metadata:
 parameters:
   volumeAs: subpath
   server: "140.210.75.195"
-  path: "/"
+  path: "/nfsshare"
   vers: "4.0"
   options: noresvport
   archiveOnDelete: "true"

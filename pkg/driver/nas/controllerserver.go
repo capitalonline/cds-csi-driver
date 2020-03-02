@@ -25,29 +25,6 @@ var (
 	processedPvc sync.Map
 )
 
-const (
-	MountPointRootPathForCreatingVolume = "/csi-nas-mount-root"
-	MountPointRootPathForDeletingVolume = "/csi-nas-unmount-root"
-	MountPointMode                      = 0777
-)
-
-type ControllerServer struct {
-	*csicommon.DefaultControllerServer
-	Client *kubernetes.Clientset
-}
-
-type VolumeCreateSubpathOptions struct {
-	NfsOpts
-	VolumeAs string
-}
-
-type DeleteVolumeSubpathOptions struct {
-	Server          string
-	Path            string
-	Vers            string
-	ArchiveOnDelete bool
-}
-
 func NewControllerServer(d *NasDriver) *ControllerServer {
 	config, err := rest.InClusterConfig()
 	if err != nil {
@@ -65,8 +42,8 @@ func NewControllerServer(d *NasDriver) *ControllerServer {
 }
 
 func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
+	log.Infof("CreateVolume:: starting nas Provisioning: %+v", req)
 	pvName := req.Name
-	log.Infof("CreateVolume:: starting nas Provisioning, %s, %v", pvName, req)
 	var ok bool
 	var volumeAs = subpathLiteral
 
@@ -82,20 +59,15 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 
 	volToCreate := &csi.Volume{}
 	if volumeAs == subpathLiteral {
+		log.Infof("CreateVolume:: nas, provisioning subpath volume, req: %+v", req)
 		opts, err := parseVolumeCreateSubpathOptions(req)
-		log.Infof("CreateVolume:: nas, provisioning subpath volume: %+v", opts)
+		log.Infof("CreateVolume:: nas, provisioning subpath volume, nfs opts: %+v", opts)
 		if err != nil {
-			log.Errorf("CreateVolume:: nas, failed to parse create volume req: %s", err.Error())
+			return nil, fmt.Errorf("CreateVolume:: nas, failed to parse create volume req: %s", err.Error())
 		}
 
-		mountPoint := filepath.Join(MountPointRootPathForCreatingVolume, pvName)
-		// create the local mount folder in the container
-		if err = utils.CreateDir(mountPoint, MountPointMode); err != nil {
-			log.Errorf("CreateVolume:: nas, unable to create directory: %s", mountPoint)
-			return nil, fmt.Errorf("CreateVolume:: nas, unable to create directory: %s", mountPoint)
-		}
 		// make dir on the nas server
-		if err := opts.createNasSubDir(MountPointRootPathForCreatingVolume, pvName); err != nil {
+		if err := opts.createNasSubDir(createVolumeRoot, pvName); err != nil {
 			return nil, fmt.Errorf("CreateVolume:: nas, failed to create subpath on the nas server: %s", err.Error())
 		}
 		// assemble the response
@@ -146,14 +118,13 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 
 		pvPath := opts.Path
 		if pvPath == "/" || pvPath == "" {
-			log.Errorf("DeleteVolume:: nas, pvPath cannot be / or empty")
-			return nil, errors.New("DeleteVolume:: nas, pvPath cannot be / or empty")
+			return nil, fmt.Errorf("DeleteVolume:: nas, pvPath cannot be / or empty")
 		}
 
 		// nfsPath is the mount point of the nas server
 		nasPath := getNasPathFromPvPath(pvPath)
-		mountPoint := filepath.Join(MountPointRootPathForDeletingVolume, req.VolumeId+"-delete")
-		if err := utils.CreateDir(mountPoint, MountPointMode); err != nil {
+		mountPoint := filepath.Join(deleteVolumeRoot, req.VolumeId+"-delete")
+		if err := utils.CreateDir(mountPoint, mountPointMode); err != nil {
 			log.Errorf("DeleteVolume:: nas, unable to create directory %s: %s", mountPoint, err)
 		}
 		mntCmd := fmt.Sprintf("mount -t nfs -o vers=%s %s:%s %s", opts.Vers, opts.Server, nasPath, mountPoint)
@@ -188,6 +159,7 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 			log.Infof("DeleteVolume:: nas, path %s doesn't exist, skipping", deletePath)
 		}
 		processedPvc.Delete(req.VolumeId)
+		log.Infof("DeleteVolume:: volume %s has been deleted successfully", req.VolumeId)
 		return &csi.DeleteVolumeResponse{}, nil
 	} else if volumeAs == systemLiteral {
 		return nil, errors.New("DeleteVolume:::: nas, volumeAs \"system\" is not supported yet")
