@@ -46,8 +46,9 @@ Description:
 |path|e.g. "/nfsshare/pvname"|yes|the path that the pv will use on the nfs server. It must start with `/nfsshare`. Please make sure each pv use a different path.|
 |vers|`3` or `4.0`|no| the protocol version to use for the nfs mount. if not provided, `4.0` will be used by default
 |options|e.g. `noresvport`|no| options for the nfs mount. If not provided it will be set to `noresvport` for `vers=4.0` and `noresvport,nolock,tcp` for `vers=3`|
-|mode|e.g. `0777`|no| to customize the mode of the path created on nfs server. If not provided, the server's default mask will be used
-|modeType|e.g `recursive` or `non-recursive`|no| This tells the driver if the chmod should be done recursively or not. Only works when `mode` is specified. Default to `non-recursive`
+|mode|e.g. `0777`|no| to customize the mode of the path created on nfs server. If not provided, the server's default mask will be used|
+|modeType|e.g `recursive` or `non-recursive`|no| This tells the driver if the chmod should be done recursively or not. Only works when `mode` is specified. Default to `non-recursive`|
+|allowShared| `"true"` or `"false"`|no | default to `"false`. If set, the directory for the pv will be exactly the same as path. Otherwise, the directory will be `path`+`pv id`. This is useful if you need two pvs share the same storage|
 
 ### To use dynamic provisioned PV
 please add the following definition to the StorageClass yaml file:

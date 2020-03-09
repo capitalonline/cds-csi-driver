@@ -1,13 +1,13 @@
 PKG=github.com/capitalonline/cds-csi-driver
 IMAGE?=registry-bj.capitalonline.net/cck/cds-csi-driver
-VERSION=v0.1.0
+VERSION=v0.1.1
 GIT_COMMIT?=$(shell git rev-parse HEAD)
 BUILD_DATE?=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 LDFLAGS?="-X ${PKG}/pkg/common.version=${VERSION} -X ${PKG}/pkg/common.gitCommit=${GIT_COMMIT} -X ${PKG}/pkg/common.buildDate=${BUILD_DATE} -s -w"
 NAS_DEPLOY_PATH=./deploy/nas
 NAS_KUSTOMIZATION_RELEASE_PATH=${NAS_DEPLOY_PATH}/overlays/release
 NAS_KUSTOMIZATION_TEST_PATH=${NAS_DEPLOY_PATH}/overlays/test
-NAS_KUSTOMIZATION_FILE=${NAS_KUSTOMIZATION_PATH}/kustomization.yaml
+NAS_KUSTOMIZATION_FILE=${NAS_KUSTOMIZATION_RELEASE_PATH}/kustomization.yaml
 .EXPORT_ALL_VARIABLES:
 
 .PHONY: build

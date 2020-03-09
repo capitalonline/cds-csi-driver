@@ -38,6 +38,7 @@ type NfsOpts struct {
 type PublishOptions struct {
 	NfsOpts
 	NodePublishPath string
+	AllowSharePath  bool
 }
 
 type VolumeCreateSubpathOptions struct {

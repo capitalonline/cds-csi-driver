@@ -121,6 +121,12 @@ func newPublishOptions(req *csi.NodePublishVolumeRequest) *PublishOptions {
 			opts.Options = value
 		} else if key == "modeType" {
 			opts.ModeType = value
+		} else if key == "allowShared" {
+			allowed, err := strconv.ParseBool(value)
+			if err != nil {
+				opts.AllowSharePath = false
+			}
+			opts.AllowSharePath = allowed
 		}
 	}
 	return opts
@@ -244,12 +250,22 @@ func mountNasVolume(opts *PublishOptions, volumeId string) error {
 		versStr = fmt.Sprintf("%s,%s", opts.Vers, opts.Options)
 	}
 
-	mntCmd := fmt.Sprintf("mount -t nfs -o vers=%s %s:%s %s", versStr, opts.Server, opts.Path, opts.NodePublishPath)
+	var serverMountPoint string
+	if opts.AllowSharePath {
+		serverMountPoint = opts.Path
+	} else {
+		serverMountPoint = filepath.Join(opts.Path, volumeId)
+	}
+	mntCmd := fmt.Sprintf("mount -t nfs -o vers=%s %s:%s %s", versStr, opts.Server, serverMountPoint, opts.NodePublishPath)
 	_, err := utils.RunCommand(mntCmd)
 	if err != nil && opts.Path != "/" {
 		if strings.Contains(err.Error(), "No such file or directory") ||
 			strings.Contains(err.Error(), "access denied by server while mounting") {
-			if err := opts.createNasSubDir(publishVolumeRoot, volumeId); err != nil {
+			subDir := volumeId
+			if opts.AllowSharePath {
+				subDir = ""
+			}
+			if err := opts.createNasSubDir(publishVolumeRoot, subDir); err != nil {
 				return fmt.Errorf("nas, create subpath error: %s", err.Error())
 			}
 			if _, err := utils.RunCommand(mntCmd); err != nil {
@@ -266,10 +282,10 @@ func mountNasVolume(opts *PublishOptions, volumeId string) error {
 	return nil
 }
 
-func (opts *NfsOpts) createNasSubDir(mountRoot, pvName string) error {
-	log.Infof("nas, running creatNasSubDir: root: %s, path: %s, pvName:%s", mountRoot, opts.Path, pvName)
-	localMountPath := filepath.Join(mountRoot, pvName)
-	fullPath := filepath.Join(localMountPath, strings.TrimPrefix(opts.Path, defaultNFSRoot), pvName)
+func (opts *NfsOpts) createNasSubDir(mountRoot, subDir string) error {
+	log.Infof("nas, running creatNasSubDir: root: %s, path: %s, subDir:%s", mountRoot, opts.Path, subDir)
+	localMountPath := filepath.Join(mountRoot, subDir)
+	fullPath := filepath.Join(localMountPath, strings.TrimPrefix(opts.Path, defaultNFSRoot), subDir)
 	// unmount the volume if it has been mounted
 	log.Infof("nas, unmount fullpath if is mounted: %s", localMountPath)
 	if utils.Mounted(localMountPath) {
