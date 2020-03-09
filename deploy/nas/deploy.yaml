@@ -200,7 +200,7 @@ spec:
           env:
             - name: CSI_ENDPOINT
               value: unix://socketDir/csi.sock
-          image: registry-bj.capitalonline.net/cck/cds-csi-driver:v0.1.0
+          image: registry-bj.capitalonline.net/cck/cds-csi-driver:v0.1.1
           imagePullPolicy: Always
           livenessProbe:
             exec:
@@ -289,7 +289,7 @@ spec:
           env:
             - name: CSI_ENDPOINT
               value: unix://var/lib/kubelet/plugins/nas.csi.cds.net/csi.sock
-          image: registry-bj.capitalonline.net/cck/cds-csi-driver:v0.1.0
+          image: registry-bj.capitalonline.net/cck/cds-csi-driver:v0.1.1
           imagePullPolicy: Always
           name: csi-node-server
           securityContext:
