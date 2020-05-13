@@ -214,7 +214,7 @@ func parseVolumeCreateSubpathOptions(req *csi.CreateVolumeRequest) (*VolumeCreat
 		serverSlice = strings.Split(opts.Servers, ",")
 	}
 	if opts.Server != "" {
-		serverSlice = append(serverSlice, strings.Join([]string{opts.Server, opts.Path}, "/"))
+		serverSlice = append(serverSlice, strings.Join([]string{opts.Server, strings.TrimPrefix(opts.Path, "/")}, "/"))
 	}
 	log.Infof("serverSlice is: %s \n", serverSlice)
 	servers := ParseServerList(serverSlice)
