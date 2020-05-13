@@ -233,7 +233,7 @@ func parseVolumeCreateSubpathOptions(req *csi.CreateVolumeRequest) (*VolumeCreat
 		}
 		// uniqueSelectString is to flag function like sc name function
 		var uniqueSelectString string
-		for _, v := range serverList {
+		for _, v := range serverSlice {
 			uniqueSelectString = strings.Join([]string{uniqueSelectString, strings.TrimSpace(v)}, ",")
 		}
 		// delete additional ","
