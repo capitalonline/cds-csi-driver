@@ -204,14 +204,21 @@ func parseVolumeCreateSubpathOptions(req *csi.CreateVolumeRequest) (*VolumeCreat
 
 	opts := newVolumeCreateSubpathOptions(req.GetParameters())
 
-	if opts.Server == "" || opts.Servers == "" {
+	if opts.Server == "" && opts.Servers == "" {
 		return nil, fmt.Errorf("nas, fatel error, server or servers is missing on volume as subpath")
 	}
 
-	serverList := strings.Split(opts.Servers, ",")
-	serverList = append(serverList, strings.Join([]string{opts.Server, opts.Path}, "/"))
-	servers := ParseServerList(serverList)
+	var serverSlice []string
 
+	if opts.Servers != "" {
+		serverSlice = strings.Split(opts.Servers, ",")
+	}
+	if opts.Server != "" {
+		serverSlice = append(serverSlice, strings.Join([]string{opts.Server, opts.Path}, "/"))
+	}
+	log.Infof("serverSlice is: %s \n", serverSlice)
+	servers := ParseServerList(serverSlice)
+	log.Infof("servers are: %s \n", servers)
 	var nfsServer *NfsServer
 
 	switch len(servers) {
@@ -227,7 +234,6 @@ func parseVolumeCreateSubpathOptions(req *csi.CreateVolumeRequest) (*VolumeCreat
 		// uniqueSelectString is to flag function like sc name function
 		var uniqueSelectString string
 		for _, v := range serverList {
-			fmt.Printf("v is: %s \n", v)
 			uniqueSelectString = strings.Join([]string{uniqueSelectString, strings.TrimSpace(v)}, ",")
 		}
 		// delete additional ","
