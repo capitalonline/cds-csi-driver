@@ -415,8 +415,202 @@ EOF
     #cleanup
 }
 
+function case3(){
+    echo "=> Case 3: test case with dynamic pv that support multi servers"
+    echo "=> Case 3: let's create a storage class with multi servers"
+    cat <<EOF | kubectl apply -f -
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: sc4
+parameters:
+  volumeAs: subpath
+  servers: "${NFS}/${SHARE_DIR}/sc4_1, ${NFS}/${SHARE_DIR}/sc4_2"
+  vers: "4.0"
+  options: noresvport
+  archiveOnDelete: "true"
+provisioner: nas.csi.cds.net
+reclaimPolicy: Delete
+EOF
+    echo "=> Done!"
+
+    echo "=> Case 3: let's create pvc6, pvc7 and pvc8 using the storage class sc4"
+    cat <<EOF | kubectl apply -f -
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  namespace: ${NAMESPACE}
+  name: pvc6
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: sc4
+  resources:
+    requests:
+      storage: 1Gi
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  namespace: ${NAMESPACE}
+  name: pvc7
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: sc4
+  resources:
+    requests:
+      storage: 1Gi
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  namespace: ${NAMESPACE}
+  name: pvc8
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: sc4
+  resources:
+    requests:
+      storage: 1Gi
+EOF
+    echo "=> Done!"
+
+    echo "=> Case 3: let's create pod6, pod7 and pod8 using the pvc created above"
+    cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: Pod
+metadata:
+  namespace: ${NAMESPACE}
+  name: pod6
+spec:
+  containers:
+    - name: "hello-world"
+      image: "tutum/hello-world"
+      volumeMounts:
+        - name: pvc-nas-sc
+          mountPath: "/data"
+  volumes:
+    - name: pvc-nas-sc
+      persistentVolumeClaim:
+        claimName: pvc6
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  namespace: ${NAMESPACE}
+  name: pod7
+spec:
+  containers:
+    - name: "hello-world"
+      image: "tutum/hello-world"
+      volumeMounts:
+        - name: pvc-nas-sc
+          mountPath: "/data"
+  volumes:
+    - name: pvc-nas-sc
+      persistentVolumeClaim:
+        claimName: pvc7
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  namespace: ${NAMESPACE}
+  name: pod8
+spec:
+  containers:
+    - name: "hello-world"
+      image: "tutum/hello-world"
+      volumeMounts:
+        - name: pvc-nas-sc
+          mountPath: "/data"
+  volumes:
+    - name: pvc-nas-sc
+      persistentVolumeClaim:
+        claimName: pvc8
+EOF
+    kubectl -n ${NAMESPACE} wait --for condition=Ready pod/pod6 pod/pod7 pod/pod8 --timeout 30s
+    echo "=> Done!"
+
+    echo "=> Case 3: verify if 3 pods are all created"
+    kubectl -n ${NAMESPACE} get pod pod6
+    kubectl -n ${NAMESPACE} get pod pod7
+    kubectl -n ${NAMESPACE} get pod pod8
+    echo "=> Done!"
+
+    echo "=> Case 3: verify if 3 pvcs are created"
+    out6=$(kubectl -n ${NAMESPACE} get pvc pvc6)
+    out7=$(kubectl -n ${NAMESPACE} get pvc pvc7)
+    out8=$(kubectl -n ${NAMESPACE} get pvc pvc8)
+    echo ${out6} | grep -iF Bound
+    echo ${out7} | grep -iF Bound
+    echo ${out8} | grep -iF Bound
+    echo "=> Done!"
+
+    echo "=> Case 3: verify if 3 pvs are created correctly"
+    pv6_name=$(kubectl -n ${NAMESPACE} get pvc pvc6 | grep -iF Bound | tr -s ' '| cut -d ' ' -f 3)
+    pv7_name=$(kubectl -n ${NAMESPACE} get pvc pvc7 | grep -iF Bound | tr -s ' '| cut -d ' ' -f 3)
+    pv8_name=$(kubectl -n ${NAMESPACE} get pvc pvc8 | grep -iF Bound | tr -s ' '| cut -d ' ' -f 3)
+    kubectl -n ${NAMESPACE} get pv ${pv6_name} | grep 'Delete.*Bound'
+    kubectl -n ${NAMESPACE} get pv ${pv7_name} | grep 'Delete.*Bound'
+    kubectl -n ${NAMESPACE} get pv ${pv8_name} | grep 'Retain.*Bound'
+    echo "=> Done!"
+
+    echo "=> Case 3: verify if directories is created on the nfs server dir by roundrobin strategy"
+    if [[ ! -d "${MOUNT_DIR}"/sc4_1/${pv6_name} ]]; then
+        echo "=> Failed: ${MOUNT_DIR}/sc4_1/${pv6_name} is not on the nfs server"
+        exit 1
+    fi
+    echo "=> Case 3: pv6 should be created in ${MOUNT_DIR}/sc4_1, check succeed!"
+    if [[ ! -d "${MOUNT_DIR}"/sc4_2/${pv7_name} ]]; then
+        echo "=> Failed: ${MOUNT_DIR}/sc4_2/${pv7_name} is not on the nfs server"
+        exit 1
+    fi
+    echo "=> Case 3: pv7 should be created in ${MOUNT_DIR}/sc4_2, check succeed!"
+    if [[ ! -d "${MOUNT_DIR}"/sc4_1/${pv8_name} ]]; then
+        echo "=> Failed: ${MOUNT_DIR}/sc4_1/${pv8_name} is not on the nfs server"
+        exit 1
+    fi
+    echo "=> Case 3: pv8 should be created in ${MOUNT_DIR}/sc4_1, check succeed!"
+    echo "=> Done!"
+
+    echo "=> Case 3: let's remove all the pods and pvc"
+    kubectl -n ${NAMESPACE} delete pod pod6
+    kubectl -n ${NAMESPACE} delete pod pod7
+    kubectl -n ${NAMESPACE} delete pod pod8
+    kubectl -n ${NAMESPACE} delete pvc pvc6
+    kubectl -n ${NAMESPACE} delete pvc pvc7
+    kubectl -n ${NAMESPACE} delete pvc pvc8
+    echo "=> Done!"
+
+    echo "=> Case 3: verify if pvs are handled correctly"
+    kubectl get pv ${pv6_name} || true
+    kubectl get pv ${pv7_name} || true
+    kubectl get pv ${pv8_name} | grep -iF "Retain"
+    echo "=> Done!"
+
+    echo "=> Case 3: verify is nfs server handles archiveOnDelete correctly"
+    if ! ls ${MOUNT_DIR}/sc4_1 | grep "archived-${pv6_name}" ; then
+        echo "=> Failed: pv ${pv6_name} for pod6 should be archived:"
+        exit 1
+    fi
+    if [[ -d ${MOUNT_DIR}/sc4_2/${pv7_name} ]]; then
+        echo "=> Failed: pv ${pv7_name} for pod7 should be removed from nfs server"
+        exit 1
+    fi
+    if [[ ! -d ${MOUNT_DIR}/sc4_1/${pv8_name} ]]; then
+        echo "=> Failed: pv ${pv8_name} for pod8 should not be removed"
+        exit 1
+    fi
+    echo "=> Done!"
+
+    echo "Case 3: Passed"
+}
+
 init ${NFS}
 case1
 case2
+case3
 
 
