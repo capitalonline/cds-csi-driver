@@ -29,7 +29,7 @@ spec:
     driver: nas.csi.cds.net
     volumeHandle: <name of the pv>
     volumeAttributes:
-      server: "140.210.75.195"
+      server: "140.210.75.196"
       path: "/nfsshare/nas-csi-cds-pv"
 ```
 Description:
@@ -40,10 +40,10 @@ Description:
 
 `volumeAttributes`: defined as below:
 
-|Key|Value|Required|Description|
-|:----:|:-----------|:---:|:----|
-|server|e.g. "140.210.75.195"|yes|the mount point of the nfs server,can be found on NAS product list|
-|path|e.g. "/nfsshare/division1"|yes|the path that the pv will use on the nfs server. It must start with `/nfsshare`. Each pv will use a separate directory(e.g `/nfsshare/division1/volumeHandleValue"`when `allowShared` is `false`. Otherwsise, the path of pv will be the same to `path`, which means all PVs with the same path will share data|
+|Key|Value|Required|Description|||
+|:----:|:-----------|:---:|:----|------|------|
+|server|e.g. "140.210.75.195"|yes|the mount point of the nfs server,can be found on NAS product list|||
+|path|e.g. "/nfsshare/division1"|yes|the path that the pv will use on the nfs server. It must start with `/nfsshare`. Each pv will use a separate directory(e.g `/nfsshare/division1/volumeHandleValue"`when `allowShared` is `false`. Otherwsise, the path of pv will be the same to `path`, which means all PVs with the same path will share data|||
 |vers|`3` or `4.0`|no| the protocol version to use for the nfs mount. if not provided, `4.0` will be used by default
 |options|e.g. `noresvport`|no| options for the nfs mount. If not provided it will be set to `noresvport` for `vers=4.0` and `noresvport,nolock,tcp` for `vers=3`|
 |mode|e.g. `0777`|no| to customize the mode of the path created on nfs server. If not provided, the server's default mask will be used|
@@ -51,11 +51,13 @@ Description:
 |allowShared| `"true"` or `"false"`|no | default to `"false`. If set, the data of all PVs with the same path will be shared|
 
 ### To use dynamic provisioned PV
+
 please add the following definition to the StorageClass yaml file:
 ```yaml
 provisioner: nas.csi.cds.net
 parameters:
   volumeAs: subpath
+  servers: "140.210.75.194/nfsshare/nas-csi-cds-pv, 140.210.75.195/nfsshare/nas-csi-cds-pv"
   server: "140.210.75.195"
   path: "/nfsshare"
   vers: "4.0"
@@ -75,10 +77,17 @@ Other parameters are defined below, when the `parametes.volumAs` is `subpath`:
 
 |Key|Value|Required|Description|
 |:----:|:-----------|:---:|:----|
-|server|e.g. "140.210.75.195"|yes|the mount point of the nfs server,can be found on NAS product list|
-|path|e.g. "/nfsshare"|yes|the root path that the pv will dynamically provisioned on the NAS server. It must start with `/nfsshare`. |
+|servers|"140.210.75.194/nfsshare/nas-csi-cds-pv, 140.210.75.195/nfsshare/nas-csi-cds-pv"|no|multi servers are supported by a StorageClass. It should be separated by "," between each server/path.|
+|server|e.g. "140.210.75.195"|no|the mount point of the nfs server,can be found on NAS product list|
+|path|e.g. "/nfsshare"|no|the root path that the pv will dynamically provisioned on the NAS server. It must start with `/nfsshare`. |
 |vers|`3` or `4.0`|no| the protocol version to use for the nfs mount. if not provided, `4.0` will be used by default
 |options|e.g. `noresvport`|no| options for the nfs mount. If not provided it will be set to `noresvport` for `vers=4.0` and `noresvport,nolock,tcp` for `vers=3`|
 |mode|e.g. `0777`|no| to customize the mode of the path created on nfs server. If not provided, the server's default mask will be used
 |modeType|e.g `recursive` or `non-recursive`|no| This tells the driver if the chmod should be done recursively or not. Only works when `mode` is specified. Default to `non-recursive`
 |archiveOnDelete|`"true"` or `"false"`|no| only works when the `reclaim police` is `delete`. if `true`, the content of the pv will be archived on nfs instead of be deleted. Default to `false`|
+
+Kindly Remind: 
+
+​	a) server and path are as a whole to use.
+
+​	b) servers and server cant be empty together. It means that servers or server is not empty at least in one yaml. 
