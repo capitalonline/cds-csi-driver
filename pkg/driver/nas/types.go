@@ -5,6 +5,11 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+type NfsServer struct {
+	Address string
+	Path    string
+}
+
 type NasDriver struct {
 	csiDriver        *csicommon.CSIDriver
 	endpoint         string
@@ -27,12 +32,14 @@ type IdentityServer struct {
 }
 
 type NfsOpts struct {
+	Servers  string
 	Server   string
 	Path     string
 	Vers     string
 	Mode     string
 	ModeType string
 	Options  string
+	Strategy string
 }
 
 type PublishOptions struct {

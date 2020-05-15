@@ -3,6 +3,7 @@ package nas
 import (
 	"errors"
 	"fmt"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -187,20 +188,64 @@ func parsePublishOptions(req *csi.NodePublishVolumeRequest) (*PublishOptions, er
 func newVolumeCreateSubpathOptions(param map[string]string) *VolumeCreateSubpathOptions {
 	opts := &VolumeCreateSubpathOptions{}
 	opts.VolumeAs = subpathLiteral
+	opts.Servers = param["servers"]
 	opts.Server = param["server"]
 	opts.Path = param["path"]
 	opts.Vers = param["vers"]
 	opts.Options = param["options"]
 	opts.Mode = param["mode"]
 	opts.ModeType = param["modeType"]
+	opts.Strategy = param["strategy"]
 
 	return opts
 }
 
 func parseVolumeCreateSubpathOptions(req *csi.CreateVolumeRequest) (*VolumeCreateSubpathOptions, error) {
+
 	opts := newVolumeCreateSubpathOptions(req.GetParameters())
-	if opts.Server == "" {
-		return nil, fmt.Errorf("nas, fatel error, server is missing on volume as subpath")
+
+	if opts.Server == "" && opts.Servers == "" {
+		return nil, fmt.Errorf("nas, fatel error, server or servers is missing on volume as subpath")
+	}
+
+	var serverSlice []string
+
+	if opts.Servers != "" {
+		serverSlice = strings.Split(opts.Servers, ",")
+	}
+	if opts.Server != "" {
+		serverSlice = append(serverSlice, strings.Join([]string{opts.Server, strings.TrimPrefix(opts.Path, "/")}, "/"))
+	}
+	log.Infof("serverSlice is: %s \n", serverSlice)
+	servers := ParseServerList(serverSlice)
+	log.Infof("servers are: %s \n", servers)
+	var nfsServer *NfsServer
+
+	switch len(servers) {
+	case 0:
+		return nil, fmt.Errorf("nas, fatel error, server or servers is missing on volume as subpath")
+	case 1:
+		opts.Server = servers[0].Address
+		opts.Path = servers[0].Path
+	default:
+		if opts.Strategy == "" {
+			opts.Strategy = "RoundRobin"
+		}
+		// uniqueSelectString is to flag function like sc name function
+		var uniqueSelectString string
+		for _, v := range serverSlice {
+			uniqueSelectString = strings.Join([]string{uniqueSelectString, strings.TrimSpace(v)}, ",")
+		}
+		// delete additional ","
+		strings.TrimPrefix(uniqueSelectString, ",")
+		nfsServer = SelectServer(servers, uniqueSelectString, strings.ToLower(opts.Strategy))
+		if nfsServer == nil {
+			log.Errorf("provision volume: failed to choose a server using strategy %s, use the first one instead", opts.Strategy)
+			opts.Server = servers[0].Address
+			opts.Path = servers[0].Path
+		}
+		opts.Server = nfsServer.Address
+		opts.Path = nfsServer.Path
 	}
 
 	if err := opts.parsNfsOpts(); err != nil {
@@ -380,4 +425,57 @@ func getDeleteVolumeSubpathOptions(pv *core.PersistentVolume, sc *storage.Storag
 		}
 	}
 	return opts
+}
+
+// parse ServerList that support multi servers in one SC
+func ParseServerList(serverList []string) []*NfsServer {
+	servers := make([]*NfsServer, 0)
+	for _, server := range serverList {
+
+		addrPath := strings.SplitN(strings.TrimSpace(server), "/", 2)
+		if len(addrPath) < 2 {
+			continue
+		}
+		if addrPath[0] == "" {
+			continue
+		}
+		addr := strings.TrimSpace(addrPath[0])
+		path := strings.TrimSpace(addrPath[1])
+		if path == "" {
+			path = defaultNfsPath
+		}
+		servers = append(servers, &NfsServer{Address: addr, Path: filepath.Join("/", path)})
+	}
+	return servers
+}
+
+func SelectServer(servers []*NfsServer, uniqueSelectString string, strategy string) *NfsServer {
+	switch strategy {
+	case "roundrobin":
+		return SelectServerRoundRobin(servers, uniqueSelectString)
+	case "random":
+		return SelectServerRandom(servers)
+	default:
+		return servers[0]
+	}
+}
+
+func SelectServerRoundRobin(servers []*NfsServer, uniqueSelectString string) *NfsServer {
+	RRLock.Lock()
+	count := RR[uniqueSelectString]
+	RR[uniqueSelectString] = count + 1
+	RRLock.Unlock()
+	length := uint(len(servers))
+	if length == 0 {
+		return nil
+	}
+	return servers[count%length]
+}
+
+func SelectServerRandom(servers []*NfsServer) *NfsServer {
+	length := len(servers)
+	if length == 0 {
+		return nil
+	}
+	return servers[rand.Intn(length)]
 }
