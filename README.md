@@ -61,6 +61,7 @@ parameters:
   server: "140.210.75.195"
   path: "/nfsshare"
   vers: "4.0"
+  strategy: "RoundRobin" 
   options: noresvport
   archiveOnDelete: "true"
 ```
@@ -79,6 +80,7 @@ Other parameters are defined below, when the `parametes.volumAs` is `subpath`:
 |:----:|:-----------|:---:|:----|
 |servers|"140.210.75.194/nfsshare/nas-csi-cds-pv, 140.210.75.195/nfsshare/nas-csi-cds-pv"|no|multi servers are supported by a StorageClass. It should be separated by "," between each server/path.|
 |server|e.g. "140.210.75.195"|no|the mount point of the nfs server,can be found on NAS product list|
+|strategy|e.g. "RoundRobin"|no| Only used for multi servers option. The value is supposed to be "RoundRobin" or "Random". The default value is "RoundRobin"|
 |path|e.g. "/nfsshare"|no|the root path that the pv will dynamically provisioned on the NAS server. It must start with `/nfsshare`. |
 |vers|`3` or `4.0`|no| the protocol version to use for the nfs mount. if not provided, `4.0` will be used by default
 |options|e.g. `noresvport`|no| options for the nfs mount. If not provided it will be set to `noresvport` for `vers=4.0` and `noresvport,nolock,tcp` for `vers=3`|
