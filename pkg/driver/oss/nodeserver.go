@@ -65,11 +65,12 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 	if err := utils.CreateDir(opts.NodePublishPath, mountPointMode); err != nil {
 		log.Errorf("create mountPath: %s failed, error is: %s", opts.NodePublishPath, errors.New("create mountPath dir error"))
 	}
-	mntCmd = fmt.Sprintf("s3fs %s %s -o passwd_file=%s -o url=%s %s", opts.Bucket, opts.Path, CredentialFile, opts.URL, defaultOtherOpts)
+	mntCmd = fmt.Sprintf("s3fs %s:%s %s -o passwd_file=%s -o url=%s %s", opts.Bucket, opts.Path, opts.NodePublishPath, CredentialFile, opts.URL, defaultOtherOpts)
+	log.Infof("mntCmd is: %s", mntCmd)
 	if _, err := utils.RunCommand(mntCmd); err != nil {
 		log.Errorf("Mount oss bucket to mountPath failed, error is: %s", err)
+		return nil, err
 	}
-	log.Infof("mntCmd is: %s", mntCmd)
 	// recheck oss mount result
 	if !utils.Mounted(opts.Path) {
 		log.Errorf("Oss mount recheck failed, error is: %s", errors.New("recheck failed after oss mount"))
