@@ -5,7 +5,6 @@ RUN cd /go/src/github.com/capitalonline/cds-csi-driver && make container-binary
 
 FROM alpine:3.6
 RUN apk update --no-cache && apk add ca-certificates
-RUN apk --no-cache add automake fuse fuse-devel gcc-c++ git libcurl-devel libxml2-devel make openssl-devel
 ARG S3FS_VERSION=v1.82
 
 RUN apk --update add --virtual build-dependencies \
