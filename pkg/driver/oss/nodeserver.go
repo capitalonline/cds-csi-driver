@@ -24,6 +24,7 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 	opts := &PublishOptions{}
 	opts.NodePublishPath = req.GetTargetPath()
 	if opts.NodePublishPath == "" {
+		log.Errorf("oss mountPath is necessary but input empty")
 		return nil, errors.New("oss mountPath is necessary but input empty")
 	}
 	for key, value := range req.VolumeContext {
@@ -54,17 +55,22 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 		return &csi.NodePublishVolumeResponse{}, nil
 	}
 
-	// save ak file: bucket:ak_id:ak_secret
-	if err := opts.saveOssCredential(); err != nil {
-		log.Infof("save ak file: bucket:ak_id:ak_secret failed")
-		return nil, err
+	// Save ak file for s3fs in default
+	opts.AuthType = AuthTypeDefault
+	// save AK and AKS
+	if opts.AuthType == "saveAkFile" {
+		// save ak file: bucket:ak_id:ak_secret to /etc/s3pass
+		if err := opts.saveOssCredential(CredentialFile); err != nil {
+			log.Infof("save ak file: bucket:ak_id:ak_secret failed")
+			return nil, err
+		}
+	} else {
+		log.Errorf("AuthType verify error, AuthType is only support %s", AuthTypeDefault)
+		return nil, errors.New("AuthType verify error, not support, it should to be saveAkFile")
 	}
 
-	log.Infof("NodePublishVolume:: Start mount source [%s:%s] to [%s]", opts.Bucket, opts.Path, opts.NodePublishPath)
 	var mntCmd string
-	if err := utils.CreateDir(opts.NodePublishPath, mountPointMode); err != nil {
-		log.Errorf("create mountPath: %s failed, error is: %s", opts.NodePublishPath, errors.New("create mountPath dir error"))
-	}
+	log.Infof("NodePublishVolume:: Start mount source [%s:%s] to [%s]", opts.Bucket, opts.Path, opts.NodePublishPath)
 	mntCmd = fmt.Sprintf("s3fs %s:%s %s -o passwd_file=%s -o url=%s %s", opts.Bucket, opts.Path, opts.NodePublishPath, CredentialFile, opts.URL, defaultOtherOpts)
 	log.Infof("mntCmd is: %s", mntCmd)
 	if _, err := utils.RunCommand(mntCmd); err != nil {
@@ -76,7 +82,7 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 		log.Errorf("Oss mount recheck failed, error is: %s", errors.New("recheck failed after oss mount"))
 		return nil, errors.New("recheck failed after oss mount")
 	}
-	log.Infof("NodePublishVolume:: Mount Oss successful, volume %s, targetPath: %s", req.VolumeId, opts.NodePublishPath)
+	log.Infof("NodePublishVolume:: Mount Oss successful, volumeID:%s, oss: [%s:%s], targetPath:%s", req.VolumeId, opts.NodePublishPath, opts.Path, opts.NodePublishPath)
 	return &csi.NodePublishVolumeResponse{}, nil
 }
 
@@ -93,10 +99,10 @@ func (n *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpub
 	// unmount the volume, use force umount on network not reachable or no other pod used
 	unmoutCmd := fmt.Sprintf("umount %s", mountPoint)
 	if _, err := utils.RunCommand(unmoutCmd); err != nil {
-		return nil, fmt.Errorf("NodeUnpublishVolume:: nas, Umount nfs fail: %s", err.Error())
+		return nil, fmt.Errorf("NodeUnpublishVolume:: oss, Umount oss bucket fail: %s", err.Error())
 	}
 
-	log.Infof("NodeUnpublishVolume:: Unmount nas Successfully on: %s", mountPoint)
+	log.Infof("NodeUnpublishVolume:: Unmount oss Successfully on: %s", mountPoint)
 	return &csi.NodeUnpublishVolumeResponse{}, nil
 }
 
