@@ -1,0 +1,13 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: csi-provisioner
+  namespace: kube-system
+  labels:
+    name: csi-provisioner
+spec:
+  selector:
+    type: csi-provisioner
+  ports:
+  - name: healthz
+    port: 9808
