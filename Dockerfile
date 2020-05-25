@@ -15,9 +15,7 @@ RUN apk --update add --virtual build-dependencies \
         curl-dev libxml2-dev  \
         ca-certificates
 
-
 # RUN apk del .build-dependencies
-
 RUN git clone https://github.com/s3fs-fuse/s3fs-fuse.git && \
     cd s3fs-fuse \
     git checkout tags/${S3FS_VERSION} && \
