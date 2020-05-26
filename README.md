@@ -35,7 +35,7 @@ OSS:
 4. Run `make oss-test`
 
 ## To use the NAS driver
-Examples can be found here [here](!https://github.com/capitalonline/cds-csi-driver/tree/master/example/nas)
+Examples can be found [here](!https://github.com/capitalonline/cds-csi-driver/tree/master/example/nas)
 ### To use static provisioned PV
 Please add the following definition to to PersistentVolume yaml file:
 ```yaml
