@@ -111,7 +111,7 @@ Kindly Remind:
 
 ## To use the OSS driver
 
-Examples can be found here [here](!https://github.com/capitalonline/cds-csi-driver/tree/master/example/oss)
+Examples can be found [here](!https://github.com/capitalonline/cds-csi-driver/tree/master/example/oss)
 
 ### To use static provisioned PV (only support)
 
