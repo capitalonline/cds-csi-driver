@@ -332,10 +332,8 @@ spec:
           name: registration-dir
       - args:
         - --csi-address=/var/lib/kubelet/plugins/nas.csi.cds.net/csi.sock
+        - health-port=9809
         image: registry-bj.capitalonline.net/cck/csi-livenessprobe:v2.0.0
-        livenessProbe:
-          tcpSocket:
-            port: 9808
         name: nas-liveness-probe
         volumeMounts:
         - mountPath: /var/lib/kubelet/
