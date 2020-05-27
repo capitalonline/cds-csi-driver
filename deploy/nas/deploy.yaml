@@ -1,13 +1,8 @@
 apiVersion: v1
-kind: Namespace
-metadata:
-  name: cds-system
----
-apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: cds-csi-sa
-  namespace: cds-system
+  namespace: kube-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -164,7 +159,7 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: cds-csi-sa
-  namespace: cds-system
+  namespace: kube-system
 ---
 apiVersion: v1
 kind: Service
@@ -172,7 +167,7 @@ metadata:
   labels:
     name: csi-provisioner
   name: csi-provisioner
-  namespace: cds-system
+  namespace: kube-system
 spec:
   ports:
   - name: healthz
@@ -184,7 +179,7 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: nas-csi-cds-controller
-  namespace: cds-system
+  namespace: kube-system
 spec:
   replicas: 1
   selector:
@@ -276,7 +271,7 @@ apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: nas-csi-cds-node
-  namespace: cds-system
+  namespace: kube-system
 spec:
   selector:
     matchLabels:
