@@ -68,7 +68,7 @@ test: unit-test integration-test
 .PHONE: oss-test
 oss-test:
 	@echo "**************************** running oss unit test ****************************"
-		go test -v -race ./pkg/driver/oss/...
+	go test -v -race ./pkg/driver/oss/...
 	@echo "**************************** running oss integration test ****************************"
 	@./test/oss/test.sh
 	@echo "**************************** all tests passed ****************************"
