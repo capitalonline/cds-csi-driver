@@ -78,7 +78,7 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 		return nil, err
 	}
 	// recheck oss mount result
-	if !utils.Mounted(opts.Path) {
+	if !utils.Mounted(opts.NodePublishPath) {
 		log.Errorf("Remote bucket path [%s:%s] is not exist, please create it firstly", opts.Bucket, opts.Path)
 		errMsg := fmt.Sprintf("Remote bucket path [%s:%s] is not exist, please create it firstly", opts.Bucket, opts.Path)
 		return nil, errors.New(errMsg)
