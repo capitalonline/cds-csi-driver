@@ -291,7 +291,7 @@ spec:
           value: unix://var/lib/kubelet/plugins/nas.csi.cds.net/csi.sock
         image: registry-bj.capitalonline.net/cck/cds-csi-driver:v1.0.0
         imagePullPolicy: Always
-        name: csi-node-server
+        name: nas-csi-node-server
         securityContext:
           allowPrivilegeEscalation: true
           capabilities:
@@ -324,7 +324,7 @@ spec:
               - /bin/sh
               - -c
               - rm -rf /registration/nas.csi.cds.net /registration/nas.csi.cds.net-reg.sock
-        name: driver-registrar
+        name: nas-driver-registrar
         volumeMounts:
         - mountPath: /var/lib/kubelet/
           name: kubelet-dir

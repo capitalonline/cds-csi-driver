@@ -185,7 +185,7 @@ spec:
           value: unix://var/lib/kubelet/plugins/oss.csi.cds.net/csi.sock
         image: registry-bj.capitalonline.net/cck/cds-csi-driver:v1.0.0
         imagePullPolicy: Always
-        name: csi-node-server
+        name: oss-csi-node-server
         securityContext:
           allowPrivilegeEscalation: true
           capabilities:
@@ -218,7 +218,7 @@ spec:
               - /bin/sh
               - -c
               - rm -rf /registration/oss.csi.cds.net /registration/oss.csi.cds.net-reg.sock
-        name: driver-registrar
+        name: oss-driver-registrar
         volumeMounts:
         - mountPath: /var/lib/kubelet/
           name: kubelet-dir
