@@ -67,12 +67,10 @@ spec:
         image: registry-bj.capitalonline.net/cck/csi-livenessprobe:v2.0.0
         args:
         - "--csi-address=/var/lib/kubelet/plugins/oss.csi.cds.net/csi.sock"
+        - "health-port=9808"
         volumeMounts:
         - name: kubelet-dir
           mountPath: /var/lib/kubelet/
-        livenessProbe:
-          tcpSocket:
-            port: 9806
       volumes:
       - name: kubelet-dir
         hostPath:
