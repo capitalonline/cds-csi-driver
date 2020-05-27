@@ -63,7 +63,7 @@ spec:
               mountPath: /var/lib/kubelet/
             - name: registration-dir
               mountPath: /registration/
-        - name: liveness-probe
+        - name: oss-liveness-probe
           image: registry-bj.capitalonline.net/cck/csi-livenessprobe:v2.0.0
           args:
             - "--csi-address=/var/lib/kubelet/plugins/nas.csi.cds.net/csi.sock"
