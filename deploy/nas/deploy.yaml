@@ -171,7 +171,7 @@ metadata:
 spec:
   ports:
   - name: healthz
-    port: 9808
+    port: 9806
   selector:
     type: csi-provisioner
 ---
@@ -333,7 +333,7 @@ spec:
       - args:
         - --csi-address=/var/lib/kubelet/plugins/nas.csi.cds.net/csi.sock
         image: registry-bj.capitalonline.net/cck/csi-livenessprobe:v2.0.0
-        name: liveness-probe
+        name: oss-liveness-probe
         volumeMounts:
         - mountPath: /var/lib/kubelet/
           name: kubelet-dir

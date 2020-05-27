@@ -227,7 +227,7 @@ spec:
       - args:
         - --csi-address=/var/lib/kubelet/plugins/oss.csi.cds.net/csi.sock
         image: registry-bj.capitalonline.net/cck/csi-livenessprobe:v2.0.0
-        name: liveness-probe
+        name: nas-liveness-probe
         volumeMounts:
         - mountPath: /var/lib/kubelet/
           name: kubelet-dir
