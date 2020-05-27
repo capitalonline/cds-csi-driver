@@ -1,6 +1,6 @@
 PKG=github.com/capitalonline/cds-csi-driver
 IMAGE?=registry-bj.capitalonline.net/cck/cds-csi-driver
-VERSION=v0.1.2
+VERSION=v1.0.0
 GIT_COMMIT?=$(shell git rev-parse HEAD)
 BUILD_DATE?=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 LDFLAGS?="-X ${PKG}/pkg/common.version=${VERSION} -X ${PKG}/pkg/common.gitCommit=${GIT_COMMIT} -X ${PKG}/pkg/common.buildDate=${BUILD_DATE} -s -w"
@@ -8,6 +8,10 @@ NAS_DEPLOY_PATH=./deploy/nas
 NAS_KUSTOMIZATION_RELEASE_PATH=${NAS_DEPLOY_PATH}/overlays/release
 NAS_KUSTOMIZATION_TEST_PATH=${NAS_DEPLOY_PATH}/overlays/test
 NAS_KUSTOMIZATION_FILE=${NAS_KUSTOMIZATION_RELEASE_PATH}/kustomization.yaml
+OSS_DEPLOY_PATH=./deploy/oss
+OSS_KUSTOMIZATION_RELEASE_PATH=${OSS_DEPLOY_PATH}/overlays/release
+OSS_KUSTOMIZATION_TEST_PATH=${OSS_DEPLOY_PATH}/overlays/test
+OSS_KUSTOMIZATION_FILE=${OSS_KUSTOMIZATION_RELEASE_PATH}/kustomization.yaml
 .EXPORT_ALL_VARIABLES:
 
 .PHONY: build
@@ -34,10 +38,12 @@ release: image-release
 .PHONY: sync-version
 sync-version:
 	sed -i.bak 's/newTag: .*/newTag: '${VERSION}'/g' ${NAS_KUSTOMIZATION_FILE} && rm ${NAS_KUSTOMIZATION_FILE}.bak
+	sed -i.bak 's/newTag: .*/newTag: '${VERSION}'/g' ${OSS_KUSTOMIZATION_FILE} && rm ${OSS_KUSTOMIZATION_FILE}.bak
 
 .PHONY: kustomize
 kustomize:sync-version
 	kubectl kustomize ${NAS_KUSTOMIZATION_RELEASE_PATH} > ${NAS_DEPLOY_PATH}/deploy.yaml
+	kubectl kustomize ${OSS_KUSTOMIZATION_RELEASE_PATH} > ${OSS_DEPLOY_PATH}/deploy.yaml
 
 .PHONY: unit-test
 unit-test:
@@ -48,6 +54,7 @@ unit-test:
 test-prerequisite:
 	docker build -t $(IMAGE):test . && docker push $(IMAGE):test
 	kubectl kustomize ${NAS_KUSTOMIZATION_TEST_PATH} | kubectl apply -f -
+	kubectl kustomize ${OSS_KUSTOMIZATION_TEST_PATH} | kubectl apply -f -
 
 .PHONY: integration-test
 integration-test:
@@ -56,4 +63,12 @@ integration-test:
 
 .PHONE: test
 test: unit-test integration-test
+	@echo "**************************** all tests passed ****************************"
+
+.PHONE: oss-test
+oss-test:
+	@echo "**************************** running oss unit test ****************************"
+	go test -v -race ./pkg/driver/oss/...
+	@echo "**************************** running oss integration test ****************************"
+	@./test/oss/test.sh
 	@echo "**************************** all tests passed ****************************"

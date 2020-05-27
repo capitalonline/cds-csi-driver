@@ -2,8 +2,8 @@
 
 A Container Storage Interface (CSI) Driver for CapitalOnline(aka. CDS) cloud. This CSI plugin allows you to use CDS storage with the kubernetes cluster hosted or managed by CDS.
 
-It currently supports CDS File Storage(NAS).
-The support for the Block Storage and Object Storage will be added soon.
+It currently supports CDS File Storage(NAS) and CDS Object Storage Service(OSS).
+The support for the Block Storage will be added soon.
 
 ## To deploy
 
@@ -12,15 +12,30 @@ To deploy the CSI NAS driver to your k8s cluster, simply run:
 kubectl apply -f https://raw.githubusercontent.com/capitalonline/cds-csi-driver/master/deploy/nas/deploy.yaml
 ```
 
+To deploy the CSI OSS driver to your k8s cluster, simply run:
+
+```bash
+kubectl apply -f https://raw.githubusercontent.com/capitalonline/cds-csi-driver/master/deploy/oss/deploy.yaml
+```
+
 ## To run tests
+
+NAS:
 
 1. Make sure that you have a Kubernetes cluster accessible with `kubectl`
 2. Provision a nfs server with exports `/nfsshare *(insecure,rw,async,no_root_squash,fsid=1000)`
 3. Run `make test-prerequisite` to build the image and deploy the driver to your k8s cluster
 4. Run `sudo NFS=<your nfs server ip> make test`
 
+OSS:
+
+1. Make sure that you have a Kubernetes cluster accessible with `kubectl`
+2. Register a Storage Service in CDS 
+3. Run `make test-prerequisite` to build the image and deploy the driver to your k8s cluster
+4. Run `make oss-test`
+
 ## To use the NAS driver
-Examples can be found here [here](!https://github.com/capitalonline/cds-csi-driver/tree/master/example/nas)
+Examples can be found [here](!https://github.com/capitalonline/cds-csi-driver/tree/master/example/nas)
 ### To use static provisioned PV
 Please add the following definition to to PersistentVolume yaml file:
 ```yaml
@@ -93,3 +108,56 @@ Kindly Remind:
 ​	a) server and path are as a whole to use.
 
 ​	b) servers and server cant be empty together. It means that servers or server is not empty at least in one yaml. 
+
+## To use the OSS driver
+
+Examples can be found [here](!https://github.com/capitalonline/cds-csi-driver/tree/master/example/oss)
+
+### To use static provisioned PV (only support)
+
+PersistentVolume yaml file:
+
+```yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: oss-csi-pv
+  labels:
+    name: oss-csi-pv
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  csi:
+    driver: oss.csi.cds.net
+    # set volumeHandle same value pv name
+    volumeHandle: oss-csi-pv
+    volumeAttributes:
+      bucket: "***"
+      url: "http://oss-cnbj01.cdsgss.com"
+      akId: "***"
+      akSecret: "***"
+      path: "***"
+```
+
+Description:
+
+`driver`: should always be `oss.csi.cds.net`
+
+`volumeHandle`: should be same with pv name
+
+`volumeAttributes`:
+
+​	`bucket`: register in CDS and get one unique name
+
+​	`url`: should always be `http://oss-cnbj01.cdsgss.com`
+
+​	`akId`: get it from your own bucket in CDS
+
+​	`akSecret`: get it from your own bucket in CDS
+
+​	`path`: created in your bucket 
+
+***Note***: path default value is `/` if input empty

@@ -161,137 +161,31 @@ subjects:
   name: cds-csi-sa
   namespace: kube-system
 ---
-apiVersion: v1
-kind: Service
-metadata:
-  labels:
-    name: csi-provisioner
-  name: csi-provisioner
-  namespace: kube-system
-spec:
-  ports:
-  - name: healthz
-    port: 9808
-  selector:
-    type: csi-provisioner
----
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
-  name: nas-csi-cds-controller
-  namespace: kube-system
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: nas-csi-cds-controller
-  serviceName: csi-provisioner
-  template:
-    metadata:
-      labels:
-        app: nas-csi-cds-controller
-        type: csi-provisioner
-    spec:
-      containers:
-      - args:
-        - --endpoint=$(CSI_ENDPOINT)
-        - --v=5
-        - --driver=nas.csi.cds.net
-        env:
-        - name: CSI_ENDPOINT
-          value: unix://socketDir/csi.sock
-        image: registry-bj.capitalonline.net/cck/cds-csi-driver:v1.0.0
-        imagePullPolicy: Always
-        livenessProbe:
-          exec:
-            command:
-            - sh
-            - -c
-            - ps -ef | grep cds-csi-driver | grep nas.csi.cds.net | grep -v grep
-          failureThreshold: 8
-          initialDelaySeconds: 15
-          periodSeconds: 10
-          successThreshold: 1
-          timeoutSeconds: 15
-        name: csi-controller-server
-        resources:
-          limits:
-            cpu: 100m
-            memory: 100Mi
-          requests:
-            cpu: 100m
-            memory: 100Mi
-        securityContext:
-          privileged: true
-        volumeMounts:
-        - mountPath: /var/log/
-          name: host-log
-        - mountPath: /socketDir/
-          name: socket-dir
-        - mountPath: /host/etc
-          name: etc
-      - args:
-        - --csi-address=$(ADDRESS)
-        - --v=5
-        env:
-        - name: ADDRESS
-          value: /socketDir/csi.sock
-        image: registry-bj.capitalonline.net/cck/csi-provisioner:v1.5.0
-        name: csi-provisioner
-        volumeMounts:
-        - mountPath: /socketDir
-          name: socket-dir
-      - args:
-        - --csi-address=/csi/csi.sock
-        image: registry-bj.capitalonline.net/cck/csi-livenessprobe:v2.0.0
-        name: liveness-probe
-        volumeMounts:
-        - mountPath: /csi
-          name: socket-dir
-      nodeSelector:
-        beta.kubernetes.io/os: linux
-      priorityClassName: system-cluster-critical
-      serviceAccount: cds-csi-sa
-      tolerations:
-      - key: CriticalAddonsOnly
-        operator: Exists
-      volumes:
-      - emptyDir: {}
-        name: socket-dir
-      - hostPath:
-          path: /var/log/
-        name: host-log
-      - hostPath:
-          path: /etc
-        name: etc
-  updateStrategy:
-    type: RollingUpdate
----
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: nas-csi-cds-node
+  name: oss-csi-cds-node
   namespace: kube-system
 spec:
   selector:
     matchLabels:
-      app: nas-csi-cds-node
+      app: oss-csi-cds-node
   template:
     metadata:
       labels:
-        app: nas-csi-cds-node
+        app: oss-csi-cds-node
     spec:
       containers:
       - args:
         - --endpoint=$(CSI_ENDPOINT)
         - --v=5
-        - --driver=nas.csi.cds.net
+        - --driver=oss.csi.cds.net
         env:
         - name: CSI_ENDPOINT
-          value: unix://var/lib/kubelet/plugins/nas.csi.cds.net/csi.sock
+          value: unix://var/lib/kubelet/plugins/oss.csi.cds.net/csi.sock
         image: registry-bj.capitalonline.net/cck/cds-csi-driver:v1.0.0
         imagePullPolicy: Always
-        name: nas-csi-node-server
+        name: oss-csi-node-server
         securityContext:
           allowPrivilegeEscalation: true
           capabilities:
@@ -312,9 +206,9 @@ spec:
         - --kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)
         env:
         - name: ADDRESS
-          value: /var/lib/kubelet/plugins/nas.csi.cds.net/csi.sock
+          value: /var/lib/kubelet/plugins/oss.csi.cds.net/csi.sock
         - name: DRIVER_REG_SOCK_PATH
-          value: /var/lib/kubelet/plugins/nas.csi.cds.net/csi.sock
+          value: /var/lib/kubelet/plugins/oss.csi.cds.net/csi.sock
         image: registry-bj.capitalonline.net/cck/csi-node-driver-registrar:v1.2.0
         imagePullPolicy: Always
         lifecycle:
@@ -323,18 +217,18 @@ spec:
               command:
               - /bin/sh
               - -c
-              - rm -rf /registration/nas.csi.cds.net /registration/nas.csi.cds.net-reg.sock
-        name: nas-driver-registrar
+              - rm -rf /registration/oss.csi.cds.net /registration/oss.csi.cds.net-reg.sock
+        name: oss-driver-registrar
         volumeMounts:
         - mountPath: /var/lib/kubelet/
           name: kubelet-dir
         - mountPath: /registration/
           name: registration-dir
       - args:
-        - --csi-address=/var/lib/kubelet/plugins/nas.csi.cds.net/csi.sock
-        - --health-port=9809
+        - --csi-address=/var/lib/kubelet/plugins/oss.csi.cds.net/csi.sock
+        - --health-port=9808
         image: registry-bj.capitalonline.net/cck/csi-livenessprobe:v2.0.0
-        name: nas-liveness-probe
+        name: oss-liveness-probe
         volumeMounts:
         - mountPath: /var/lib/kubelet/
           name: kubelet-dir
@@ -365,6 +259,6 @@ spec:
 apiVersion: storage.k8s.io/v1beta1
 kind: CSIDriver
 metadata:
-  name: nas.csi.cds.net
+  name: oss.csi.cds.net
 spec:
   attachRequired: false

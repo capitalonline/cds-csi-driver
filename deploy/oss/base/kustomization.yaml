@@ -1,0 +1,6 @@
+bases:
+- ../../rbac
+
+resources:
+- csidriver.yaml
+- node.yaml

@@ -1,6 +1,9 @@
 bases:
   - ../../base
 
+patchesStrategicMerge:
+  - node.yaml
+
 images:
   - name: registry-bj.capitalonline.net/cck/cds-csi-driver
-    newTag: v1.0.0
+    newTag: test

@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: oss-csi-pv
+  labels:
+    name: oss-csi-pv
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+  - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  csi:
+    driver: oss.csi.cds.net
+    # set volumeHandle same value pv name
+    volumeHandle: oss-csi-pv
+    volumeAttributes:
+      bucket: "***"
+      url: "http://oss-cnbj01.cdsgss.com"
+      akId: "***"
+      akSecret: "***"
+      path: "/"

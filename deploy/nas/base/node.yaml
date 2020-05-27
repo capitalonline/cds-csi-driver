@@ -19,7 +19,7 @@ spec:
       hostNetwork: true
       hostPID: true
       containers:
-        - name: csi-node-server
+        - name: nas-csi-node-server
           securityContext:
             privileged: true
             capabilities:
@@ -42,7 +42,7 @@ spec:
               mountPath: /var/log/
             - name: etc
               mountPath: /host/etc
-        - name: driver-registrar
+        - name: nas-driver-registrar
           image: registry-bj.capitalonline.net/cck/csi-node-driver-registrar:v1.2.0
           imagePullPolicy: Always
           lifecycle:
@@ -63,10 +63,11 @@ spec:
               mountPath: /var/lib/kubelet/
             - name: registration-dir
               mountPath: /registration/
-        - name: liveness-probe
+        - name: nas-liveness-probe
           image: registry-bj.capitalonline.net/cck/csi-livenessprobe:v2.0.0
           args:
             - "--csi-address=/var/lib/kubelet/plugins/nas.csi.cds.net/csi.sock"
+            - "--health-port=9809"
           volumeMounts:
             - name: kubelet-dir
               mountPath: /var/lib/kubelet/
