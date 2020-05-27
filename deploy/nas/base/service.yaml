@@ -10,4 +10,4 @@ spec:
     type: csi-provisioner
   ports:
     - name: healthz
-      port: 9806
+      port: 9808

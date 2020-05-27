@@ -63,13 +63,16 @@ spec:
               mountPath: /var/lib/kubelet/
             - name: registration-dir
               mountPath: /registration/
-        - name: oss-liveness-probe
+        - name: nas-liveness-probe
           image: registry-bj.capitalonline.net/cck/csi-livenessprobe:v2.0.0
           args:
             - "--csi-address=/var/lib/kubelet/plugins/nas.csi.cds.net/csi.sock"
           volumeMounts:
             - name: kubelet-dir
               mountPath: /var/lib/kubelet/
+          livenessProbe:
+            tcpSocket:
+              port: 9808
       volumes:
         - name: kubelet-dir
           hostPath:
