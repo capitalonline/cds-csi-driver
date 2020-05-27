@@ -226,7 +226,7 @@ spec:
           name: registration-dir
       - args:
         - --csi-address=/var/lib/kubelet/plugins/oss.csi.cds.net/csi.sock
-        - health-port=9808
+        - --health-port=9808
         image: registry-bj.capitalonline.net/cck/csi-livenessprobe:v2.0.0
         name: oss-liveness-probe
         volumeMounts:
