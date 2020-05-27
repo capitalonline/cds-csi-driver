@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: nas-csi-cds-controller
-  namespace: kube-system
+  namespace: cds-system
 spec:
   replicas: 1
   serviceName: csi-provisioner

@@ -1,6 +1,6 @@
 PKG=github.com/capitalonline/cds-csi-driver
 IMAGE?=registry-bj.capitalonline.net/cck/cds-csi-driver
-VERSION=v0.1.3
+VERSION=v1.0.0
 GIT_COMMIT?=$(shell git rev-parse HEAD)
 BUILD_DATE?=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 LDFLAGS?="-X ${PKG}/pkg/common.version=${VERSION} -X ${PKG}/pkg/common.gitCommit=${GIT_COMMIT} -X ${PKG}/pkg/common.buildDate=${BUILD_DATE} -s -w"

@@ -4,4 +4,3 @@ bases:
 resources:
 - csidriver.yaml
 - node.yaml
-- service.yaml

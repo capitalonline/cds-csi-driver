@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: oss-csi-cds-node
-  namespace: kube-system
+  namespace: cds-system
 spec:
   selector:
     matchLabels:
