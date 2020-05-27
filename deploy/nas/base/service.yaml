@@ -2,7 +2,7 @@ kind: Service
 apiVersion: v1
 metadata:
   name: csi-provisioner
-  namespace: cds-system
+  namespace: kube-system
   labels:
     name: csi-provisioner
 spec:

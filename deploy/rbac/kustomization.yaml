@@ -2,4 +2,3 @@ resources:
   - serviceaccount.yaml
   - clusterrole.yaml
   - clusterrolebinding.yaml
-  - namespace.yaml 
