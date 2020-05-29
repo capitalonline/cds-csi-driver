@@ -14,6 +14,7 @@ const (
 	nasPortNumber     = "2049"
 	dialTimeout       = time.Duration(3) * time.Second
 	subpathLiteral    = "subpath"
-	systemLiteral     = "system"
+	fileSystemLiteral    = "filesystem"
 	defaultNfsPath     = "/nfsshare"
+	defaultNfsVersion = "4.0"
 )

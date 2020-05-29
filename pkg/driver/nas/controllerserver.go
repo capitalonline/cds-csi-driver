@@ -18,11 +18,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	cdsNas "github.com/capitalonline/cck-sdk-go/pkg/cck"
 )
 
 var (
 	// stores the processed pvc: key - pvname, value - *csi.Volume
 	processedPvc sync.Map
+	// stores the processed pvc: key - pvName, value - "/nfsshare" + "/" + pvName
+	pvcMountTargetMap sync.Map
 )
 
 func NewControllerServer(d *NasDriver) *ControllerServer {
@@ -42,33 +45,37 @@ func NewControllerServer(d *NasDriver) *ControllerServer {
 }
 
 func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
-	log.Infof("CreateVolume:: starting nas Provisioning: %+v", req)
-	pvName := req.Name
-	var ok bool
-	var volumeAs = subpathLiteral
+	log.Infof("CreateVolume: Starting NFS CreateVolume, req.Name is: %s", req.Name)
 
-	// directly return is the pvc has been processed
+	pvName := req.Name
+	// step1: check pvc is created or not. return pv directly if created, else do create action
 	if value, ok := processedPvc.Load(pvName); ok && value != nil {
 		log.Infof("CreateVolume:: nas Volume %s had been created before, skip: %v", pvName, value)
 		return &csi.CreateVolumeResponse{Volume: value.(*csi.Volume)}, nil
 	}
 
-	if volumeAs, ok = req.GetParameters()["volumeAs"]; !ok {
+	// step2: justify volumeAs type, "subpath" or "filesystem", default is "subpath"
+	volOptions := req.GetParameters()
+	volumeAs, ok := volOptions["volumeAs"]
+	if !ok {
 		volumeAs = subpathLiteral
+	} else if volumeAs != "filesystem" && volumeAs != "subpath"  {
+		return nil, fmt.Errorf("Required parameter [parameter.volumeAs] must be [filesystem] or [subpath]")
 	}
 
+	// step3: create pv
 	volToCreate := &csi.Volume{}
 	if volumeAs == subpathLiteral {
 		log.Infof("CreateVolume:: nas, provisioning subpath volume, req: %+v", req)
 		opts, err := parseVolumeCreateSubpathOptions(req)
 		log.Infof("CreateVolume:: nas, provisioning subpath volume, nfs opts: %+v", opts)
 		if err != nil {
-			return nil, fmt.Errorf("CreateVolume:: nas, failed to parse create volume req: %s", err.Error())
+			return nil, fmt.Errorf("CreateVolume:: nas, failed to parse subpath create volume req, error is: %s", err.Error())
 		}
 
 		// make dir on the nas server
 		if err := opts.createNasSubDir(createVolumeRoot, pvName); err != nil {
-			return nil, fmt.Errorf("CreateVolume:: nas, failed to create subpath on the nas server: %s", err.Error())
+			return nil, fmt.Errorf("CreateVolume:: nas, failed to create subpath on the nas server, error is: %s", err.Error())
 		}
 		// assemble the response
 		volumeContext := newSubpathVolumeContext(opts, pvName)
@@ -77,8 +84,43 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 			CapacityBytes: req.GetCapacityRange().GetRequiredBytes(),
 			VolumeContext: volumeContext,
 		}
-	} else if volumeAs == systemLiteral {
-		return nil, errors.New("CreateVolume:: nas, volumeAs \"system\" is not supported yet")
+	} else if volumeAs == fileSystemLiteral {
+		fileSystemNasID := ""
+		fileSystemReqID := ""
+		volumeContext := map[string]string{}
+		log.Infof("CreateVolume:: nas, provisioning filesystem volume, req: %+v", req)
+		// parse params
+		opts, err := parseVolumeCreateFilesystemOptions(req)
+		log.Infof("CreateVolume:: nas, provisioning filesystem volume, nfs opts: %+v", opts)
+		if err != nil {
+			return nil, fmt.Errorf("CreateVolume:: nas, failed to parse filesystem create volume req, error is: %s", err.Error())
+		}
+		// create filesystem
+		createFileSystemsNasRes, err := cdsNas.CreateFilesystemNas(opts.SiteID, "filesystem", opts.StorageType, opts.Capacity)
+		if err != nil {
+			log.Errorf("Create NAS filesystem failed, error is:%s", err.Error())
+		}
+		fileSystemReqID = createFileSystemsNasRes.FileSystemNasId
+		fileSystemNasID = createFileSystemsNasRes.FileSystemReqId
+		FileSystemNasIP := createFileSystemsNasRes.FileSystemNasIP
+		processedPvc.Store(pvName, fileSystemNasID)
+		log.Infof("CreateVolume: Volume: %s, Successful Create, fileSystemReqID is: %s, fileSystemNasID is: %s, FileSystemNasIP is: %s", pvName, fileSystemReqID, fileSystemNasID, FileSystemNasIP)
+		// make dir on the nas server
+		if err := opts.createNasFilesystemSubDir(createVolumeRoot, pvName, FileSystemNasIP); err != nil {
+			return nil, fmt.Errorf("CreateVolume:: nas, failed to create filesystem on the nas server, error is: %s", err.Error())
+		}
+		pvcMountTargetMap.Store(pvName, defaultNfsPath + "/"+ pvName)
+		// assemble the response
+		volumeContext["volumeAs"] = opts.VolumeAs
+		volumeContext["fileSystemId"] = fileSystemNasID
+		volumeContext["server"] = FileSystemNasIP
+		volumeContext["path"] = defaultNfsPath + "/" + pvName
+		volumeContext["vers"] = defaultNfsVersion
+		volToCreate = &csi.Volume{
+			VolumeId:      pvName,
+			CapacityBytes: req.GetCapacityRange().GetRequiredBytes(),
+			VolumeContext: volumeContext,
+		}
 	} else {
 		return nil, fmt.Errorf("CreateVolume:: nas, unsupported volumeAs: %s", volumeAs)
 	}
