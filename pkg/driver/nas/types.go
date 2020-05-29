@@ -42,6 +42,16 @@ type NfsOpts struct {
 	Strategy string
 }
 
+type NfsFilesystemOpts struct {
+	ProtocolType    string `json:"protocolType"`
+	StorageType     string `json:"storageType"`
+	SiteID          string `json:"siteID"`
+	Capacity		string `json:"capacity"`
+	ClusterID		string `json:"clusterID"`
+	Description     string `json:"description"`
+	DeleteVolume    bool   `json:"deleteVolume"`
+}
+
 type PublishOptions struct {
 	NfsOpts
 	NodePublishPath string
@@ -50,6 +60,11 @@ type PublishOptions struct {
 
 type VolumeCreateSubpathOptions struct {
 	NfsOpts
+	VolumeAs string
+}
+
+type VolumeCreateFilesystemOptions struct {
+	NfsFilesystemOpts
 	VolumeAs string
 }
 

@@ -187,7 +187,7 @@ func parsePublishOptions(req *csi.NodePublishVolumeRequest) (*PublishOptions, er
 
 func newVolumeCreateSubpathOptions(param map[string]string) *VolumeCreateSubpathOptions {
 	opts := &VolumeCreateSubpathOptions{}
-	opts.VolumeAs = subpathLiteral
+	opts.VolumeAs = param["volumeAs"]
 	opts.Servers = param["servers"]
 	opts.Server = param["server"]
 	opts.Path = param["path"]
@@ -198,6 +198,55 @@ func newVolumeCreateSubpathOptions(param map[string]string) *VolumeCreateSubpath
 	opts.Strategy = param["strategy"]
 
 	return opts
+}
+
+func newVolumeCreateFilesystemOptions(param map[string]string) *VolumeCreateFilesystemOptions {
+	opts := &VolumeCreateFilesystemOptions{}
+	opts.VolumeAs = param["volumeAs"]
+	opts.ProtocolType = param["protocolType"]
+	opts.StorageType = param["storageType"]
+	opts.Capacity = param["capacity"]
+	opts.SiteID = param["siteID"]
+	opts.ClusterID = param["clusterID"]
+	opts.Description = param["description"]
+	if param["DeleteVolume"] != "" {
+		opts.DeleteVolume = true
+	} else {
+		opts.DeleteVolume = false
+	}
+	return opts
+}
+
+func parseVolumeCreateFilesystemOptions(req *csi.CreateVolumeRequest) (*VolumeCreateFilesystemOptions, error) {
+	opts := newVolumeCreateFilesystemOptions(req.GetParameters())
+	// protocolType
+	if opts.ProtocolType == ""{
+		log.Warnf("input ProtocolType is none, default set it to NFS")
+		opts.ProtocolType = "NFS"
+	} else if opts.ProtocolType != "NFS" {
+		return nil, fmt.Errorf("Required parameter [parameter.protocolType] must be [NFS]")
+	}
+
+	// storageType
+	if opts.StorageType == "" {
+		opts.StorageType = "Performance"
+	} else if opts.StorageType != "Performance" && opts.StorageType != "Capacity" {
+		return nil, fmt.Errorf("Required parameter [parameter.storageType] must be [Performance] or [Capacity]")
+	}
+
+	// capacity
+	if opts.Capacity == "" {
+		log.Errorf("capacity is empty, it must be not empty")
+		return nil, fmt.Errorf("capacity is empty, it must be not empty")
+	}
+
+	// siteID and clusterID
+	if opts.SiteID == "" || opts.ClusterID == "" {
+		log.Errorf("siteID or clusterID is empty, it must be not empty", opts.SiteID)
+		return nil, fmt.Errorf("zoneID is empty, it must be not empty", opts.ClusterID)
+	}
+
+	return opts, nil
 }
 
 func parseVolumeCreateSubpathOptions(req *csi.CreateVolumeRequest) (*VolumeCreateSubpathOptions, error) {
@@ -368,6 +417,51 @@ func (opts *NfsOpts) createNasSubDir(mountRoot, subDir string) error {
 		log.Errorf("nas, failed to unmount path %s: %s", fullPath, err)
 	}
 	log.Infof("nas, create sub directory successful: %s", opts.Path)
+	return nil
+}
+
+func (opts *NfsFilesystemOpts) createNasFilesystemSubDir(mountRoot, subDir, FileSystemIP string) error {
+	log.Infof("nas, running creatNasSubDir: root: %s, subDir:%s", mountRoot,subDir)
+	localMountPath := filepath.Join(mountRoot, subDir)
+	fullPath := filepath.Join(localMountPath, defaultNFSRoot, subDir)
+	// unmount the volume if it has been mounted
+	log.Infof("nas, unmount fullpath if is mounted: %s", localMountPath)
+	if utils.Mounted(localMountPath) {
+		if err := utils.Unmount(localMountPath); err != nil {
+			log.Errorf("nas, failed to unmount already mounted path %s: %s", localMountPath, err)
+		}
+	}
+
+	log.Infof("nas, creating localMountPath dir: %s", localMountPath)
+	if err := utils.CreateDir(localMountPath, mountPointMode); err != nil {
+		return fmt.Errorf("nas, create localMountPath %s err: %s", localMountPath, err.Error())
+	}
+
+	// mount localMountPath to remote nfs server
+	mntCmd := fmt.Sprintf("mount -t nfs -o vers=%s %s:%s %s", defaultNfsVersion, FileSystemIP, defaultNFSRoot, localMountPath)
+	log.Infof("nas, mount for sub dir: %s", mntCmd)
+	if _, err := utils.RunCommand(mntCmd); err != nil {
+		return fmt.Errorf("nas, failed to localMountPath %s: %s", mntCmd, err.Error())
+	}
+
+	// create sub directory, which makes the folder on the remote nfs server at the same time
+	log.Infof("nas, creating fullPath: %s", fullPath)
+	if err := utils.CreateDir(fullPath, mountPointMode); err != nil {
+		return fmt.Errorf("nas, create sub directory err: " + err.Error())
+	}
+	defer os.RemoveAll(localMountPath)
+
+	log.Infof("nas, changing mode for %s", fullPath)
+	if err := os.Chmod(fullPath, mountPointMode); err != nil {
+		log.Errorf("nas, failed to change the mode of %s to %d", fullPath, mountPointMode)
+	}
+
+	// unmount the local path after the remote folder is created
+	log.Infof("nas, unmount dir after the dir creation: %s", fullPath)
+	if err := utils.Unmount(localMountPath); err != nil {
+		log.Errorf("nas, failed to unmount path %s: %s", fullPath, err)
+	}
+	log.Infof("nas, create sub directory successful: %s", subDir)
 	return nil
 }
 
