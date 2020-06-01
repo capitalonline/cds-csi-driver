@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"time"
 
@@ -71,17 +72,18 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 	volToCreate := &csi.Volume{}
 	if volumeAs == subpathLiteral {
 		log.Infof("CreateVolume:: nas, provisioning subpath volume, req: %+v", req)
+		// step3-subpath-1: parse subpath params
 		opts, err := parseVolumeCreateSubpathOptions(req)
 		log.Infof("CreateVolume:: nas, provisioning subpath volume, nfs opts: %+v", opts)
 		if err != nil {
 			return nil, fmt.Errorf("CreateVolume:: nas, failed to parse subpath create volume req, error is: %s", err.Error())
 		}
 
-		// make dir on the nas server
+		// step3-subpath-2: make dir on the nas server
 		if err := opts.createNasSubDir(createVolumeRoot, pvName); err != nil {
 			return nil, fmt.Errorf("CreateVolume:: nas, failed to create subpath on the nas server, error is: %s", err.Error())
 		}
-		// assemble the response
+		// step3-subpath-3: assemble the response
 		volumeContext := newSubpathVolumeContext(opts, pvName)
 		volToCreate = &csi.Volume{
 			VolumeId:      pvName,
@@ -92,7 +94,14 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 		fileSystemNasID := ""
 		fileSystemReqID := ""
 		fileSystemNasIP := ""
-		// if the pvc mapped fileSystem is already create, skip creating a filesystem
+		// step3-filesystem-1: parse params
+		opts, err := parseVolumeCreateFilesystemOptions(req)
+		log.Infof("CreateVolume: nas, provisioning filesystem volume, nfs opts: %+v", opts)
+		if err != nil {
+			log.Errorf("CreateVolume:: nas, failed to parse filesystem create volume req, error is: %s", err.Error())
+			return nil, fmt.Errorf("CreateVolume:: nas, failed to parse filesystem create volume req, error is: %s", err.Error())
+		}
+		// step3-filesystem-2: if the pvc mapped fileSystem is already create, skip creating a filesystem
 		if value, ok := pvcFileSystemIDMap.Load(pvName); ok && value != "" {
 			log.Warnf("CreateVolume: Nfs Volume(%s)'s filesystemID: %s has been Created Already", pvName, value)
 			fileSystemNasID = value.(string)
@@ -103,19 +112,14 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 			fileSystemNasIP = value.(string)
 			log.Infof("CreateVolume: fileSystemNasID is: %s, fileSystemNasIP is: %s, skip to create mountTargetPath", fileSystemNasID, fileSystemNasIP)
 		} else {
-			// create filesystem
 			log.Infof("CreateVolume: nas, provisioning filesystem volume, req: %+v", req)
-			// parse params
-			opts, err := parseVolumeCreateFilesystemOptions(req)
-			log.Infof("CreateVolume: nas, provisioning filesystem volume, nfs opts: %+v", opts)
+			// 1-create filesystem
+			createFileSystemsNasRes, err := cdsNas.CreateNas(opts.SiteID, "filesystem", opts.StorageType, opts.Capacity)
 			if err != nil {
-				return nil, fmt.Errorf("CreateVolume:: nas, failed to parse filesystem create volume req, error is: %s", err.Error())
+				log.Errorf("Create NAS filesystem failed, error is: %s", err.Error())
+				return nil, fmt.Errorf("Create NAS filesystem failed, error is: %s", err.Error())
 			}
-			// create filesystem
-			createFileSystemsNasRes, err := cdsNas.CreateFilesystemNas(opts.SiteID, "filesystem", opts.StorageType, opts.Capacity)
-			if err != nil {
-				log.Errorf("Create NAS filesystem failed, error is:%s", err.Error())
-			}
+			// 2-store
 			fileSystemReqID = createFileSystemsNasRes.FileSystemNasId
 			fileSystemNasID = createFileSystemsNasRes.FileSystemReqId
 			fileSystemNasIP = createFileSystemsNasRes.FileSystemNasIP
@@ -124,60 +128,69 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 			log.Infof("CreateVolume: Nfs Volume (%s) Successful Created, fileSystemReqID is: %s, fileSystemNasID is: %s, FileSystemNasIP is: %s", pvName, fileSystemReqID, fileSystemNasID, fileSystemNasIP)
 
 		}
-		// if mountTarget is already created, skip create a mountTarget
+		// step3-filesystem-3: if mountTarget is already created, skip create a mountTarget
 		mountTargetPath := ""
 		if value, ok := pvcMountTargetMap.Load(pvName); ok && value != "" {
 			mountTargetPath = value.(string)
 			log.Warnf("CreateVolume: Nfs Volume (%s) mountTargetPath: %s has Created Already, skip to get mountTarget's status", pvName, mountTargetPath)
 		} else {
-			// make dir on the nas server
+			// 1-make dir on the nas server
 			mountTargetPath = filepath.Join(defaultNFSRoot, pvName)
 			if err := createNasFilesystemSubDir(createVolumeRoot, pvName, fileSystemNasIP); err != nil {
 				return nil, fmt.Errorf("CreateVolume:: nas, failed to create mountTargetPath on the nas server, error is: %s", err.Error())
 			}
+			// 2-store
 			pvcMountTargetMap.Store(pvName, mountTargetPath)
 			log.Infof("CreateVolume: Nfs Volume (%s) mountTarget: %s created succeed!", pvName, mountTargetPath)
 		}
-		// assemble the response
+		// step3-filesystem-4: assemble the response
 		volumeContext := map[string]string{}
 		volumeContext["volumeAs"] = volumeAs
 		volumeContext["fileSystemId"] = fileSystemNasID
 		volumeContext["server"] = fileSystemNasIP
 		volumeContext["path"] = mountTargetPath
 		volumeContext["vers"] = defaultNfsVersion
+		volumeContext["deleteVolume"] = strconv.FormatBool(opts.DeleteVolume)
 		volToCreate = &csi.Volume{
 			VolumeId:      pvName,
 			CapacityBytes: req.GetCapacityRange().GetRequiredBytes(),
 			VolumeContext: volumeContext,
 		}
 	} else {
+		log.Errorf("CreateVolume:: nas, unsupported volumeAs: %s, [parameter.volumeAs] must be [filesystem] or [subpath]", volumeAs)
 		return nil, fmt.Errorf("CreateVolume:: nas, unsupported volumeAs: %s, [parameter.volumeAs] must be [filesystem] or [subpath]", volumeAs)
 	}
+	// step4: store
 	processedPvc.Store(pvName, volToCreate)
 	log.Infof("CreateVolume:: nas, successfully provisioned pv %+v:", volToCreate)
+	// step5: return
 	return &csi.CreateVolumeResponse{Volume: volToCreate}, nil
 }
 
 func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
-	log.Infof("DeleteVolume:: nas, starting deleting volume %s", req.GetVolumeId())
+	log.Infof("DeleteVolume:: nas, starting deleting volumeId(pvName): %s", req.GetVolumeId())
 
 	pv, err := c.Client.CoreV1().PersistentVolumes().Get(req.VolumeId, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("DeleteVolume:: nas, get Volume: %s from cluster error: %s", req.VolumeId, err.Error())
 	}
 
-	// get PV volumeAs
+	// check pv's plug-in, must be not empty
 	if pv.Spec.CSI == nil {
-		return nil, fmt.Errorf("DeleteVolume:: nas, Volume Spec with CSI empty: %s, pv: %v", req.VolumeId, pv)
+		return nil, fmt.Errorf("DeleteVolume:: Nas, Volume Spec with CSI empty: %s, pv: %v", req.VolumeId, pv)
 	}
+	// get pv's volumeAs, default is subpath
 	var volumeAs string
-	if v, ok := pv.Spec.CSI.VolumeAttributes["volumeAs"]; !ok {
+	if value, ok := pv.Spec.CSI.VolumeAttributes["volumeAs"]; !ok {
 		volumeAs = subpathLiteral
 	} else {
-		volumeAs = v
+		volumeAs = value
 	}
+	log.Infof("DeleteVolume: Nas, volumeAs is: %s", volumeAs)
 
+	// subpath
 	if volumeAs == subpathLiteral {
+		// step1: get pv's StorageClass info
 		if pv.Spec.StorageClassName == "" {
 			return nil, fmt.Errorf("DeleteVolume:: nas, volume spec with empty storagecless: %s, Spec: %+v", req.VolumeId, pv.Spec)
 		}
@@ -192,7 +205,7 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 			return nil, fmt.Errorf("DeleteVolume:: nas, pvPath cannot be / or empty")
 		}
 
-		// nfsPath is the mount point of the nas server
+		// step2: nfsPath is the mount point of the nas server
 		nasPath := getNasPathFromPvPath(pvPath)
 		mountPoint := filepath.Join(deleteVolumeRoot, req.VolumeId+"-delete")
 		if err := utils.CreateDir(mountPoint, mountPointMode); err != nil {
@@ -231,12 +244,69 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 		}
 		processedPvc.Delete(req.VolumeId)
 		log.Infof("DeleteVolume:: volume %s has been deleted successfully", req.VolumeId)
-		return &csi.DeleteVolumeResponse{}, nil
-	} else if volumeAs == systemLiteral {
-		return nil, errors.New("DeleteVolume:::: nas, volumeAs \"system\" is not supported yet")
-	} else {
-		return nil, fmt.Errorf("CreateVolume:: nas, unsupported volumeAs: %s", volumeAs)
 	}
+
+	// filesystem
+	if volumeAs == fileSystemLiteral {
+		// step1: check params
+		fileSystemNasID := ""
+		fileSystemNasIP := ""
+		mountTargetPath := ""
+		deleteVolume := defaultDeleteVolume
+		if value, ok := pv.Spec.CSI.VolumeAttributes["deleteVolume"]; ok {
+			deleteVolume = value
+		}
+		if deleteVolume == "true" {
+			// step2: check pv's params
+			if value, ok := pv.Spec.CSI.VolumeAttributes["fileSystemId"]; !ok {
+				log.Errorf("DeleteVolume: nas, volumeID is: %s, fileSystemId is empty", req.VolumeId)
+				return nil, fmt.Errorf("DeleteVolume: nas, volumeID is: %s, fileSystemId is empty", req.VolumeId)
+			} else {
+				fileSystemNasID = value
+				log.Info("DeleteVolume: nas, volumeID is: %s, fileSystemId is: %s", req.VolumeId, fileSystemNasID)
+			}
+
+			if value, ok := pv.Spec.CSI.VolumeAttributes["server"]; ok {
+				fileSystemNasIP = value
+				log.Infof("DeleteVolume: nas, volumeID is: %s, server is: %s", req.VolumeId, fileSystemNasIP)
+			} else {
+				log.Errorf("DeleteVolume: volumeID is: %s, Spec with nfs server is empty, CSI is: %v", req.VolumeId, pv.Spec.CSI)
+				return nil, fmt.Errorf("DeleteVolume: volumeID is: %s, Spec with nfs server is empty, CSI is: %v", req.VolumeId, pv.Spec.CSI)
+			}
+			if value, ok := pv.Spec.CSI.VolumeAttributes["path"]; ok {
+				mountTargetPath = value
+				log.Infof("DeleteVolume: nas, volumeID is: %s, path is: %s", req.VolumeId, mountTargetPath)
+			} else {
+				log.Errorf("DeleteVolume: volumeID is: %s, Spec with path is empty, CSI is: %v", req.VolumeId, pv.Spec.CSI)
+				return nil, fmt.Errorf("DeleteVolume: volumeID is: %s, Spec with path is empty, CSI is: %v", req.VolumeId, pv.Spec.CSI)
+			}
+
+			// step3: delete pv's subpath
+			if err := deleteNasFilesystemSubDir(createVolumeRoot, mountTargetPath, fileSystemNasIP); err != nil {
+				return nil, fmt.Errorf("DeleteVolume: nas, failed to create mountTargetPath on the nas server, error is: %s", err.Error())
+			}
+
+			// step4: delete pv's filesystem
+			_, err := cdsNas.DeleteNas(fileSystemNasID)
+			if err != nil {
+				log.Errorf("DeleteVolume: nas filesystem failed, error is: %s", err)
+				return nil, fmt.Errorf("DeleteVolume: nas filesystem failed, error is: %s", err)
+			}
+
+			// step5: clean processedPvc, pvcMountTargetMap, pvcFileSystemIDMap, pvcFileSystemIPMap
+			processedPvc.Delete(req.VolumeId)
+			pvcMountTargetMap.Delete(req.VolumeId)
+			pvcFileSystemIPMap.Delete(fileSystemNasID)
+			pvcFileSystemIDMap.Delete(req.VolumeId)
+			log.Infof("clean processedPvc, pvcMountTargetMap, pvcFileSystemIDMap, pvcFileSystemIPMap record")
+
+			// step6: response
+			log.Infof("DeleteVolume:: Nas volume(%s)'s fileSystem and mountTargetPath have been deleted successfully", req.VolumeId)
+		} else {
+			log.Infof("DeleteVolume: Nas volume(%s) Filesystem's deleteVolume is [false], skip delete mountTargetPath and fileSystem", req.VolumeId)
+		}
+	}
+	return &csi.DeleteVolumeResponse{}, nil
 }
 
 func (c ControllerServer) ValidateVolumeCapabilities(ctx context.Context, req *csi.ValidateVolumeCapabilitiesRequest) (*csi.ValidateVolumeCapabilitiesResponse, error) {

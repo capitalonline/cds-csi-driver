@@ -209,10 +209,16 @@ func newVolumeCreateFilesystemOptions(param map[string]string) *VolumeCreateFile
 	opts.SiteID = param["siteID"]
 	opts.ClusterID = param["clusterID"]
 	opts.Description = param["description"]
-	if param["DeleteVolume"] != "" {
-		opts.DeleteVolume = true
-	} else {
+	value, ok := param["deleteVolume"]
+	if !ok {
 		opts.DeleteVolume = false
+	}else {
+		value = strings.ToLower(value)
+		if value == "true" {
+			opts.DeleteVolume = true
+		} else {
+			opts.DeleteVolume = false
+		}
 	}
 	return opts
 }
@@ -245,7 +251,6 @@ func parseVolumeCreateFilesystemOptions(req *csi.CreateVolumeRequest) (*VolumeCr
 		log.Errorf("siteID or clusterID is empty, it must be not empty", opts.SiteID)
 		return nil, fmt.Errorf("siteID or clusterID is empty, it must be not empty")
 	}
-
 	return opts, nil
 }
 
@@ -421,6 +426,51 @@ func (opts *NfsOpts) createNasSubDir(mountRoot, subDir string) error {
 }
 
 func createNasFilesystemSubDir(mountRoot, subDir, fileSystemNasIP string) error {
+	log.Infof("nas, running createNasFilesystemSubDir, root is: %s, subDir is:%s", mountRoot, subDir)
+	localMountPath := filepath.Join(mountRoot, subDir)
+	fullPath := filepath.Join(localMountPath, defaultNFSRoot, subDir)
+	// unmount the volume if it has been mounted
+	log.Infof("nas, unmount fullpath if is mounted: %s", localMountPath)
+	if utils.Mounted(localMountPath) {
+		if err := utils.Unmount(localMountPath); err != nil {
+			log.Errorf("nas, failed to unmount already mounted path %s: %s", localMountPath, err)
+		}
+	}
+
+	log.Infof("nas, creating localMountPath dir: %s", localMountPath)
+	if err := utils.CreateDir(localMountPath, mountPointMode); err != nil {
+		return fmt.Errorf("nas, create localMountPath %s err: %s", localMountPath, err.Error())
+	}
+
+	// mount localMountPath to remote nfs server
+	mntCmd := fmt.Sprintf("mount -t nfs -o vers=%s %s:%s %s", defaultNfsVersion, fileSystemNasIP, defaultNFSRoot, localMountPath)
+	log.Infof("nas, mount for sub dir: %s", mntCmd)
+	if _, err := utils.RunCommand(mntCmd); err != nil {
+		return fmt.Errorf("nas, failed to localMountPath %s: %s", mntCmd, err.Error())
+	}
+
+	// create sub directory, which makes the folder on the remote nfs server at the same time
+	log.Infof("nas, creating fullPath: %s", fullPath)
+	if err := utils.CreateDir(fullPath, mountPointMode); err != nil {
+		return fmt.Errorf("nas, create sub directory err: " + err.Error())
+	}
+	defer os.RemoveAll(localMountPath)
+
+	log.Infof("nas, changing mode for %s", fullPath)
+	if err := os.Chmod(fullPath, mountPointMode); err != nil {
+		log.Errorf("nas, failed to change the mode of %s to %d", fullPath, mountPointMode)
+	}
+
+	// unmount the local path after the remote folder is created
+	log.Infof("nas, unmount dir after the dir creation: %s", fullPath)
+	if err := utils.Unmount(localMountPath); err != nil {
+		log.Errorf("nas, failed to unmount path %s: %s", fullPath, err)
+	}
+	log.Infof("nas, create sub directory successful: %s", subDir)
+	return nil
+}
+
+func deleteNasFilesystemSubDir(mountRoot, subDir, fileSystemNasIP string) error {
 	log.Infof("nas, running createNasFilesystemSubDir, root is: %s, subDir is:%s", mountRoot, subDir)
 	localMountPath := filepath.Join(mountRoot, subDir)
 	fullPath := filepath.Join(localMountPath, defaultNFSRoot, subDir)
