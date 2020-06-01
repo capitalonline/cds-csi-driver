@@ -26,6 +26,10 @@ var (
 	processedPvc sync.Map
 	// stores the processed pvc: key - pvName, value - "/nfsshare" + "/" + pvName
 	pvcMountTargetMap sync.Map
+	// stores the processed pvc: key - pvName, value - fileSystemID
+	pvcFileSystemIDMap sync.Map
+	// stores the processed pvc: key - fileSystemNasID, value - fileSystemIP
+	pvcFileSystemIPMap sync.Map
 )
 
 func NewControllerServer(d *NasDriver) *ControllerServer {
@@ -87,34 +91,59 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 	} else if volumeAs == fileSystemLiteral {
 		fileSystemNasID := ""
 		fileSystemReqID := ""
-		volumeContext := map[string]string{}
-		log.Infof("CreateVolume:: nas, provisioning filesystem volume, req: %+v", req)
-		// parse params
-		opts, err := parseVolumeCreateFilesystemOptions(req)
-		log.Infof("CreateVolume:: nas, provisioning filesystem volume, nfs opts: %+v", opts)
-		if err != nil {
-			return nil, fmt.Errorf("CreateVolume:: nas, failed to parse filesystem create volume req, error is: %s", err.Error())
+		fileSystemNasIP := ""
+		// if the pvc mapped fileSystem is already create, skip creating a filesystem
+		if value, ok := pvcFileSystemIDMap.Load(pvName); ok && value != "" {
+			log.Warnf("CreateVolume: Nfs Volume(%s)'s filesystemID: %s has been Created Already", pvName, value)
+			fileSystemNasID = value.(string)
+			if value, ok := pvcFileSystemIPMap.Load(fileSystemNasID); ok && value == "" {
+				log.Errorf("CreateVolume: fileSystemNasID: %s has been created and store in [pvcFileSystemIPMap], but fileSystemNasIP is empty", fileSystemNasID)
+				return nil, fmt.Errorf("CreateVolume: fileSystemNasID: %s has been created and store in [pvcFileSystemIPMap], but fileSystemNasIP is empty", fileSystemNasID)
+			}
+			fileSystemNasIP = value.(string)
+			log.Infof("CreateVolume: fileSystemNasID is: %s, fileSystemNasIP is: %s, skip to create mountTargetPath", fileSystemNasID, fileSystemNasIP)
+		} else {
+			// create filesystem
+			log.Infof("CreateVolume: nas, provisioning filesystem volume, req: %+v", req)
+			// parse params
+			opts, err := parseVolumeCreateFilesystemOptions(req)
+			log.Infof("CreateVolume: nas, provisioning filesystem volume, nfs opts: %+v", opts)
+			if err != nil {
+				return nil, fmt.Errorf("CreateVolume:: nas, failed to parse filesystem create volume req, error is: %s", err.Error())
+			}
+			// create filesystem
+			createFileSystemsNasRes, err := cdsNas.CreateFilesystemNas(opts.SiteID, "filesystem", opts.StorageType, opts.Capacity)
+			if err != nil {
+				log.Errorf("Create NAS filesystem failed, error is:%s", err.Error())
+			}
+			fileSystemReqID = createFileSystemsNasRes.FileSystemNasId
+			fileSystemNasID = createFileSystemsNasRes.FileSystemReqId
+			fileSystemNasIP = createFileSystemsNasRes.FileSystemNasIP
+			pvcFileSystemIDMap.Store(pvName, fileSystemNasID)
+			pvcFileSystemIPMap.Store(fileSystemNasID, fileSystemNasIP)
+			log.Infof("CreateVolume: Nfs Volume (%s) Successful Created, fileSystemReqID is: %s, fileSystemNasID is: %s, FileSystemNasIP is: %s", pvName, fileSystemReqID, fileSystemNasID, fileSystemNasIP)
+
 		}
-		// create filesystem
-		createFileSystemsNasRes, err := cdsNas.CreateFilesystemNas(opts.SiteID, "filesystem", opts.StorageType, opts.Capacity)
-		if err != nil {
-			log.Errorf("Create NAS filesystem failed, error is:%s", err.Error())
+		// if mountTarget is already created, skip create a mountTarget
+		mountTargetPath := ""
+		if value, ok := pvcMountTargetMap.Load(pvName); ok && value != "" {
+			mountTargetPath = value.(string)
+			log.Warnf("CreateVolume: Nfs Volume (%s) mountTargetPath: %s has Created Already, skip to get mountTarget's status", pvName, mountTargetPath)
+		} else {
+			// make dir on the nas server
+			mountTargetPath = filepath.Join(defaultNFSRoot, pvName)
+			if err := createNasFilesystemSubDir(createVolumeRoot, pvName, fileSystemNasIP); err != nil {
+				return nil, fmt.Errorf("CreateVolume:: nas, failed to create mountTargetPath on the nas server, error is: %s", err.Error())
+			}
+			pvcMountTargetMap.Store(pvName, mountTargetPath)
+			log.Infof("CreateVolume: Nfs Volume (%s) mountTarget: %s created succeed!", pvName, mountTargetPath)
 		}
-		fileSystemReqID = createFileSystemsNasRes.FileSystemNasId
-		fileSystemNasID = createFileSystemsNasRes.FileSystemReqId
-		FileSystemNasIP := createFileSystemsNasRes.FileSystemNasIP
-		processedPvc.Store(pvName, fileSystemNasID)
-		log.Infof("CreateVolume: Volume: %s, Successful Create, fileSystemReqID is: %s, fileSystemNasID is: %s, FileSystemNasIP is: %s", pvName, fileSystemReqID, fileSystemNasID, FileSystemNasIP)
-		// make dir on the nas server
-		if err := opts.createNasFilesystemSubDir(createVolumeRoot, pvName, FileSystemNasIP); err != nil {
-			return nil, fmt.Errorf("CreateVolume:: nas, failed to create filesystem on the nas server, error is: %s", err.Error())
-		}
-		pvcMountTargetMap.Store(pvName, defaultNfsPath + "/"+ pvName)
 		// assemble the response
-		volumeContext["volumeAs"] = opts.VolumeAs
+		volumeContext := map[string]string{}
+		volumeContext["volumeAs"] = volumeAs
 		volumeContext["fileSystemId"] = fileSystemNasID
-		volumeContext["server"] = FileSystemNasIP
-		volumeContext["path"] = defaultNfsPath + "/" + pvName
+		volumeContext["server"] = fileSystemNasIP
+		volumeContext["path"] = mountTargetPath
 		volumeContext["vers"] = defaultNfsVersion
 		volToCreate = &csi.Volume{
 			VolumeId:      pvName,
@@ -122,7 +151,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 			VolumeContext: volumeContext,
 		}
 	} else {
-		return nil, fmt.Errorf("CreateVolume:: nas, unsupported volumeAs: %s", volumeAs)
+		return nil, fmt.Errorf("CreateVolume:: nas, unsupported volumeAs: %s, [parameter.volumeAs] must be [filesystem] or [subpath]", volumeAs)
 	}
 	processedPvc.Store(pvName, volToCreate)
 	log.Infof("CreateVolume:: nas, successfully provisioned pv %+v:", volToCreate)

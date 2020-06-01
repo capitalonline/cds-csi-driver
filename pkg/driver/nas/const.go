@@ -15,6 +15,5 @@ const (
 	dialTimeout       = time.Duration(3) * time.Second
 	subpathLiteral    = "subpath"
 	fileSystemLiteral    = "filesystem"
-	defaultNfsPath     = "/nfsshare"
 	defaultNfsVersion = "4.0"
 )
