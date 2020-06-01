@@ -243,7 +243,7 @@ func parseVolumeCreateFilesystemOptions(req *csi.CreateVolumeRequest) (*VolumeCr
 	// siteID and clusterID
 	if opts.SiteID == "" || opts.ClusterID == "" {
 		log.Errorf("siteID or clusterID is empty, it must be not empty", opts.SiteID)
-		return nil, fmt.Errorf("zoneID is empty, it must be not empty", opts.ClusterID)
+		return nil, fmt.Errorf("siteID or clusterID is empty, it must be not empty")
 	}
 
 	return opts, nil
@@ -420,8 +420,8 @@ func (opts *NfsOpts) createNasSubDir(mountRoot, subDir string) error {
 	return nil
 }
 
-func (opts *NfsFilesystemOpts) createNasFilesystemSubDir(mountRoot, subDir, FileSystemIP string) error {
-	log.Infof("nas, running creatNasSubDir: root: %s, subDir:%s", mountRoot,subDir)
+func createNasFilesystemSubDir(mountRoot, subDir, fileSystemNasIP string) error {
+	log.Infof("nas, running createNasFilesystemSubDir, root is: %s, subDir is:%s", mountRoot, subDir)
 	localMountPath := filepath.Join(mountRoot, subDir)
 	fullPath := filepath.Join(localMountPath, defaultNFSRoot, subDir)
 	// unmount the volume if it has been mounted
@@ -438,7 +438,7 @@ func (opts *NfsFilesystemOpts) createNasFilesystemSubDir(mountRoot, subDir, File
 	}
 
 	// mount localMountPath to remote nfs server
-	mntCmd := fmt.Sprintf("mount -t nfs -o vers=%s %s:%s %s", defaultNfsVersion, FileSystemIP, defaultNFSRoot, localMountPath)
+	mntCmd := fmt.Sprintf("mount -t nfs -o vers=%s %s:%s %s", defaultNfsVersion, fileSystemNasIP, defaultNFSRoot, localMountPath)
 	log.Infof("nas, mount for sub dir: %s", mntCmd)
 	if _, err := utils.RunCommand(mntCmd); err != nil {
 		return fmt.Errorf("nas, failed to localMountPath %s: %s", mntCmd, err.Error())
