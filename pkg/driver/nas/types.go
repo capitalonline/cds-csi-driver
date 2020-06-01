@@ -43,13 +43,13 @@ type NfsOpts struct {
 }
 
 type NfsFilesystemOpts struct {
-	ProtocolType    string `json:"protocolType"`
-	StorageType     string `json:"storageType"`
-	SiteID          string `json:"siteID"`
-	Capacity		string `json:"capacity"`
-	ClusterID		string `json:"clusterID"`
-	Description     string `json:"description"`
-	DeleteVolume    bool   `json:"deleteVolume"`
+	ProtocolType    string
+	StorageType     string
+	SiteID          string
+	Capacity		string
+	ClusterID		string
+	Description     string
+	DeleteVolume    bool
 }
 
 type PublishOptions struct {
