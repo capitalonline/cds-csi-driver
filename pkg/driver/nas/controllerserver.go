@@ -2,7 +2,6 @@ package nas
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -306,6 +305,7 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 			log.Infof("DeleteVolume: Nas volume(%s) Filesystem's deleteVolume is [false], skip delete mountTargetPath and fileSystem", req.VolumeId)
 		}
 	}
+
 	return &csi.DeleteVolumeResponse{}, nil
 }
 
