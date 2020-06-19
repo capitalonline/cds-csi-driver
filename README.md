@@ -55,10 +55,10 @@ Description:
 
 `volumeAttributes`: defined as below:
 
-|Key|Value|Required|Description|||
-|:----:|:-----------|:---:|:----|------|------|
-|server|e.g. "140.210.75.195"|yes|the mount point of the nfs server,can be found on NAS product list|||
-|path|e.g. "/nfsshare/division1"|yes|the path that the pv will use on the nfs server. It must start with `/nfsshare`. Each pv will use a separate directory(e.g `/nfsshare/division1/volumeHandleValue"`when `allowShared` is `false`. Otherwsise, the path of pv will be the same to `path`, which means all PVs with the same path will share data|||
+|Key|Value|Required|Description|
+|:----:|:-----------|:---:|:----|
+|server|e.g. "140.210.75.195"|yes|the mount point of the nfs server,can be found on NAS product list|
+|path|e.g. "/nfsshare/division1"|yes|the path that the pv will use on the nfs server. It must start with `/nfsshare`. Each pv will use a separate directory(e.g `/nfsshare/division1/volumeHandleValue"`when `allowShared` is `false`. Otherwsise, the path of pv will be the same to `path`, which means all PVs with the same path will share data|
 |vers|`3` or `4.0`|no| the protocol version to use for the nfs mount. if not provided, `4.0` will be used by default
 |options|e.g. `noresvport`|no| options for the nfs mount. If not provided it will be set to `noresvport` for `vers=4.0` and `noresvport,nolock,tcp` for `vers=3`|
 |mode|e.g. `0777`|no| to customize the mode of the path created on nfs server. If not provided, the server's default mask will be used|
