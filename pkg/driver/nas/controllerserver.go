@@ -175,7 +175,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 			pvcFileSystemIDMap.Store(pvName, fileSystemNasID)
 			pvcFileSystemIPMap.Store(fileSystemNasID, fileSystemNasIP)
 
-			log.Infof("CreateVolume: Nfs Volume (%s) Successful Created, fileSystemReqID is: %s, fileSystemNasID is: %s, FileSystemNasIP is: %s", pvName, fileSystemReqID, fileSystemNasID, fileSystemNasIP)
+			log.Infof("CreateVolume: Nfs Volume (%s) Successful Created, fileSystemNasID is: %s, FileSystemNasIP is: %s", pvName, fileSystemNasID, fileSystemNasIP)
 
 		}
 		// step3-filesystem-3: if mountTarget is already created, skip create a mountTarget
@@ -362,7 +362,7 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 			// step6: response
 			log.Infof("DeleteVolume:: Nas volume(%s)'s fileSystem and mountTargetPath have been deleted successfully", req.VolumeId)
 		} else {
-			// retain pv's filesystem type nas
+			// retain pv's filesystem NAS storage
 			log.Infof("DeleteVolume: Nas volume(%s) Filesystem's deleteVolume is [false], skip delete mountTargetPath and fileSystem", req.VolumeId)
 		}
 	}
