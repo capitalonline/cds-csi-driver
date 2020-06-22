@@ -144,20 +144,12 @@ spec:
 
 Description:
 
-`driver`: should always be `oss.csi.cds.net`
-
-`volumeHandle`: should be same with pv name
-
-`volumeAttributes`:
-
-​	`bucket`: register in CDS and get one unique name
-
-​	`url`: should always be `http://oss-cnbj01.cdsgss.com`
-
-​	`akId`: get it from your own bucket in CDS
-
-​	`akSecret`: get it from your own bucket in CDS
-
-​	`path`: created in your bucket 
-
-***Note***: path default value is `/` if input empty
+| Key          | Value                        | Required | Description                              |
+| ------------ | ---------------------------- | -------- | ---------------------------------------- |
+| driver       | oss.csi.cds.net              | Yes      | CDS csi driver name                      |
+| volumeHandle | <pv_name>                    | Yes      | Should be same with pv name              |
+| bucket       | <bucket_name>                | Yes      | Register in CDS and get one unique name  |
+| url          | http://oss-cnbj01.cdsgss.com | Yes      | Should be `http://oss-cnbj01.cdsgss.com` |
+| akId         | <access_key>                 | Yes      | Get it from your own bucket's in CDS web |
+| akSecret     | <acckedd_key_secret>         | Yes      | Get it from your own bucket's in CDS web |
+| path         | <bucket_path>                | Yes      | Bucket path, default is `/`              |
