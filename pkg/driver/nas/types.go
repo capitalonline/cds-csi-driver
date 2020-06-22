@@ -46,9 +46,7 @@ type NfsFilesystemOpts struct {
 	ProtocolType    string
 	StorageType     string
 	SiteID          string
-	Capacity		string
 	ClusterID		string
-	Description     string
 	DeleteVolume    bool
 }
 

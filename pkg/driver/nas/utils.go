@@ -205,10 +205,8 @@ func newVolumeCreateFilesystemOptions(param map[string]string) *VolumeCreateFile
 	opts.VolumeAs = param["volumeAs"]
 	opts.ProtocolType = param["protocolType"]
 	opts.StorageType = param["storageType"]
-	opts.Capacity = param["capacity"]
 	opts.SiteID = param["siteID"]
 	opts.ClusterID = param["clusterID"]
-	opts.Description = param["description"]
 	value, ok := param["deleteVolume"]
 	if !ok {
 		opts.DeleteVolume = false
@@ -226,7 +224,7 @@ func newVolumeCreateFilesystemOptions(param map[string]string) *VolumeCreateFile
 func parseVolumeCreateFilesystemOptions(req *csi.CreateVolumeRequest) (*VolumeCreateFilesystemOptions, error) {
 	opts := newVolumeCreateFilesystemOptions(req.GetParameters())
 	// protocolType
-	if opts.ProtocolType == ""{
+	if opts.ProtocolType == "" {
 		log.Warnf("input ProtocolType is none, default set it to NFS")
 		opts.ProtocolType = "NFS"
 	} else if opts.ProtocolType != "NFS" {
@@ -235,15 +233,9 @@ func parseVolumeCreateFilesystemOptions(req *csi.CreateVolumeRequest) (*VolumeCr
 
 	// storageType
 	if opts.StorageType == "" {
-		opts.StorageType = "Performance"
-	} else if opts.StorageType != "Performance" && opts.StorageType != "Capacity" {
-		return nil, fmt.Errorf("Required parameter [parameter.storageType] must be [Performance] or [Capacity]")
-	}
-
-	// capacity
-	if opts.Capacity == "" {
-		log.Errorf("capacity is empty, it must be not empty")
-		return nil, fmt.Errorf("capacity is empty, it must be not empty")
+		opts.StorageType = "high_disk"
+	} else if opts.StorageType != "high_disk" {
+		return nil, fmt.Errorf("Required parameter [parameter.storageType] must be [high_disk] ")
 	}
 
 	// siteID and clusterID

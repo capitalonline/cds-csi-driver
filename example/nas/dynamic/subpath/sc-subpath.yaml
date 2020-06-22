@@ -1,7 +1,7 @@
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: nas-csi-csd-sc
+  name: nas-csi-csd-sc-subpath
 parameters:
   volumeAs: subpath
   server: "140.210.75.195"
