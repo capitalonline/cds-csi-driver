@@ -17,4 +17,5 @@ const (
 	fileSystemLiteral = "filesystem"
 	defaultNfsVersion = "4.0"
 	defaultDeleteVolume = "false"
+	defaultNfsPath     = "/nfsshare"
 )
