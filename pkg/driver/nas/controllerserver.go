@@ -175,13 +175,15 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 
 			log.Infof("CreateVolume: Nfs Volume (%s) Successful Created, fileSystemNasID is: %s, FileSystemNasIP is: %s", pvName, fileSystemNasID, fileSystemNasIP)
 
+			// only do create nas storage and mount to cluster, then to return
+			return nil, nil 
 		}
 
 		// step3-filesystem-3: check if nas mounted to cluster and get nasIP
 		if value, ok := pvcFileSystemIPMap.Load(fileSystemNasID); ok && value != "" {
 			fileSystemNasIP = value.(string)
 		} else {
-			log.Infof("CreateVolume: fileSystemNasID: %s has been created and store in [pvcFileSystemIPMap], but fileSystemNasIP is empty, waiting mount to cluster and get nasIP", fileSystemNasID)
+			log.Warnf("CreateVolume: fileSystemNasID: %s has been created and store in [pvcFileSystemIPMap], but fileSystemNasIP is empty, waiting mount to cluster and get nasIP", fileSystemNasID)
 			return nil, fmt.Errorf("CreateVolume: fileSystemNasID: %s, waiting for mount to cluster and get nasIP", fileSystemNasID)
 		}
 
