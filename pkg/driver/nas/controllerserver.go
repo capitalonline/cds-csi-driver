@@ -125,7 +125,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 
 			// 1-create filesystem
 			storageSize := req.CapacityRange.RequiredBytes/(1024 * 1024 * 1024)
-			createFileSystemsNasRes, err := cdsNas.CreateNas(opts.SiteID, pvName, opts.StorageType, int(storageSize))
+			createFileSystemsNasRes, err := cdsNas.CreateNas(opts.SiteID, pvName[0:29], opts.StorageType, int(storageSize))
 
 			if err != nil {
 				log.Errorf("CreateVolume: Create NAS filesystem task api error, error is: %s", err.Error())
