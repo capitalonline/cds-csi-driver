@@ -130,17 +130,18 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 			log.Infof("CreateVolume: nas, provisioning filesystem volume, req: %+v", req)
 
 			// 1-create filesystem
-			log.Infof("CreateVolume: req.CapacityRange.RequiredBytes is: %d", req.CapacityRange.RequiredBytes)
 			storageSize := req.CapacityRange.RequiredBytes/(1024 * 1024 * 1024)
-			log.Infof("CreateVolume: storageSize is: %d", storageSize)
+
 			createFileSystemsNasRes, err := cdsNas.CreateNas(opts.SiteID, "Nas-"+pvName[0:12], opts.StorageType, int(storageSize))
+
+			log.Infof("CreateVolume: createFileSystemsNasRes is: %+v", createFileSystemsNasRes)
 
 			if err != nil {
 				log.Errorf("CreateVolume: Create NAS filesystem task api error, error is: %s", err.Error())
 				return nil, fmt.Errorf("CreateVolume: Create NAS filesystem task api error, error is: %s", err.Error())
 			}
 
-			fileSystemReqID = createFileSystemsNasRes.Data.TaskID
+			fileSystemReqID = createFileSystemsNasRes.TaskID
 			fileSystemNasID = createFileSystemsNasRes.Data.NasID
 
 			log.Infof("CreateVolume: create Nas succeed, fileSystemReqID is: %s, fileSystemNasID is: %s", fileSystemReqID, fileSystemNasID)
@@ -162,7 +163,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 				return nil, fmt.Errorf("CreateVolume: Create mount Nas task api error, err is: %s", err.Error())
 			}
 
-			mountReqID := mountNasRes.Data.TaskID
+			mountReqID := mountNasRes.TaskID
 			fileSystemNasIP = mountNasRes.Data.NasIP
 
 			// 4-get mount task status
