@@ -30,7 +30,7 @@ var (
 	pvcFileSystemIDMap sync.Map
 	// stores the processed pvc: key - fileSystemNasID, value - fileSystemIP
 	pvcFileSystemIPMap sync.Map
-	// pvcFileSystemDeleteMap pvc: key - fileSystemNasID, value - deleting
+	// pvcFileSystemDeleteMap pvc: key - fileSystemNasID, value - deleting or ok
 	pvcFileSystemDeleteMap sync.Map
 )
 
@@ -336,9 +336,16 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 			}
 
 			// check if pv is deleted or not
-			if value, ok := pvcFileSystemDeleteMap.Load(fileSystemNasID); ok && value == "deleting"{
-				log.Infof("DeleteVolume: the pv has been deleting, ignore this request to avoid repeating delete")
-				return nil, fmt.Errorf("DeleteVolume: the pv have been deleting, ignore this request to avoid repeating delete")
+			if value, ok := pvcFileSystemDeleteMap.Load(fileSystemNasID); ok {
+				if value == "deleting" {
+					log.Infof("DeleteVolume: the pv has been deleting, ignore this request to avoid repeating delete")
+					return nil, fmt.Errorf("DeleteVolume: the pv have been deleting, ignore this request to avoid repeating delete")
+				} else if value == "ok" {
+					log.Infof("DeleteVolume: pv deleting process finished")
+					pvcFileSystemDeleteMap.Delete(fileSystemNasID)
+					return &csi.DeleteVolumeResponse{}, nil
+				}
+
 			}
 
 			// set pv deleting status
@@ -401,7 +408,7 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 			pvcMountTargetMap.Delete(req.VolumeId)
 			pvcFileSystemIPMap.Delete(fileSystemNasID)
 			pvcFileSystemIDMap.Delete(req.VolumeId)
-			pvcFileSystemDeleteMap.Delete(fileSystemNasID)
+			pvcFileSystemDeleteMap.Store(fileSystemNasID, "ok")
 			log.Infof("clean processedPvc, pvcMountTargetMap, pvcFileSystemIDMap, pvcFileSystemIPMap, pvcFileSystemDeleteMap record")
 
 			// step7: response
