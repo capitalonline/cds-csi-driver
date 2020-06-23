@@ -463,47 +463,47 @@ func createNasFilesystemSubDir(mountRoot, subDir, fileSystemNasIP string) error 
 }
 
 func deleteNasFilesystemSubDir(mountRoot, subDir, fileSystemNasIP string) error {
-	log.Infof("nas, running createNasFilesystemSubDir, root is: %s, subDir is:%s", mountRoot, subDir)
-	localMountPath := filepath.Join(mountRoot, subDir)
-	fullPath := filepath.Join(localMountPath, defaultNFSRoot, subDir)
+
+	log.Infof("nas, running createNasFilesystemSubDir, mountRoot is: %s, subDir is:%s", mountRoot, subDir)
+
 	// unmount the volume if it has been mounted
-	log.Infof("nas, unmount fullpath if is mounted: %s", localMountPath)
-	if utils.Mounted(localMountPath) {
-		if err := utils.Unmount(localMountPath); err != nil {
-			log.Errorf("nas, failed to unmount already mounted path %s: %s", localMountPath, err)
+	log.Infof("nas, unmount mountRoot if is mounted: %s", mountRoot)
+	if utils.Mounted(mountRoot) {
+		if err := utils.Unmount(mountRoot); err != nil {
+			log.Errorf("nas, failed to unmount already mounted path: %s, err is: %s", mountRoot, err)
 		}
 	}
 
-	log.Infof("nas, creating localMountPath dir: %s", localMountPath)
-	if err := utils.CreateDir(localMountPath, mountPointMode); err != nil {
-		return fmt.Errorf("nas, create localMountPath %s err: %s", localMountPath, err.Error())
+	log.Infof("nas, creating mountRoot dir: %s", mountRoot)
+	if err := utils.CreateDir(mountRoot, mountPointMode); err != nil {
+		return fmt.Errorf("nas, create mountRoot %s err: %s", mountRoot, err.Error())
 	}
 
-	// mount localMountPath to remote nfs server
-	mntCmd := fmt.Sprintf("mount -t nfs -o vers=%s %s:%s %s", defaultNfsVersion, fileSystemNasIP, defaultNFSRoot, localMountPath)
-	log.Infof("nas, mount for sub dir: %s", mntCmd)
+	// mount mountRoot to remote nfs server
+	mntCmd := fmt.Sprintf("mount -t nfs -o vers=%s %s:%s %s", defaultNfsVersion, fileSystemNasIP, defaultNFSRoot, mountRoot)
+	log.Infof("nas, mntCmd is: %s", mntCmd)
+
 	if _, err := utils.RunCommand(mntCmd); err != nil {
-		return fmt.Errorf("nas, failed to localMountPath %s: %s", mntCmd, err.Error())
+		return fmt.Errorf("nas, failed to mountRoot %s: %s", mntCmd, err.Error())
 	}
 
-	// create sub directory, which makes the folder on the remote nfs server at the same time
-	log.Infof("nas, creating fullPath: %s", fullPath)
-	if err := utils.CreateDir(fullPath, mountPointMode); err != nil {
-		return fmt.Errorf("nas, create sub directory err: " + err.Error())
-	}
-	defer os.RemoveAll(localMountPath)
+	// delete pv's path
+	deleteDir := mountRoot + strings.TrimPrefix(subDir, "/nfsshare")
+	log.Infof("nas, delete pv path is: %s", deleteDir)
 
-	log.Infof("nas, changing mode for %s", fullPath)
-	if err := os.Chmod(fullPath, mountPointMode); err != nil {
-		log.Errorf("nas, failed to change the mode of %s to %d", fullPath, mountPointMode)
+	if err := os.RemoveAll(deleteDir); err != nil {
+		log.Errorf("nas, delete pv path error, err is: %s", err)
 	}
+
+	log.Infof("nas, delete pv path succeed in NAS storage")
+	defer os.RemoveAll(mountRoot)
 
 	// unmount the local path after the remote folder is created
-	log.Infof("nas, unmount dir after the dir creation: %s", fullPath)
-	if err := utils.Unmount(localMountPath); err != nil {
-		log.Errorf("nas, failed to unmount path %s: %s", fullPath, err)
+	log.Infof("nas, unmount dir after the dir creation: %s", mountRoot)
+	if err := utils.Unmount(mountRoot); err != nil {
+		log.Errorf("nas, failed to unmount path %s: %s", mountRoot, err)
 	}
-	log.Infof("nas, create sub directory successful: %s", subDir)
+
 	return nil
 }
 
