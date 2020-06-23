@@ -30,6 +30,8 @@ var (
 	pvcFileSystemIDMap sync.Map
 	// stores the processed pvc: key - fileSystemNasID, value - fileSystemIP
 	pvcFileSystemIPMap sync.Map
+	// pvcFileSystemDeleteMap pvc: key - fileSystemNasID, value - deleting
+	pvcFileSystemDeleteMap sync.Map
 )
 
 func NewControllerServer(d *NasDriver) *ControllerServer {
@@ -352,12 +354,15 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 			}
 
 			// check if pv is deleted or not
-			if value, ok := pvcFileSystemIPMap.Load(fileSystemNasID); ok && value == "" {
+			if value, ok := pvcFileSystemDeleteMap.Load(fileSystemNasID); ok && value == "deleting"{
 				log.Infof("DeleteVolume: the pv has been deleting, ignore this request to avoid repeating delete")
 				return nil, fmt.Errorf("DeleteVolume: the pv have been deleting, ignore this request to avoid repeating delete")
 			} else {
-				log.Infof("DeleteVolume:  pvcFileSystemIPMap.Load(fileSystemNasID), value is: %s, ok is: %s", value, ok)
+				log.Infof("DeleteVolume:  pvcFileSystemIPMap.Load(fileSystemNasID), value is: %s", value)
 			}
+
+			// set pv deleting status
+			pvcFileSystemDeleteMap.Store(fileSystemNasID, "deleting")
 
 			// step3: delete pv data in NAS storage
 			if err := deleteNasFilesystemSubDir(deleteVolumeRoot, mountTargetPath, fileSystemNasIP); err != nil {
@@ -369,9 +374,6 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 			if err != nil {
 				log.Errorf("DeleteVolume: cdsNas.UnMountNas api error, err is: %s", err)
 			}
-
-			// clean pvcFileSystemIPMap to avoid repeating delete action
-			pvcFileSystemIPMap.Delete(fileSystemNasID)
 
 			// get unmount task status
 			unMountNasTaskID := unMountNasRes.TaskID
@@ -393,12 +395,13 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 
 			log.Infof("DeleteVolume: delete NAS storage succeed!")
 
-			// step6: clean processedPvc, pvcMountTargetMap, pvcFileSystemIPMap
+			// step6: clean processedPvc, pvcMountTargetMap, pvcFileSystemIPMap, pvcFileSystemIDMap, pvcFileSystemDeleteMap
 			processedPvc.Delete(req.VolumeId)
 			pvcMountTargetMap.Delete(req.VolumeId)
-			// pvcFileSystemIPMap.Delete(fileSystemNasID)
+			pvcFileSystemIPMap.Delete(fileSystemNasID)
 			pvcFileSystemIDMap.Delete(req.VolumeId)
-			log.Infof("clean processedPvc, pvcMountTargetMap, pvcFileSystemIDMap, pvcFileSystemIPMap record")
+			pvcFileSystemDeleteMap.Delete(fileSystemNasID)
+			log.Infof("clean processedPvc, pvcMountTargetMap, pvcFileSystemIDMap, pvcFileSystemIPMap, pvcFileSystemDeleteMap record")
 
 			// step7: response
 			log.Infof("DeleteVolume:: Nas volume(%s)'s NAS storage and mountTargetPath have been deleted successfully", req.VolumeId)
