@@ -235,7 +235,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 }
 
 func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
-	log.Infof("DeleteVolume:: nas, starting deleting volumeId(pvName): %s", req.GetVolumeId())
+	log.Infof("DeleteVolume:: nas, delete volumeId(pvName) is: %s", req.GetVolumeId())
 
 	pv, err := c.Client.CoreV1().PersistentVolumes().Get(req.VolumeId, metav1.GetOptions{})
 	if err != nil {
@@ -324,11 +324,6 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 			deleteVolume = value
 		}
 		if deleteVolume == "true" {
-			// check if delete or not
-			if value, ok := processedPvc.Load(req.VolumeId); ok && value == "" {
-				log.Infof("DeleteVolume: the pv have been deleting, ignore this request to avoid repeating delete")
-				return nil, fmt.Errorf("DeleteVolume: the pv have been deleting, ignore this request to avoid repeating delete")
-			}
 			// step2: check pv's params
 			if value, ok := pv.Spec.CSI.VolumeAttributes["fileSystemId"]; !ok {
 				log.Errorf("DeleteVolume: nas, volumeID is: %s, fileSystemId is empty", req.VolumeId)
@@ -356,6 +351,12 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 				return nil, fmt.Errorf("DeleteVolume: volumeID is: %s, Spec with path is empty, CSI is: %v", req.VolumeId, pv.Spec.CSI)
 			}
 
+			// check if delete or not
+			if value, ok := pvcFileSystemIPMap.Load(fileSystemNasID); ok && value == "" {
+				log.Infof("DeleteVolume: the pv has been deleting, ignore this request to avoid repeating delete")
+				return nil, fmt.Errorf("DeleteVolume: the pv have been deleting, ignore this request to avoid repeating delete")
+			}
+
 			// step3: delete pv data in NAS storage
 			if err := deleteNasFilesystemSubDir(deleteVolumeRoot, mountTargetPath, fileSystemNasIP); err != nil {
 				return nil, fmt.Errorf("DeleteVolume: nas, failed to delete mountTargetPath on the nas server, error is: %s", err.Error())
@@ -367,8 +368,8 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 				log.Errorf("DeleteVolume: cdsNas.UnMountNas api error, err is: %s", err)
 			}
 
-			// clean processedPvc to avoid repeating delete action
-			processedPvc.Delete(req.VolumeId)
+			// clean pvcFileSystemIPMap to avoid repeating delete action
+			pvcFileSystemIPMap.Delete(fileSystemNasID)
 
 			// get unmount task status
 			unMountNasTaskID := unMountNasRes.TaskID
@@ -390,10 +391,10 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 
 			log.Infof("DeleteVolume: delete NAS storage succeed!")
 
-			// step6: clean processedPvc, pvcMountTargetMap, pvcFileSystemIDMap, pvcFileSystemIPMap
-			//processedPvc.Delete(req.VolumeId)
+			// step6: clean processedPvc, pvcMountTargetMap, pvcFileSystemIPMap
+			processedPvc.Delete(req.VolumeId)
 			pvcMountTargetMap.Delete(req.VolumeId)
-			pvcFileSystemIPMap.Delete(fileSystemNasID)
+			// pvcFileSystemIPMap.Delete(fileSystemNasID)
 			pvcFileSystemIDMap.Delete(req.VolumeId)
 			log.Infof("clean processedPvc, pvcMountTargetMap, pvcFileSystemIDMap, pvcFileSystemIPMap record")
 
