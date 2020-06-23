@@ -464,17 +464,17 @@ func createNasFilesystemSubDir(mountRoot, subDir, fileSystemNasIP string) error 
 
 func deleteNasFilesystemSubDir(mountRoot, subDir, fileSystemNasIP string) error {
 
-	log.Infof("nas, running createNasFilesystemSubDir, mountRoot is: %s, subDir is:%s", mountRoot, subDir)
+	// log.Infof("nas, running createNasFilesystemSubDir, mountRoot is: %s, subDir is:%s", mountRoot, subDir)
 
 	// unmount the volume if it has been mounted
-	log.Infof("nas, unmount mountRoot if is mounted: %s", mountRoot)
+	// log.Infof("nas, unmount mountRoot if is mounted: %s", mountRoot)
 	if utils.Mounted(mountRoot) {
 		if err := utils.Unmount(mountRoot); err != nil {
 			log.Errorf("nas, failed to unmount already mounted path: %s, err is: %s", mountRoot, err)
 		}
 	}
 
-	log.Infof("nas, creating mountRoot dir: %s", mountRoot)
+	// log.Infof("nas, creating mountRoot dir: %s", mountRoot)
 	if err := utils.CreateDir(mountRoot, mountPointMode); err != nil {
 		return fmt.Errorf("nas, create mountRoot %s err: %s", mountRoot, err.Error())
 	}
@@ -499,7 +499,7 @@ func deleteNasFilesystemSubDir(mountRoot, subDir, fileSystemNasIP string) error 
 	defer os.RemoveAll(mountRoot)
 
 	// unmount the local path after the remote folder is created
-	log.Infof("nas, unmount dir after the dir creation: %s", mountRoot)
+	// log.Infof("nas, unmount dir after the dir creation: %s", mountRoot)
 	if err := utils.Unmount(mountRoot); err != nil {
 		log.Errorf("nas, failed to unmount path %s: %s", mountRoot, err)
 	}

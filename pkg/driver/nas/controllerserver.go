@@ -336,25 +336,27 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 			// check pv nasIP
 			if value, ok := pv.Spec.CSI.VolumeAttributes["server"]; ok {
 				fileSystemNasIP = value
-				log.Infof("DeleteVolume: nas, volumeID is: %s, server is: %s", req.VolumeId, fileSystemNasIP)
+				log.Infof("DeleteVolume: nas, server is: %s", fileSystemNasIP)
 			} else {
-				log.Errorf("DeleteVolume: volumeID is: %s, Spec with nfs server is empty, CSI is: %v", req.VolumeId, pv.Spec.CSI)
-				return nil, fmt.Errorf("DeleteVolume: volumeID is: %s, Spec with nfs server is empty, CSI is: %v", req.VolumeId, pv.Spec.CSI)
+				log.Errorf("DeleteVolume: nas server is empty, CSI is: %v", req.VolumeId, pv.Spec.CSI)
+				return nil, fmt.Errorf("DeleteVolume: nas server is empty, CSI is: %v", req.VolumeId, pv.Spec.CSI)
 			}
 
 			// check pv path
 			if value, ok := pv.Spec.CSI.VolumeAttributes["path"]; ok {
 				mountTargetPath = value
-				log.Infof("DeleteVolume: nas, volumeID is: %s, path is: %s", req.VolumeId, mountTargetPath)
+				log.Infof("DeleteVolume: nas, path is: %s", mountTargetPath)
 			} else {
-				log.Errorf("DeleteVolume: volumeID is: %s, Spec with path is empty, CSI is: %v", req.VolumeId, pv.Spec.CSI)
-				return nil, fmt.Errorf("DeleteVolume: volumeID is: %s, Spec with path is empty, CSI is: %v", req.VolumeId, pv.Spec.CSI)
+				log.Errorf("DeleteVolume: path is empty, CSI is: %v", req.VolumeId, pv.Spec.CSI)
+				return nil, fmt.Errorf("DeleteVolume: path is empty, CSI is: %v", req.VolumeId, pv.Spec.CSI)
 			}
 
-			// check if delete or not
+			// check if pv is deleted or not
 			if value, ok := pvcFileSystemIPMap.Load(fileSystemNasID); ok && value == "" {
 				log.Infof("DeleteVolume: the pv has been deleting, ignore this request to avoid repeating delete")
 				return nil, fmt.Errorf("DeleteVolume: the pv have been deleting, ignore this request to avoid repeating delete")
+			} else {
+				log.Infof("DeleteVolume:  pvcFileSystemIPMap.Load(fileSystemNasID), value is: %s, ok is: %s", value, ok)
 			}
 
 			// step3: delete pv data in NAS storage
@@ -379,7 +381,7 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 				log.Errorf("DeleteVolume: describeTaskStatus error, err is: %s", err.Error())
 				return nil, fmt.Errorf("CreateVolume: describeTaskStatus error, err is: %s", err.Error())
 			}
-			log.Infof("DeleteVolume: delete Nas succeed")
+			log.Infof("DeleteVolume: delete pv path succeed")
 
 			// step5: delete NAS storage
 			_, err = cdsNas.DeleteNas(fileSystemNasID)
@@ -399,7 +401,7 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 			log.Infof("clean processedPvc, pvcMountTargetMap, pvcFileSystemIDMap, pvcFileSystemIPMap record")
 
 			// step7: response
-			log.Infof("DeleteVolume:: Nas volume(%s)'s fileSystem and mountTargetPath have been deleted successfully", req.VolumeId)
+			log.Infof("DeleteVolume:: Nas volume(%s)'s NAS storage and mountTargetPath have been deleted successfully", req.VolumeId)
 		} else {
 			// retain pv's filesystem NAS storage
 			log.Infof("DeleteVolume: Nas volume(%s) Filesystem's deleteVolume is [false], remain nas storage and pv data", req.VolumeId)
