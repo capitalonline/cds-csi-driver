@@ -118,23 +118,12 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 
 			fileSystemNasID = value.(string)
 
-			if value, ok := pvcFileSystemIPMap.Load(fileSystemNasID); ok && value == "" {
-				log.Errorf("CreateVolume: fileSystemNasID: %s has been created and store in [pvcFileSystemIPMap], but fileSystemNasIP is empty", fileSystemNasID)
-				return nil, fmt.Errorf("CreateVolume: fileSystemNasID: %s has been created and store in [pvcFileSystemIPMap], but fileSystemNasIP is empty", fileSystemNasID)
-			}
-
-			fileSystemNasIP = value.(string)
-
-			log.Infof("CreateVolume: fileSystemNasID is: %s, fileSystemNasIP is: %s, skip to create mountTargetPath", fileSystemNasID, fileSystemNasIP)
 		} else {
 			log.Infof("CreateVolume: nas, provisioning filesystem volume, req: %+v", req)
 
 			// 1-create filesystem
 			storageSize := req.CapacityRange.RequiredBytes/(1024 * 1024 * 1024)
-
 			createFileSystemsNasRes, err := cdsNas.CreateNas(opts.SiteID, "Nas-"+pvName[0:12], opts.StorageType, int(storageSize))
-
-			log.Infof("CreateVolume: createFileSystemsNasRes is: %+v", createFileSystemsNasRes)
 
 			if err != nil {
 				log.Errorf("CreateVolume: Create NAS filesystem task api error, error is: %s", err.Error())
@@ -143,6 +132,12 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 
 			fileSystemReqID = createFileSystemsNasRes.TaskID
 			fileSystemNasID = createFileSystemsNasRes.Data.NasID
+
+			// store
+			pvcFileSystemIDMap.Store(pvName, fileSystemNasID)
+
+			// storage with nasIP= ""
+			pvcFileSystemIPMap.Store(fileSystemNasID, "")
 
 			log.Infof("CreateVolume: create Nas succeed, fileSystemReqID is: %s, fileSystemNasID is: %s", fileSystemReqID, fileSystemNasID)
 
@@ -155,7 +150,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 			}
 			log.Infof("CreateVolume: create Nas succeed, then to mount Nas to cluster")
 
-			// 3-mount nas
+			// 3-mount nas then get the nasIP
 			mountNasRes, err := cdsNas.MountNas(fileSystemNasID, opts.ClusterID)
 
 			if err != nil {
@@ -175,13 +170,24 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 			}
 			log.Infof("CreateVolume: mount nas: %s to cluster: %s succeed", fileSystemNasID, opts.ClusterID)
 
-			pvcFileSystemIDMap.Store(pvName, fileSystemNasID)
+			// storage with nasIP
 			pvcFileSystemIPMap.Store(fileSystemNasID, fileSystemNasIP)
 
 			log.Infof("CreateVolume: Nfs Volume (%s) Successful Created, fileSystemNasID is: %s, FileSystemNasIP is: %s", pvName, fileSystemNasID, fileSystemNasIP)
 
 		}
-		// step3-filesystem-3: if mountTarget is already created, skip create a mountTarget
+
+		// step3-filesystem-3: check if nas mounted to cluster and get nasIP
+		if value, ok := pvcFileSystemIPMap.Load(fileSystemNasID); ok && value != "" {
+			fileSystemNasIP = value.(string)
+		} else {
+			log.Infof("CreateVolume: fileSystemNasID: %s has been created and store in [pvcFileSystemIPMap], but fileSystemNasIP is empty, waiting mount to cluster and get nasIP", fileSystemNasID)
+			return nil, fmt.Errorf("CreateVolume: fileSystemNasID: %s, waiting for mount to cluster and get nasIP", fileSystemNasID)
+		}
+
+		log.Infof("CreateVolume: fileSystemNasID is: %s, fileSystemNasIP is: %s, then to create mountTargetPath", fileSystemNasID, fileSystemNasIP)
+
+		// step3-filesystem-3: if mountTarget is already created, skip creating a mountTarget
 		mountTargetPath := ""
 
 		if value, ok := pvcMountTargetMap.Load(pvName); ok && value != "" {
@@ -220,7 +226,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 
 	// step4: store
 	processedPvc.Store(pvName, volToCreate)
-	log.Infof("CreateVolume:: nas, successfully provisioned pv %+v:", volToCreate)
+	log.Infof("CreateVolume:: nas, succeed provisioned pv %+v:", volToCreate)
 
 	// step5: return
 	return &csi.CreateVolumeResponse{Volume: volToCreate}, nil
