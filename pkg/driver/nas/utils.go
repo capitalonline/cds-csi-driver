@@ -495,7 +495,7 @@ func deleteNasFilesystemSubDir(mountRoot, subDir, fileSystemNasIP string) error 
 		log.Errorf("nas, delete pv path error, err is: %s", err)
 	}
 
-	log.Infof("nas, delete pv path succeed in NAS storage")
+	// log.Infof("nas, delete pv path succeed in NAS storage")
 	defer os.RemoveAll(mountRoot)
 
 	// unmount the local path after the remote folder is created
