@@ -33,6 +33,16 @@ spec:
           env:
             - name: CSI_ENDPOINT
               value: unix://socketDir/csi.sock
+          - name: ACCESS_KEY_ID
+            valueFrom:
+              secretKeyRef:
+                key: access_key_id
+                name: cck-secrets
+          - name: ACCESS_KEY_SECRET
+            valueFrom:
+              secretKeyRef:
+                key: access_key_secret
+                name: cck-secrets
           securityContext:
             privileged: true
           volumeMounts:

@@ -200,6 +200,16 @@ spec:
         env:
         - name: CSI_ENDPOINT
           value: unix://socketDir/csi.sock
+        - name: ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              key: access_key_id
+              name: cck-secrets
+        - name: ACCESS_KEY_SECRET
+          valueFrom:
+            secretKeyRef:
+              key: access_key_secret
+              name: cck-secrets
         image: registry-bj.capitalonline.net/cck/cds-csi-driver:v1.0.0
         imagePullPolicy: Always
         livenessProbe:
