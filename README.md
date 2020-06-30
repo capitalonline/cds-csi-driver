@@ -53,18 +53,17 @@ spec:
 
 Description:
 
-|     Key      | Value                         | Required | Description                                                  |
-| :----------: | :---------------------------- | :------: | :----------------------------------------------------------- |
-|    driver    | nas.csi.cds.net               |   yes    | CDS csi driver's name                                        |
-| volumeHandle | <name of the pv>              |   yes    | Should be same with pv name                                  |
-|    server    | e.g. <br />140.210.75.195     |   yes    | the mount point of the nfs server,can be found on NAS product list |
-|     path     | e.g.<br />/nfsshare/division1 |   yes    | the path that the pv will use on the nfs server. It must start with `/nfsshare`. Each pv will use a separate directory(e.g `/nfsshare/division1/volumeHandleValue"`when `allowShared` is `false`. Otherwsise, the path of pv will be the same to `path`, which means all PVs with the same path will share data |
-
-|vers|`3` or `4.0`|no| the protocol version to use for the nfs mount. if not provided, `4.0` will be used by default
-|options|e.g. `noresvport`|no| options for the nfs mount. If not provided it will be set to `noresvport` for `vers=4.0` and `noresvport,nolock,tcp` for `vers=3`|
-|mode|e.g. `0777`|no| to customize the mode of the path created on nfs server. If not provided, the server's default mask will be used|
-|modeType|e.g `recursive` or `non-recursive`|no| This tells the driver if the chmod should be done recursively or not. Only works when `mode` is specified. Default to `non-recursive`|
-|allowShared| `"true"` or `"false"`|no | default to `"false`. If set, the data of all PVs with the same path will be shared|
+|     Key      | Value                              | Required | Description                                                  |
+| :----------: | :--------------------------------- | :------: | :----------------------------------------------------------- |
+|    driver    | nas.csi.cds.net                    |   yes    | CDS csi driver's name                                        |
+| volumeHandle | <pv_name>                          |   yes    | Should be same with pv name                                  |
+|    server    | e.g. <br />140.210.75.195          |   yes    | the mount point of the nfs server,can be found on NAS product list |
+|     path     | e.g.<br />/nfsshare/division1      |   yes    | the path that the pv will use on the nfs server. It must start with `/nfsshare`. Each pv will use a separate directory(e.g `/nfsshare/division1/volumeHandleValue"`when `allowShared` is `false`. Otherwsise, the path of pv will be the same to `path`, which means all PVs with the same path will share data |
+|     vers     | `3` or `4.0`                       |    no    | the protocol version to use for the nfs mount. if not provided, `4.0` will be used by default |
+|   options    | e.g. `noresvport`                  |    no    | options for the nfs mount. If not provided it will be set to `noresvport` for `vers=4.0` and `noresvport,nolock,tcp` for `vers=3` |
+|     mode     | e.g. `0777`                        |    no    | to customize the mode of the path created on nfs server. If not provided, the server's default mask will be used |
+|   modeType   | e.g `recursive` or `non-recursive` |    no    | This tells the driver if the chmod should be done recursively or not. Only works when `mode` is specified. Default to `non-recursive` |
+| allowShared  | `"true"` or `"false"`              |    no    | default to `"false`. If set, the data of all PVs with the same path will be shared |
 
 ### Dynamic PV
 
@@ -88,21 +87,20 @@ parameters:
 
 Description:
 
-|      Key      | Value                                                        | Required | Description                                                  |
-| :-----------: | :----------------------------------------------------------- | :------: | :----------------------------------------------------------- |
-|  provisioner  | nas.csi.cds.net                                              |   yes    | CDS csi driver's name                                        |
-| reclaimPolicy | Delete \| Retain                                             |   yes    | `Delete` means that PV will be deleted with PVC delete<br />`Retain` means that PV will be retained when PVC delete |
-|   volumeAs    | subpath                                                      |    no    | Default is `subpath`<br />`subpath`  means each PV will be provisioned on a specified NAS server.<br />`filesystem` means each PV will be provision with a new NAS Storage and use the storage exclusively. |
-|    servers    | eg.<br />140.210.75.194/nfsshare/nas-csi-cds-pv, 140.210.75.195/nfsshare/nas-csi-cds-pv |    no    | multi servers are supported by a StorageClass. It should be separated by "," between each server/path. |
-|    server     | e.g. <br />140.210.75.195                                    |    no    | the mount point of the nfs server,can be found on NAS product list |
-|   strategy    | e.g. <br />RoundRobin                                        |    no    | Only used for multi servers option. The value is supposed to be "RoundRobin" or "Random". The default value is "RoundRobin" |
-|     path      | e.g. <br />/nfsshare                                         |    no    | the root path that the pv will dynamically provisioned on the NAS server. It must start with `/nfsshare`. |
-
-|vers|`3` or `4.0`|no| the protocol version to use for the nfs mount. if not provided, `4.0` will be used by default
-|options|e.g. `noresvport`|no| options for the nfs mount. If not provided it will be set to `noresvport` for `vers=4.0` and `noresvport,nolock,tcp` for `vers=3`|
-|mode|e.g. `0777`|no| to customize the mode of the path created on nfs server. If not provided, the server's default mask will be used
-|modeType|e.g `recursive` or `non-recursive`|no| This tells the driver if the chmod should be done recursively or not. Only works when `mode` is specified. Default to `non-recursive`
-|archiveOnDelete|`"true"` or `"false"`|no| only works when the `reclaim police` is `delete`. if `true`, the content of the pv will be archived on nfs instead of be deleted. Default to `false`|
+|       Key       | Value                                                        | Required | Description                                                  |
+| :-------------: | :----------------------------------------------------------- | :------: | :----------------------------------------------------------- |
+|   provisioner   | nas.csi.cds.net                                              |   yes    | CDS csi driver's name                                        |
+|  reclaimPolicy  | Delete \| Retain                                             |   yes    | `Delete` means that PV will be deleted with PVC delete<br />`Retain` means that PV will be retained when PVC delete |
+|    volumeAs     | subpath                                                      |    no    | Default is `subpath`<br />`subpath`  means each PV will be provisioned on a specified NAS server.<br />`filesystem` means each PV will be provision with a new NAS Storage and use the storage exclusively. |
+|     servers     | eg.<br />140.210.75.194/nfsshare/nas-csi-cds-pv, 140.210.75.195/nfsshare/nas-csi-cds-pv |    no    | multi servers are supported by a StorageClass. It should be separated by "," between each server/path. |
+|     server      | e.g. <br />140.210.75.195                                    |    no    | the mount point of the nfs server,can be found on NAS product list |
+|    strategy     | e.g. <br />RoundRobin                                        |    no    | Only used for multi servers option. The value is supposed to be "RoundRobin" or "Random". The default value is "RoundRobin" |
+|      path       | e.g. <br />/nfsshare                                         |    no    | the root path that the pv will dynamically provisioned on the NAS server. It must start with `/nfsshare`. |
+|      vers       | `3` or `4.0`                                                 |    no    | the protocol version to use for the nfs mount. if not provided, `4.0` will be used by default |
+|     options     | e.g. `noresvport`                                            |    no    | options for the nfs mount. If not provided it will be set to `noresvport` for `vers=4.0` and `noresvport,nolock,tcp` for `vers=3` |
+|      mode       | e.g. `0777`                                                  |    no    | to customize the mode of the path created on nfs server. If not provided, the server's default mask will be used |
+|    modeType     | e.g `recursive` or `non-recursive`                           |    no    | This tells the driver if the chmod should be done recursively or not. Only works when `mode` is specified. Default to `non-recursive` |
+| archiveOnDelete | `"true"` or `"false"`                                        |    no    | only works when the `reclaim police` is `delete`. if `true`, the content of the pv will be archived on nfs instead of be deleted. Default to `false` |
 
 Kindly Remind: 
 
