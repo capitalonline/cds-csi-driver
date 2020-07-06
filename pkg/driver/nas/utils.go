@@ -346,9 +346,13 @@ func mountNasVolume(opts *PublishOptions, volumeId string) error {
 	} else {
 		serverMountPoint = filepath.Join(opts.Path, volumeId)
 	}
+
 	mntCmd := fmt.Sprintf("mount -t nfs -o vers=%s %s:%s %s", versStr, opts.Server, serverMountPoint, opts.NodePublishPath)
+	log.Infof("mountNasVolume:: mntCmd is: %s", mntCmd)
+
 	_, err := utils.RunCommand(mntCmd)
 	if err != nil && opts.Path != "/" {
+		log.Infof("mountNasVolume:: mntCmd error is: %s", err.Error())
 		if strings.Contains(err.Error(), "No such file or directory") ||
 			strings.Contains(err.Error(), "access denied by server while mounting") {
 			subDir := volumeId
@@ -377,7 +381,7 @@ func (opts *NfsOpts) createNasSubDir(mountRoot, subDir string) error {
 	localMountPath := filepath.Join(mountRoot, subDir)
 	fullPath := filepath.Join(localMountPath, strings.TrimPrefix(opts.Path, defaultNFSRoot), subDir)
 	// unmount the volume if it has been mounted
-	log.Infof("nas, unmount fullpath if is mounted: %s", localMountPath)
+	log.Infof("nas, unmount localMountPath if is mounted: %s", localMountPath)
 	if utils.Mounted(localMountPath) {
 		if err := utils.Unmount(localMountPath); err != nil {
 			log.Errorf("nas, failed to unmount already mounted path %s: %s", localMountPath, err)
