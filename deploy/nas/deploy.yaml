@@ -200,7 +200,17 @@ spec:
         env:
         - name: CSI_ENDPOINT
           value: unix://socketDir/csi.sock
-        image: registry-bj.capitalonline.net/cck/cds-csi-driver:v1.1.0
+        - name: ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              key: access_key_id
+              name: cck-secrets
+        - name: ACCESS_KEY_SECRET
+          valueFrom:
+            secretKeyRef:
+              key: access_key_secret
+              name: cck-secrets
+        image: registry-bj.capitalonline.net/cck/cds-csi-driver:v1.2.2
         imagePullPolicy: Always
         livenessProbe:
           exec:
@@ -289,7 +299,7 @@ spec:
         env:
         - name: CSI_ENDPOINT
           value: unix://var/lib/kubelet/plugins/nas.csi.cds.net/csi.sock
-        image: registry-bj.capitalonline.net/cck/cds-csi-driver:v1.1.0
+        image: registry-bj.capitalonline.net/cck/cds-csi-driver:v1.2.2
         imagePullPolicy: Always
         name: nas-csi-node-server
         securityContext:

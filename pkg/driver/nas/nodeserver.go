@@ -20,7 +20,9 @@ func NewNodeServer(d *NasDriver) *NodeServer {
 func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
 	log.Infof("NodePublishVolume:: starting mount nas volume with req: %+v", req)
 	var opts, err = parsePublishOptions(req)
+
 	log.Infof("NodePublishVolume:: parsed PublishOptions options: %+v", opts)
+
 	if err != nil {
 		return nil, fmt.Errorf("nas, failed to parse mount options %+v: %s", opts, err)
 	}

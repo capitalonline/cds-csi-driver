@@ -1,0 +1,13 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: nas-csi-csd-sc-filesystem
+parameters:
+  volumeAs: filesystem
+  protocolType: "NFS"
+  storageType: "high_disk"
+  siteID: "ca0bd848-9b59-40a2-9f57-d64fbc72a9df"
+  clusterID: "a5091cda-b46e-11ea-8fa0-fa4d2f19f40a"
+  deleteVolume: "true"
+provisioner: nas.csi.cds.net
+reclaimPolicy: Delete

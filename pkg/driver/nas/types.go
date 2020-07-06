@@ -40,6 +40,15 @@ type NfsOpts struct {
 	ModeType string
 	Options  string
 	Strategy string
+	VolumeAs string
+}
+
+type NfsFilesystemOpts struct {
+	ProtocolType    string
+	StorageType     string
+	SiteID          string
+	ClusterID		string
+	DeleteVolume    bool
 }
 
 type PublishOptions struct {
@@ -50,6 +59,11 @@ type PublishOptions struct {
 
 type VolumeCreateSubpathOptions struct {
 	NfsOpts
+	VolumeAs string
+}
+
+type VolumeCreateFilesystemOptions struct {
+	NfsFilesystemOpts
 	VolumeAs string
 }
 
