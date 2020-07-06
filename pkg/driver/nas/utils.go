@@ -341,11 +341,14 @@ func mountNasVolume(opts *PublishOptions, volumeId string) error {
 	}
 
 	var serverMountPoint string
-	if opts.AllowSharePath {
-		serverMountPoint = opts.Path
-	} else {
-		serverMountPoint = filepath.Join(opts.Path, volumeId)
-	}
+
+	serverMountPoint = opts.Path
+
+	//if opts.AllowSharePath {
+	//	//	serverMountPoint = opts.Path
+	//	//} else {
+	//	//	serverMountPoint = filepath.Join(opts.Path, volumeId)
+	//	//}
 
 	mntCmd := fmt.Sprintf("mount -t nfs -o vers=%s %s:%s %s", versStr, opts.Server, serverMountPoint, opts.NodePublishPath)
 	log.Infof("mountNasVolume:: mntCmd is: %s", mntCmd)
@@ -372,6 +375,7 @@ func mountNasVolume(opts *PublishOptions, volumeId string) error {
 	} else if err != nil {
 		return err
 	}
+	
 	log.Infof("nas, mount nfs successful with command: %s", mntCmd)
 	return nil
 }
