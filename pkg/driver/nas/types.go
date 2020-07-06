@@ -40,6 +40,7 @@ type NfsOpts struct {
 	ModeType string
 	Options  string
 	Strategy string
+	VolumeAs string
 }
 
 type NfsFilesystemOpts struct {

@@ -122,7 +122,9 @@ func newPublishOptions(req *csi.NodePublishVolumeRequest) *PublishOptions {
 			opts.Options = value
 		} else if key == "modeType" {
 			opts.ModeType = value
-		} else if key == "allowShared" {
+		} else if key == "volumeAs" {
+			opts.VolumeAs = value
+		}else if key == "allowShared" {
 			allowed, err := strconv.ParseBool(value)
 			if err != nil {
 				opts.AllowSharePath = false
@@ -333,7 +335,9 @@ func optimizeNasSetting() {
 }
 
 func mountNasVolume(opts *PublishOptions, volumeId string) error {
+	log.Infof("mountNasVolume:: mount opts.Path to opts.NodePublishPath")
 	var versStr string
+
 	if opts.Options == "" {
 		versStr = opts.Vers
 	} else {
@@ -341,14 +345,18 @@ func mountNasVolume(opts *PublishOptions, volumeId string) error {
 	}
 
 	var serverMountPoint string
-
-	serverMountPoint = opts.Path
-
-	//if opts.AllowSharePath {
-	//	//	serverMountPoint = opts.Path
-	//	//} else {
-	//	//	serverMountPoint = filepath.Join(opts.Path, volumeId)
-	//	//}
+	if opts.VolumeAs == "subpath" {
+		if opts.AllowSharePath {
+			serverMountPoint = opts.Path
+		} else {
+			serverMountPoint = filepath.Join(opts.Path, volumeId)
+		}
+	} else if opts.VolumeAs == "filesystem" {
+		serverMountPoint = opts.Path
+	} else {
+		log.Errorf("mountNasVolume:: volumeAs type is not [subpath] or [filesystem], not support")
+		return fmt.Errorf("mountNasVolume:: volumeAs type is not [subpath] or [filesystem], not support")
+	}
 
 	mntCmd := fmt.Sprintf("mount -t nfs -o vers=%s %s:%s %s", versStr, opts.Server, serverMountPoint, opts.NodePublishPath)
 	log.Infof("mountNasVolume:: mntCmd is: %s", mntCmd)
@@ -375,7 +383,7 @@ func mountNasVolume(opts *PublishOptions, volumeId string) error {
 	} else if err != nil {
 		return err
 	}
-	
+
 	log.Infof("nas, mount nfs successful with command: %s", mntCmd)
 	return nil
 }
