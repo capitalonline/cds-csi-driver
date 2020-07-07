@@ -352,11 +352,20 @@ func mountNasVolume(opts *PublishOptions, volumeId string) error {
 	var serverMountPoint string
 	if opts.VolumeAs == "subpath" {
 		if opts.AllowSharePath {
+			// share path
 			serverMountPoint = opts.Path
 		} else {
-			serverMountPoint = filepath.Join(opts.Path, volumeId)
+			// not share path
+			if strings.Contains(opts.Path, "pvc-") && len(opts.Path) > 32 {
+				// dynamic pv
+				serverMountPoint = opts.Path
+			} else {
+				// static pv
+				serverMountPoint = filepath.Join(opts.Path, volumeId)
+			}
 		}
 	} else if opts.VolumeAs == "filesystem" {
+		// never share for filesystem
 		serverMountPoint = opts.Path
 	} else {
 		log.Errorf("mountNasVolume:: volumeAs type is not [subpath] or [filesystem], not support")
