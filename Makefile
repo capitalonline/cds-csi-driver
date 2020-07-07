@@ -1,6 +1,7 @@
 PKG=github.com/capitalonline/cds-csi-driver
 IMAGE?=registry-bj.capitalonline.net/cck/cds-csi-driver
-VERSION=v1.1.0
+IMAGE_OVERSEA=capitalonline/cds-csi-driver
+VERSION=v1.2.3
 GIT_COMMIT?=$(shell git rev-parse HEAD)
 BUILD_DATE?=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 LDFLAGS?="-X ${PKG}/pkg/common.version=${VERSION} -X ${PKG}/pkg/common.gitCommit=${GIT_COMMIT} -X ${PKG}/pkg/common.buildDate=${BUILD_DATE} -s -w"
@@ -26,6 +27,7 @@ container-binary:
 .PHONY: image-release
 image-release:
 	docker build -t $(IMAGE):$(VERSION) .
+	docker tag $(IMAGE):$(VERSION) $(IMAGE_OVERSEA):$(VERSION)
 
 .PHONY: image
 image:
@@ -34,6 +36,7 @@ image:
 .PHONY: release
 release: image-release
 	docker push $(IMAGE):$(VERSION)
+	docker push $(IMAGE_OVERSEA):$(VERSION)
 
 .PHONY: sync-version
 sync-version:
