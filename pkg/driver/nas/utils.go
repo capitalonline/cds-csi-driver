@@ -368,7 +368,6 @@ func mountNasVolume(opts *PublishOptions, volumeId string) error {
 
 	_, err := utils.RunCommand(mntCmd)
 	if err != nil && opts.Path != "/" {
-		log.Infof("mountNasVolume:: mntCmd error is: %s", err.Error())
 		if strings.Contains(err.Error(), "No such file or directory") ||
 			strings.Contains(err.Error(), "access denied by server while mounting") {
 			subDir := volumeId
@@ -395,10 +394,13 @@ func mountNasVolume(opts *PublishOptions, volumeId string) error {
 
 func (opts *NfsOpts) createNasSubDir(mountRoot, subDir string) error {
 	log.Infof("nas, running creatNasSubDir: root: %s, path: %s, subDir:%s", mountRoot, opts.Path, subDir)
+
 	localMountPath := filepath.Join(mountRoot, subDir)
 	fullPath := filepath.Join(localMountPath, strings.TrimPrefix(opts.Path, defaultNFSRoot), subDir)
+
 	// unmount the volume if it has been mounted
 	log.Infof("nas, unmount localMountPath if is mounted: %s", localMountPath)
+
 	if utils.Mounted(localMountPath) {
 		if err := utils.Unmount(localMountPath); err != nil {
 			log.Errorf("nas, failed to unmount already mounted path %s: %s", localMountPath, err)
@@ -406,35 +408,43 @@ func (opts *NfsOpts) createNasSubDir(mountRoot, subDir string) error {
 	}
 
 	log.Infof("nas, creating localMountPath dir: %s", localMountPath)
+
 	if err := utils.CreateDir(localMountPath, mountPointMode); err != nil {
 		return fmt.Errorf("nas, create localMountPath %s err: %s", localMountPath, err.Error())
 	}
 
 	// mount localMountPath to remote nfs server
 	mntCmd := fmt.Sprintf("mount -t nfs -o vers=%s %s:%s %s", opts.Vers, opts.Server, defaultNFSRoot, localMountPath)
+
 	log.Infof("nas, mount for sub dir: %s", mntCmd)
+
 	if _, err := utils.RunCommand(mntCmd); err != nil {
 		return fmt.Errorf("nas, failed to localMountPath %s: %s", mntCmd, err.Error())
 	}
 
 	// create sub directory, which makes the folder on the remote nfs server at the same time
 	log.Infof("nas, creating fullPath: %s", fullPath)
+
 	if err := utils.CreateDir(fullPath, mountPointMode); err != nil {
 		return fmt.Errorf("nas, create sub directory err: " + err.Error())
 	}
 	defer os.RemoveAll(localMountPath)
 
 	log.Infof("nas, changing mode for %s", fullPath)
+
 	if err := os.Chmod(fullPath, mountPointMode); err != nil {
 		log.Errorf("nas, failed to change the mode of %s to %d", fullPath, mountPointMode)
 	}
 
 	// unmount the local path after the remote folder is created
 	log.Infof("nas, unmount dir after the dir creation: %s", fullPath)
+
 	if err := utils.Unmount(localMountPath); err != nil {
 		log.Errorf("nas, failed to unmount path %s: %s", fullPath, err)
 	}
+
 	log.Infof("nas, create sub directory successful: %s", opts.Path)
+
 	return nil
 }
 
@@ -442,6 +452,7 @@ func createNasFilesystemSubDir(localMountPath, subDir, fileSystemNasIP string) e
 	log.Infof("nas, running createNasFilesystemSubDir")
 
 	createFullPath := filepath.Join(localMountPath, subDir)
+
 	log.Infof("localMountPath is: %s, createFullPath is: %s, pvPath is:%s", localMountPath, createFullPath, subDir)
 
 	// unmount the localMountPath if mounted
@@ -454,6 +465,7 @@ func createNasFilesystemSubDir(localMountPath, subDir, fileSystemNasIP string) e
 	}
 
 	log.Infof("nas, creating localMountPath dir: %s", localMountPath)
+
 	if err := utils.CreateDir(localMountPath, mountPointMode); err != nil {
 		return fmt.Errorf("nas, create localMountPath %s err: %s", localMountPath, err.Error())
 	}
@@ -469,6 +481,7 @@ func createNasFilesystemSubDir(localMountPath, subDir, fileSystemNasIP string) e
 
 	// create sub directory, which makes the folder on the remote nfs server at the same time
 	log.Infof("nas, creating createFullPath: %s", createFullPath)
+
 	if err := utils.CreateDir(createFullPath, mountPointMode); err != nil {
 		return fmt.Errorf("nas, create sub directory err: " + err.Error())
 	}
@@ -477,6 +490,7 @@ func createNasFilesystemSubDir(localMountPath, subDir, fileSystemNasIP string) e
 	defer os.RemoveAll(localMountPath)
 
 	log.Infof("nas, changing mode for %s", createFullPath)
+
 	if err := os.Chmod(createFullPath, mountPointMode); err != nil {
 		log.Errorf("nas, failed to change the mode of %s to %d", createFullPath, mountPointMode)
 	}
