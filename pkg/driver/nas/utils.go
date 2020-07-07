@@ -150,8 +150,17 @@ func newSubpathVolumeContext(opts *VolumeCreateSubpathOptions, pvName string) ma
 func parsePublishOptions(req *csi.NodePublishVolumeRequest) (*PublishOptions, error) {
 	opts := newPublishOptions(req)
 
+	// set volumeAs to default "subpath"
+	if opts.VolumeAs == "" {
+		opts.VolumeAs = "subpath"
+	}
+
 	if opts.NodePublishPath == "" {
 		return nil, errors.New("mountPath is empty")
+	}
+
+	if opts.Server == "" {
+		return nil, errors.New("host is empty, should input nas domain")
 	}
 
 	if err := opts.parsNfsOpts(); err != nil {
@@ -176,9 +185,6 @@ func parsePublishOptions(req *csi.NodePublishVolumeRequest) (*PublishOptions, er
 		}
 	}
 
-	if opts.Server == "" {
-		return nil, errors.New("host is empty, should input nas domain")
-	}
 	if !utils.ServerReachable(opts.Server, nasPortNumber, dialTimeout) {
 		log.Errorf("nas, cannot connect to nas host: %s", opts.Server)
 		return nil, fmt.Errorf("nas, cannot connect to nas host: %s", opts.Server)
@@ -335,7 +341,6 @@ func optimizeNasSetting() {
 }
 
 func mountNasVolume(opts *PublishOptions, volumeId string) error {
-	log.Infof("mountNasVolume:: mount opts.Path to opts.NodePublishPath")
 	var versStr string
 
 	if opts.Options == "" {
