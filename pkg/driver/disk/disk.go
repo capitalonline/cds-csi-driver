@@ -1,8 +1,6 @@
 package disk
 
 import (
-	"os"
-
 	"github.com/capitalonline/cds-csi-driver/pkg/common"
 	"github.com/kubernetes-csi/drivers/pkg/csi-common"
 	log "github.com/sirupsen/logrus"
@@ -27,9 +25,6 @@ func NewDriver(driverName, nodeId, endpoint string) *DiskDriver {
 func (d *DiskDriver) Run() {
 	log.Infof("Starting csi-plugin Driver: %v version: %v", driverName, csiVersion)
 	s := csicommon.NewNonBlockingGRPCServer()
-	os.MkdirAll(createVolumeRoot, mountPointMode)
-	os.Mkdir(deleteVolumeRoot, mountPointMode)
-	os.MkdirAll(publishVolumeRoot, mountPointMode)
 	s.Start(d.endpoint, d.idServer, nil, d.nodeServer)
 	s.Wait()
 }
