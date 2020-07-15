@@ -3,7 +3,7 @@ package disk
 import (
 	"context"
 	"fmt"
-	"strings"
+	"strconv"
 	"time"
 
 	cdsDisk "github.com/capitalonline/cck-sdk-go/pkg/cck/disk"
@@ -18,12 +18,12 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// the map of req.Name and csi.Volume
-var createdVolumeMap = map[string]*csi.Volume{}
+// the map of req.Name and csi.Volume.
+var pvcMap = map[string]*csi.Volume{}
 
 // the map of diskId and pvName
 // diskId and pvName is not same under csi plugin
-var diskIDPVMap = map[string]string{}
+var diskIdPvMap = map[string]string{}
 
 func NewControllerServer(d *DiskDriver) *ControllerServer {
 	config, err := rest.InClusterConfig()
@@ -43,53 +43,65 @@ func NewControllerServer(d *DiskDriver) *ControllerServer {
 
 // to create disk
 func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
-	log.Infof("CreateVolume: Starting CreateVolume, req.name is:%s, req is:%v", req.Name, req)
+	log.Infof("CreateVolume: Starting CreateVolume, req is:%v", req)
 
+	pvName := req.Name
 	// Step 1: check critical params
-	if req.Name == "" {
-		log.Errorf("CreateVolume: Volume Name cannot be empty")
-		return nil, status.Error(codes.InvalidArgument, "Volume Name cannot be empty")
+	if pvName == "" {
+		log.Errorf("CreateVolume: pv Name (req.Name) cannot be empty")
+		return nil, status.Error(codes.InvalidArgument, "pv Name (req.Name) cannot be empty")
 	}
 	if req.VolumeCapabilities == nil {
-		log.Errorf("CreateVolume: Volume Capabilities cannot be empty")
-		return nil, status.Error(codes.InvalidArgument, "Volume Capabilities cannot be empty")
+		log.Errorf("CreateVolume: req.VolumeCapabilities cannot be empty")
+		return nil, status.Error(codes.InvalidArgument, "req.VolumeCapabilities cannot be empty")
 	}
 	if req.GetCapacityRange() == nil {
 		log.Errorf("CreateVolume: Capacity cannot be empty")
-		return nil, status.Errorf(codes.InvalidArgument, "CreateVolume: req.name is: %s, Capacity cannot be empty", req.Name)
-	}
-	volSizeBytes := int64(req.GetCapacityRange().GetRequiredBytes())
-	diskRequestGB := req.CapacityRange.RequiredBytes / (1024 * 1024 * 1024)
-	if diskRequestGB < 100 {
-		log.Error("CreateVolume: pvc require disk size should > 100 GB, input is: %d", diskRequestGB)
-		return nil, fmt.Errorf("CreateVolume: pvc require disk size should > 100 GB, input is: %d", diskRequestGB)
+		return nil, status.Errorf(codes.InvalidArgument, "CreateVolume: Capacity cannot be empty", req.Name)
 	}
 
-	// Step 2: check if the pvName created in this volume
-	if value, ok := createdVolumeMap[req.Name]; ok {
-		log.Infof("CreateVolume: volume already be created pvName: %s, VolumeId: %s, volumeContext: %v", req.Name, value.VolumeId, value.VolumeContext)
+	volSizeBytes := int64(req.GetCapacityRange().GetRequiredBytes())
+	diskRequestGB := req.CapacityRange.RequiredBytes / (1024 * 1024 * 1024)
+
+	log.Infof("CreateVolume: diskRequestGB is: %d", diskRequestGB)
+
+	if diskRequestGB < 100 {
+		log.Error("CreateVolume: require disk size should > 100 GB, input is: %d", diskRequestGB)
+		return nil, fmt.Errorf("CreateVolume: require disk size should > 100 GB, input is: %d", diskRequestGB)
+	}
+
+	// Step 2: check the pvc(req.Name) is created or not. return pv directly if created, else do creation
+	if value, ok := pvcMap[pvName]; ok {
+		log.Warnf("CreateVolume: volume already be created, pvName: %s, volumeContext: %v, return directly", pvName, value.VolumeContext)
 		return &csi.CreateVolumeResponse{Volume: value}, nil
 	}
 
 	// Step 3: parse DiskVolume params
 	diskVol, err := parseDiskVolumeOptions(req)
 	if err != nil {
-		log.Errorf("CreateVolume: error parameters from input: %v, with error: %v", req.Name, err)
-		return nil, status.Errorf(codes.InvalidArgument, "Invalid parameters from input: %v, with error: %v", req.Name, err)
+		log.Errorf("CreateVolume: error parameters from input, err is: %s", err.Error())
+		return nil, status.Errorf(codes.InvalidArgument, "CreateVolume: error parameters from input, err is: %s", err.Error())
 	}
 
 	// Step 4: create disk
-	diskVolumeID, err := createDisk(diskVol.FsType, diskVol.Type, diskVol.RegionID, diskVol.ClusterID, int(diskRequestGB), diskVol.ReadOnly)
+	diskID, err := createDisk(diskVol.FsType, diskVol.Type, diskVol.RegionID, diskVol.ClusterID, int(diskRequestGB), diskVol.ReadOnly)
 	if err != nil {
 		log.Errorf("CreateVolume: createDisk error, err is: %s", err.Error())
 		return nil, fmt.Errorf("CreateVolume: createDisk error, err is: %s", err.Error())
 	}
 
 	// Step 5: generate return volume
+	volumeContext := map[string]string{}
+
+	volumeContext["fsType"] = diskVol.FsType
+	volumeContext["type"] = diskVol.Type
+	volumeContext["readOnly"] = strconv.FormatBool(diskVol.ReadOnly)
+	volumeContext["encrypted"] = strconv.FormatBool(diskVol.Encrypted)
+
 	tmpVol := &csi.Volume{
-		VolumeId:      diskVolumeID,
+		VolumeId:      diskID,
 		CapacityBytes: int64(volSizeBytes),
-		VolumeContext: req.GetParameters(),
+		VolumeContext: volumeContext,
 		AccessibleTopology: []*csi.Topology{
 			{
 				Segments: map[string]string{
@@ -100,22 +112,24 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 	}
 
 	// Step 6: store
-	// store diskId and pvName
-	diskIDPVMap[diskVolumeID] = req.Name
+	// store diskId and pvName(pvName is equal to pvcName)
+	diskIdPvMap[diskID] = pvName
 	// store req.Name and csi.Volume
-	createdVolumeMap[req.Name] = tmpVol
-	log.Infof("CreateVolume: store [createdVolumeMap] and [diskIDPVMap] succeed")
+	pvcMap[pvName] = tmpVol
 
-	log.Infof("CreateVolume: createDisk successfully, diskVolumeID is: %s", diskVolumeID)
+	log.Infof("CreateVolume: store [diskIdPvMap] and [pvcMap] succeed")
+	log.Infof("CreateVolume: successfully create disk, pvName is: %s, diskID is: %s", pvName, diskID)
+
 	return &csi.CreateVolumeResponse{Volume: tmpVol}, nil
 }
 
 // to delete disk
 func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
-	log.Infof("DeleteVolume: Starting deleting volume, req.VolumeID is: %s, req is: %v", req.VolumeId, req)
+	log.Infof("DeleteVolume: Starting deleting volume, req is: %v", req)
 
 	// Step 1: check params
-	if req.VolumeId == "" {
+	diskID := req.VolumeId
+	if diskID == "" {
 		log.Error("DeleteVolume: req.VolumeID cannot be empty")
 		return nil, fmt.Errorf("DeleteVolume: req.VolumeID cannot be empty")
 	}
@@ -124,91 +138,96 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 	disk, err := findDiskByVolumeID(req.VolumeId)
 	if err != nil {
 		log.Errorf("DeleteVolume: findDiskByVolumeID error, err is: %s", err.Error())
+		return nil, err
 	}
 
-	nodeID := disk.Data.InstanceID
-	log.Infof("DeleteVolume: findDiskByVolumeID succeed, instanceID is: %s", nodeID)
-
-	// Step 3: check if disk detached from node, if not detach it firstly
+	// Step 3: check disk detached from node or not, if not detach it firstly
 	if disk != nil {
+		nodeID := disk.Data.InstanceID
+		log.Infof("DeleteVolume: findDiskByVolumeID succeed, diskID is: %s, instanceID is: %s", diskID, nodeID)
+
 		if disk.Data.Status == DiskStatusInUse {
-			log.Errorf("DeleteVolume: disk [in use], cant delete volumeID: %s from instanceID: %s", req.VolumeId, nodeID)
-			return nil, fmt.Errorf("DeleteVolume: disk [in use], cant delete volumeID: %s from instanceID: %s", req.VolumeId, nodeID)
+			log.Errorf("DeleteVolume: disk [in use], cant delete volumeID: %s from instanceID: %s", diskID, nodeID)
+			return nil, fmt.Errorf("DeleteVolume: disk [in use], cant delete volumeID: %s from instanceID: %s", diskID, nodeID)
 		} else if disk.Data.Status == DiskStatusInIdle {
 			log.Infof("DeleteVolume: disk is in [idle], then to delete directly!")
 		} else {
-			log.Warnf("DeleteVolume: disk status is not [in_use] or [idle], need to detach and then to delete it")
+			log.Warnf("DeleteVolume: disk status is not [in_use] or [idle], need to detach firstly, then to delete it")
 			err := detachDisk(req.VolumeId, nodeID)
 			if err != nil {
-				log.Errorf("DeleteVolume: detach disk: %s from node: %s with error, err is: %s", req.VolumeId, nodeID, err.Error())
+				log.Errorf("DeleteVolume: detach disk: %s from node: %s firstly with error, err is: %s", diskID, nodeID, err.Error())
 				return nil, err
 			}
-			log.Warnf("DeleteVolume: detach disk: %s from node: %s successfully! Then to delete it!", req.VolumeId, nodeID)
+			log.Warnf("DeleteVolume: detach disk: %s from node: %s firstly successfully! Then to delete it!", diskID, nodeID)
 		}
+	} else {
+		log.Error("DeleteVolume: findDiskByVolumeID(cdsDisk.FindDiskByVolumeID) response is nil")
+		return nil, fmt.Errorf("DeleteVolume: findDiskByVolumeID(cdsDisk.FindDiskByVolumeID) response is nil")
 	}
 
 	// Step 4: delete disk
-	if err := deleteDisk(req.VolumeId); err != nil {
+	if err := deleteDisk(diskID); err != nil {
 		log.Errorf("DeleteVolume: delete disk error, err is: %s", err)
 	}
 
 	log.Infof("DeleteVolume: delete disk successfully!")
 
-	// Step 5: delete diskIDPVMap and createdVolumeMap
-	if value, ok := diskIDPVMap[req.VolumeId]; ok {
-		delete(createdVolumeMap, value)
-		delete(diskIDPVMap, req.VolumeId)
+	// Step 5: delete pvcMap and diskIdPvMap
+	if pvName, ok := diskIdPvMap[diskID]; ok {
+		delete(pvcMap, pvName)
+		delete(diskIdPvMap, diskID)
 	}
 
-	log.Infof("DeleteVolume: delete [createdVolumeMap] and [diskIDPVMap] succeed!")
+	log.Infof("DeleteVolume: clean [diskIdPvMap] and [pvcMap] succeed!")
+	log.Infof("DeleteVolume: successfully delete diskID: %s !", diskID)
 
 	return &csi.DeleteVolumeResponse{}, nil
 }
 
 func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
-	log.Infof("ControllerPublishVolume: starting attach disk: %s to node: %s", req.VolumeId, req.NodeId)
+	// Step 1: get necessary params
+	diskID := req.VolumeId
+	nodeID := req.NodeId
 
-	// default is false
-	isSharedDisk := DiskShareDefault
-	if value, ok := req.VolumeContext[SharedEnable]; ok {
-		value = strings.ToLower(value)
-		if value == "true" {
-			isSharedDisk = true
-		}
-	}
+	log.Infof("ControllerPublishVolume: pvName: %s, starting attach diskID: %s to node: %s", req.VolumeId, diskID, nodeID)
 
-	if req.VolumeId == "" || req.NodeId == "" {
+	// Step 2: check necessary params
+	if diskID == "" || nodeID == "" {
 		log.Errorf("ControllerPublishVolume: missing [VolumeId/NodeId] in request")
 		return nil, status.Error(codes.InvalidArgument, "ControllerPublishVolume missing [VolumeId/NodeId] in request")
 	}
 
-	err := attachDisk(req.VolumeId, req.NodeId, isSharedDisk)
+	// Step 3: attach disk to node
+	err := attachDisk(diskID, nodeID, DiskShareDefault)
 	if err != nil {
-		log.Errorf("ControllerPublishVolume: attach disk:%s to node: %s with error, err is: %s", req.VolumeId, req.NodeId, err.Error())
+		log.Errorf("ControllerPublishVolume: attach disk:%s to node: %s with error, err is: %s", diskID, nodeID, err.Error())
 		return nil, err
 	}
 
-	log.Infof("ControllerPublishVolume: Successfully attach disk: %s to node: %s", req.VolumeId, req.NodeId)
+	log.Infof("ControllerPublishVolume: Successfully attach disk: %s to node: %s", diskID, nodeID)
 
 	return &csi.ControllerPublishVolumeResponse{}, nil
 }
 
 func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
+	// Step 1: get necessary params
+	diskID := req.VolumeId
+	nodeID := req.NodeId
+	log.Infof("ControllerUnpublishVolume: starting detach disk: %s from node: %s", diskID, nodeID)
 
-	log.Infof("ControllerUnpublishVolume: starting detach disk: %s from node: %s", req.VolumeId, req.NodeId)
-
-	if req.VolumeId == "" || req.NodeId == "" {
+	// Step 2: check necessary params
+	if diskID == "" || nodeID == "" {
 		log.Errorf("ControllerUnpublishVolume: missing [VolumeId/NodeId] in request")
 		return nil, status.Error(codes.InvalidArgument, "ControllerUnpublishVolume: missing [VolumeId/NodeId] in request")
 	}
 
-	err := detachDisk(req.VolumeId, req.NodeId)
+	err := detachDisk(diskID, nodeID)
 	if err != nil {
-		log.Errorf("ControllerUnpublishVolume: detach disk: %s from node: %s with error, err is: %s", req.VolumeId, req.NodeId, err.Error())
+		log.Errorf("ControllerUnpublishVolume: detach disk: %s from node: %s with error, err is: %s", diskID, nodeID, err.Error())
 		return nil, err
 	}
 
-	log.Infof("ControllerUnpublishVolume: Successfully detach disk: %s from node: %s", req.VolumeId, req.NodeId)
+	log.Infof("ControllerUnpublishVolume: Successfully detach disk: %s from node: %s", diskID, nodeID)
 
 	return &csi.ControllerUnpublishVolumeResponse{}, nil
 }
@@ -241,7 +260,7 @@ func createDisk(diskFsType, diskType, diskClusterID, diskRegionID string, diskRe
 
 	err = describeTaskStatus(taskID)
 	if err != nil {
-		log.Errorf("createDisk: cdsDisk.CreateDisk task result failed, err is: %s", err)
+		log.Errorf("createDisk: cdsDisk.CreateDisk task result failed, err is: %s", err.Error())
 		return "", err
 	}
 
@@ -274,12 +293,12 @@ func deleteDisk(diskID string) error {
 	return nil
 }
 
-func attachDisk(volumeID, nodeID string, isShareDisk bool) error {
+func attachDisk(diskID, nodeID string, isShareDisk bool) error {
 	// attach disk to node
-	log.Infof("attachDisk: volumeID: %s, nodeID: %s, isShareDisk: %t", volumeID, nodeID, isShareDisk)
+	log.Infof("attachDisk: diskID: %s, nodeID: %s, isShareDisk: %t", diskID, nodeID, isShareDisk)
 
 	res, err := cdsDisk.AttachDisk(&cdsDisk.AttachDiskArgs{
-		VolumeID: volumeID,
+		VolumeID: diskID,
 		NodeID:   nodeID,
 	})
 
@@ -300,12 +319,12 @@ func attachDisk(volumeID, nodeID string, isShareDisk bool) error {
 	return nil
 }
 
-func detachDisk(volumeID, nodeID string) error {
+func detachDisk(diskID, nodeID string) error {
 	// to detach disk from node
-	log.Infof("detachDisk: volumeID: %s, nodeID: %s", volumeID, nodeID)
+	log.Infof("detachDisk: diskID: %s, nodeID: %s", diskID, nodeID)
 
 	res, err := cdsDisk.DetachDisk(&cdsDisk.DetachDiskArgs{
-		VolumeID: volumeID,
+		VolumeID: diskID,
 		NodeID:   nodeID,
 	})
 
@@ -334,8 +353,8 @@ func findDiskByVolumeID(volumeID string) (*cdsDisk.FindDiskByVolumeIDResponse, e
 		VolumeID: volumeID,
 	})
 
-	if err != nil || res != nil {
-		log.Errorf("findDiskByVolumeID: cdsDisk.FindDiskByVolumeID [api error] or [res is nil], err is: %s", err)
+	if err != nil {
+		log.Errorf("findDiskByVolumeID: cdsDisk.FindDiskByVolumeID [api error], err is: %s", err)
 		return nil, err
 	}
 
@@ -345,13 +364,10 @@ func findDiskByVolumeID(volumeID string) (*cdsDisk.FindDiskByVolumeIDResponse, e
 }
 
 func describeTaskStatus(taskID string) error {
-
 	log.Infof("describeTaskStatus: taskID is: %s", taskID)
 
 	for i := 1; i < 120; i++ {
-
 		res, err := cdsDisk.DescribeTaskStatus(taskID)
-
 		if err != nil {
 			log.Errorf("task api error, err is: %s", err)
 			return fmt.Errorf("apiError")
