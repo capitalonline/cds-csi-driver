@@ -107,18 +107,56 @@ func (n *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpub
 	return &csi.NodeUnpublishVolumeResponse{}, nil
 }
 
-func (n *NodeServer) NodeStageVolume(context.Context, *csi.NodeStageVolumeRequest) (
-	*csi.NodeStageVolumeResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "")
+func (n *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
+	log.Infof("NodeStageVolume: ")
+	// Step 1: get necessary params
+	diskID := req.VolumeId
+	log.Infof("NodeStageVolume: starting format diskID: %s, req is: %v", diskID, req)
+
+	// Step 1: get deviceName
+	diskUUid, err := findVolumeUuidByVolumeID(diskID)
+	if err != nil {
+		log.Errorf("NodeStageVolume: findDeviceNameByVolumeID(cdsDisk.FindDeviceNameByVolumeID) error, err is: %s", err.Error())
+		return nil, err
+	}
+
+	log.Infof("NodeStageVolume: findDeviceNameByVolumeID succeed, diskUUid is: %s", diskUUid)
+
+	// Step 2: find deviceName bu diskUUid
+	deviceName, err := findDeviceNameByVolumeUUid(diskUUid)
+	if err != nil {
+		log.Errorf("NodeStageVolume: findDeviceNameByVolumeUUid error, err is: %s", err.Error())
+		return nil, err
+	}
+
+	// Step 3: format deviceName
+	diskVol := req.GetVolumeContext()
+	fsType := diskVol["fsType"]
+
+	if err = formatDiskDevice(deviceName, fsType); err != nil {
+		log.Errorf("NodeStageVolume: format deviceName: %s failed, err is: %s", deviceName, err.Error())
+		return nil, err
+	}
+
+	log.Infof("NodeStageVolume: successfully stageVolume!")
+
+	return &csi.NodeStageVolumeResponse{}, nil
 }
 
-func (n *NodeServer) NodeUnstageVolume(context.Context, *csi.NodeUnstageVolumeRequest) (
-	*csi.NodeUnstageVolumeResponse, error) {
+func (n *NodeServer) NodeUnstageVolume(context.Context, *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
 func (n *NodeServer) NodeExpandVolume(context.Context, *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "")
+}
+
+func findVolumeUuidByVolumeID(diskID string) (string, error) {
+	return "", nil
+}
+
+func findDeviceNameByVolumeUUid(diskUUid string) (string, error) {
+	return "", nil 
 }
 
 func findDeviceNameByVolumeID(volumeID string) (string, error) {
@@ -200,4 +238,39 @@ func isDeviceMounted(deviceName string) (string, error) {
 	log.Infof("isDeviceMounted: successfully!")
 
 	return out, nil
+}
+
+func formatDiskDevice(deviceName, fsType string) error {
+	log.Infof("formatDiskDevice: deviceName is: %s, fsType is: %s", deviceName, fsType)
+
+	// Step 1: check deviceName(disk) is scannable
+	scanDeviceCmd := fmt.Sprintf("fdisk -l | grep %s | grep -v grep", deviceName)
+	if _, err := utils.RunCommand(scanDeviceCmd); err != nil {
+		log.Error("formatDiskDevice: scanDeviceCmd: %s failed, err is: %s", scanDeviceCmd, err.Error())
+		return err
+	}
+
+	// Step 2: format deviceName(disk)
+	var formatDeviceCmd string
+	if fsType == DefaultFsTypeExt4 {
+		formatDeviceCmd = fmt.Sprintf("mkfs.ext4 %s", deviceName)
+	} else if fsType == FsTypeExt3 {
+		formatDeviceCmd = fmt.Sprintf("mkfs.ext3 %s", deviceName)
+	} else if fsType == FsTypeExt2 {
+		formatDeviceCmd = fmt.Sprintf("mkfs.ext2 %s", deviceName)
+	} else if fsType == FsTypeXfs {
+		formatDeviceCmd = fmt.Sprintf("mkfs.xfs %s", deviceName)
+	} else {
+		log.Error("formatDiskDevice: fsType not support, should be [ext4/ext3/ext2/xfs]")
+		return fmt.Errorf("formatDiskDevice: fsType not support, should be [ext4/ext3/ext2/xfs]")
+	}
+
+	if _, err := utils.RunCommand(formatDeviceCmd); err != nil {
+		log.Error("formatDiskDevice: formatDeviceCmd: %s failed, err is: %s", formatDeviceCmd, err.Error())
+		return err
+	}
+
+	log.Infof("formatDiskDevice: format deivceName: %s successfully!", deviceName)
+
+	return  nil
 }
