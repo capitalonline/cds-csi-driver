@@ -16,6 +16,6 @@ const (
 	subpathLiteral    = "subpath"
 	fileSystemLiteral = "filesystem"
 	defaultNfsVersion = "4.0"
-	defaultDeleteVolume = "false"
-	defaultNfsPath     = "/nfsshare"
+	defaultDeleteNas  = "false"
+	defaultNfsPath    = "/nfsshare"
 )

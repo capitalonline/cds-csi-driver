@@ -1,7 +1,7 @@
 package nas
 
 import (
-	csicommon "github.com/kubernetes-csi/drivers/pkg/csi-common"
+	"github.com/kubernetes-csi/drivers/pkg/csi-common"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -44,11 +44,11 @@ type NfsOpts struct {
 }
 
 type NfsFilesystemOpts struct {
-	ProtocolType    string
-	StorageType     string
-	SiteID          string
-	ClusterID		string
-	DeleteVolume    bool
+	ProtocolType string
+	StorageType  string
+	SiteID       string
+	ClusterID    string
+	DeleteNas    bool
 }
 
 type PublishOptions struct {

@@ -216,7 +216,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 		volumeContext["server"] = fileSystemNasIP
 		volumeContext["path"] = mountTargetPath
 		volumeContext["vers"] = defaultNfsVersion
-		volumeContext["deleteVolume"] = strconv.FormatBool(opts.DeleteVolume)
+		volumeContext["deleteNas"] = strconv.FormatBool(opts.DeleteNas)
 
 		volToCreate = &csi.Volume{
 			VolumeId:      pvName,
@@ -321,8 +321,8 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 		fileSystemNasID := ""
 		fileSystemNasIP := ""
 		mountTargetPath := ""
-		deleteVolume := defaultDeleteVolume
-		if value, ok := pv.Spec.CSI.VolumeAttributes["deleteVolume"]; ok {
+		deleteVolume := defaultDeleteNas
+		if value, ok := pv.Spec.CSI.VolumeAttributes["deleteNas"]; ok {
 			deleteVolume = value
 		}
 		if deleteVolume == "true" {
@@ -357,7 +357,7 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 				log.Infof("DeleteVolume: nas, server is: %s", fileSystemNasIP)
 			} else {
 				log.Errorf("DeleteVolume: nas server is empty, CSI is: %v", req.VolumeId, pv.Spec.CSI)
-				return nil, fmt.Errorf("DeleteVolume: nas server is empty, CSI is: %v", req.VolumeId, pv.Spec.CSI)
+				return nil, fmt.Errorf("DeleteVolume: nas server is empty, CSI is: %v", pv.Spec.CSI)
 			}
 
 			// check pv path
@@ -366,7 +366,7 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 				log.Infof("DeleteVolume: nas, path is: %s", mountTargetPath)
 			} else {
 				log.Errorf("DeleteVolume: path is empty, CSI is: %v", req.VolumeId, pv.Spec.CSI)
-				return nil, fmt.Errorf("DeleteVolume: path is empty, CSI is: %v", req.VolumeId, pv.Spec.CSI)
+				return nil, fmt.Errorf("DeleteVolume: path is empty, CSI is: %v", pv.Spec.CSI)
 			}
 
 			// step3: delete pv data in NAS storage
