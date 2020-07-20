@@ -156,7 +156,7 @@ func findVolumeUuidByVolumeID(diskID string) (string, error) {
 }
 
 func findDeviceNameByVolumeUUid(diskUUid string) (string, error) {
-	return "", nil 
+	return "", nil
 }
 
 func findDeviceNameByVolumeID(volumeID string) (string, error) {
