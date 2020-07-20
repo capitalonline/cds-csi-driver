@@ -1,11 +1,11 @@
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
-  name: nas-csi-cds-pvc-sc-filesystem
+  name: pvc-sc-filesystem
 spec:
   accessModes:
   - ReadWriteMany
-  storageClassName: nas-csi-csd-sc-filesystem
+  storageClassName:  sc-filesystem
   resources:
     requests:
       storage: 500Gi

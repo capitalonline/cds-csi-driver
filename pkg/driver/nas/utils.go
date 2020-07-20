@@ -215,15 +215,15 @@ func newVolumeCreateFilesystemOptions(param map[string]string) *VolumeCreateFile
 	opts.StorageType = param["storageType"]
 	opts.SiteID = param["siteID"]
 	opts.ClusterID = param["clusterID"]
-	value, ok := param["deleteVolume"]
+	value, ok := param["deleteNas"]
 	if !ok {
-		opts.DeleteVolume = false
+		opts.DeleteNas = false
 	}else {
 		value = strings.ToLower(value)
 		if value == "true" {
-			opts.DeleteVolume = true
+			opts.DeleteNas = true
 		} else {
-			opts.DeleteVolume = false
+			opts.DeleteNas = false
 		}
 	}
 	return opts
