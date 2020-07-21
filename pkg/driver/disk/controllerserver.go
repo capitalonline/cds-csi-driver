@@ -210,7 +210,7 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 	return &csi.ControllerPublishVolumeResponse{}, nil
 }
 
-// to detach disk from node 
+// to detach disk from node
 func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
 	// Step 1: get necessary params
 	diskID := req.VolumeId
