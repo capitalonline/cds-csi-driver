@@ -141,7 +141,7 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 		return nil, err
 	}
 
-	// Step 3: check disk detached from node or not, if not detach it firstly
+	// Step 3: check disk detached from node or not, detach it firstly if not
 	if disk != nil {
 		nodeID := disk.Data.InstanceID
 		log.Infof("DeleteVolume: findDiskByVolumeID succeed, diskID is: %s, instanceID is: %s", diskID, nodeID)
@@ -184,6 +184,7 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 	return &csi.DeleteVolumeResponse{}, nil
 }
 
+// to attach disk to node
 func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
 	// Step 1: get necessary params
 	diskID := req.VolumeId
@@ -209,6 +210,7 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 	return &csi.ControllerPublishVolumeResponse{}, nil
 }
 
+// to detach disk from node 
 func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
 	// Step 1: get necessary params
 	diskID := req.VolumeId
