@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"github.com/capitalonline/cds-csi-driver/pkg/driver/disk"
 	"github.com/capitalonline/cds-csi-driver/pkg/driver/oss"
 	"os"
 	"path"
@@ -15,6 +16,7 @@ import (
 const (
 	DriverNasTypeName = "nas.csi.cds.net"
 	DriverOssTypeName = "oss.csi.cds.net"
+	DriverBlockTypeName = "block.csi.cds.net"
 )
 
 var (
@@ -72,6 +74,9 @@ func main() {
 	case DriverOssTypeName:
 		ossDriver := oss.NewDriver(DriverOssTypeName, nodeID, endpoint)
 		ossDriver.Run()
+	case DriverBlockTypeName:
+		blockDriver := disk.NewDriver(DriverBlockTypeName, nodeID, endpoint)
+		blockDriver.Run()
 	default:
 		log.Fatalf("unsupported driver type: %s", driverName)
 	}
