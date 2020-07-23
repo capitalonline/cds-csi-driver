@@ -43,6 +43,11 @@ spec:
                 secretKeyRef:
                   key: access_key_secret
                   name: cck-secrets
+            - name: CDS_OVERSEA
+              valueFrom:
+                configMapKeyRef:
+                  name: cds-properties
+                  key: oversea
           securityContext:
             privileged: true
           volumeMounts:
