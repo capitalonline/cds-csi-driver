@@ -275,7 +275,7 @@ func deleteDisk(diskID string) error {
 	log.Infof("deleteDisk: diskID is:%s", diskID)
 
 	res, err := cdsDisk.DeleteDisk(&cdsDisk.DeleteDiskArgs{
-		DiskID: diskID,
+		VolumeID: diskID,
 	})
 
 	if err != nil {
