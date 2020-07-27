@@ -20,6 +20,27 @@ func NewNodeServer(d *DiskDriver) *NodeServer {
 	}
 }
 
+func (n *NodeServer) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
+	log.Infof("NodeGetCapabilities: starting to get node capabilities req is: %v", req)
+
+	nodeCap := &csi.NodeServiceCapability{
+		Type: &csi.NodeServiceCapability_Rpc{
+			Rpc: &csi.NodeServiceCapability_RPC{
+				Type: csi.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME,
+			},
+		},
+	}
+
+	// Disk Metric enable config
+	nodeSvcCap := []*csi.NodeServiceCapability{nodeCap}
+
+	log.Infof("NodeGetCapabilities: Successfully, nodeSvcCap is: %s", nodeSvcCap)
+
+	return &csi.NodeGetCapabilitiesResponse{
+		Capabilities: nodeSvcCap,
+	}, nil
+}
+
 // bind mount node's global path to pod directory
 func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
 	log.Infof("NodePublishVolume:: starting to mount bind stagingTargetPath to pod directory with req: %+v", req)
