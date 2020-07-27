@@ -1,0 +1,13 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: block-csi-csd-sc
+parameters:
+  Fstype: "ext4"
+  Type: "high_disk"
+  ReadOnly: "true"
+  Encrypted: "true"
+  RegionID: "beijing001"
+  ClusterID: "volumeID-testing001"
+provisioner: block.csi.cds.net
+reclaimPolicy: Delete
