@@ -8,7 +8,7 @@ import (
 
 // PluginFolder defines the location of disk plugin
 const (
-	driverName      = "disk.csi.cds.net"
+	driverName      = "block.csi.cds.net"
 	csiVersion      = "1.0.0"
 	TopologyRegionKey = "topology." + driverName + "/region"
 )
