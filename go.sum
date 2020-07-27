@@ -19,6 +19,8 @@ github.com/beorn7/perks v1.0.0/go.mod h1:KWe93zE9D1o94FZ5RNwFwVgaQK1VOXiVxmqh+Ce
 github.com/blang/semver v3.5.0+incompatible/go.mod h1:kRBLl5iJ+tD4TcOOxsy/0fnwebNt5EWlYSAyrTnjyyk=
 github.com/capitalonline/cck-sdk-go v1.0.5 h1:8uhEwPXJWWjIRddpKjVibw3OO48uXe87rlRxnroCQ1A=
 github.com/capitalonline/cck-sdk-go v1.0.5/go.mod h1:+Q882r7gQpNb6AfAGXVda6eNmZO49QnAztzkqEB52UY=
+github.com/capitalonline/cck-sdk-go v1.0.6 h1:iPiLy6QNZL/L1vI5AaPD7EqCEVDxsuq1iHDU9iz1V+E=
+github.com/capitalonline/cck-sdk-go v1.0.6/go.mod h1:+Q882r7gQpNb6AfAGXVda6eNmZO49QnAztzkqEB52UY=
 github.com/census-instrumentation/opencensus-proto v0.2.1/go.mod h1:f6KPmirojxKA12rnyqOA5BBL4O983OfeGPqjHWSTneU=
 github.com/client9/misspell v0.3.4/go.mod h1:qj6jICC3Q7zFZvVWo7KLAzC3yx5G7kyvSDkc90ppPyw=
 github.com/container-storage-interface/spec v1.1.0/go.mod h1:6URME8mwIBbpVyZV93Ce5St17xBiQJQY67NDsuohiy4=
