@@ -46,11 +46,13 @@ release: image-release
 sync-version:
 	sed -i.bak 's/newTag: .*/newTag: '${VERSION}'/g' ${NAS_KUSTOMIZATION_FILE} && rm ${NAS_KUSTOMIZATION_FILE}.bak
 	sed -i.bak 's/newTag: .*/newTag: '${VERSION}'/g' ${OSS_KUSTOMIZATION_FILE} && rm ${OSS_KUSTOMIZATION_FILE}.bak
+	sed -i.bak 's/newTag: .*/newTag: '${VERSION}'/g' ${BLOCK_KUSTOMIZATION_FILE} && rm ${BLOCK_KUSTOMIZATION_FILE}.bak
 
 .PHONY: kustomize
 kustomize:sync-version
 	kubectl kustomize ${NAS_KUSTOMIZATION_RELEASE_PATH} > ${NAS_DEPLOY_PATH}/deploy.yaml
 	kubectl kustomize ${OSS_KUSTOMIZATION_RELEASE_PATH} > ${OSS_DEPLOY_PATH}/deploy.yaml
+	kubectl kustomize ${BLOCK_KUSTOMIZATION_RELEASE_PATH} > ${BLOCK_DEPLOY_PATH}/deploy.yaml
 
 .PHONY: unit-test
 unit-test:
