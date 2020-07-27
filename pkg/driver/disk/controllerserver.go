@@ -211,7 +211,7 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 }
 
 // to detach disk from node
-func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
+func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
 	// Step 1: get necessary params
 	diskID := req.VolumeId
 	nodeID := req.NodeId
@@ -234,8 +234,24 @@ func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *c
 	return &csi.ControllerUnpublishVolumeResponse{}, nil
 }
 
-func (c ControllerServer) ValidateVolumeCapabilities(ctx context.Context, req *csi.ValidateVolumeCapabilitiesRequest) (*csi.ValidateVolumeCapabilitiesResponse, error) {
-	return nil, nil
+func (c *ControllerServer) ValidateVolumeCapabilities(ctx context.Context, req *csi.ValidateVolumeCapabilitiesRequest) (*csi.ValidateVolumeCapabilitiesResponse, error) {
+	log.Infof("ValidateVolumeCapabilities: req is: %v", req)
+
+	for _, capability := range req.VolumeCapabilities {
+		if capability.GetAccessMode().GetMode() != csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER {
+			return &csi.ValidateVolumeCapabilitiesResponse{Message: ""}, nil
+		}
+	}
+
+	return &csi.ValidateVolumeCapabilitiesResponse{
+		Confirmed: &csi.ValidateVolumeCapabilitiesResponse_Confirmed{
+			VolumeCapabilities: req.VolumeCapabilities,
+		},
+	}, nil
+}
+
+func (c *ControllerServer) ControllerExpandVolume(context.Context, *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "")
 }
 
 func createDisk(diskFsType, diskType, diskClusterID, diskRegionID string, diskRequestGB int, diskReadOnly bool) (string, error) {

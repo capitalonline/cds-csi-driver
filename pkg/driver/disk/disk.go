@@ -25,6 +25,6 @@ func NewDriver(driverName, nodeId, endpoint string) *DiskDriver {
 func (d *DiskDriver) Run() {
 	log.Infof("Starting csi-plugin Driver: %v version: %v", driverName, csiVersion)
 	s := csicommon.NewNonBlockingGRPCServer()
-	s.Start(d.endpoint, d.idServer, nil, d.nodeServer)
+	s.Start(d.endpoint, d.idServer, d.controllerServer, d.nodeServer)
 	s.Wait()
 }
