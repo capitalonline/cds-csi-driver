@@ -1,0 +1,6 @@
+bases:
+- ../../base
+
+images:
+- name: registry-bj.capitalonline.net/cck/cds-csi-driver
+  newTag: v1.2.4
