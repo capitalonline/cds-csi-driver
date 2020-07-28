@@ -4,7 +4,7 @@ metadata:
   name: block-csi-csd-sc
 parameters:
   fstype: "ext4"
-  type: "high_disk"
+  type: "disk_high"
   readOnly: "true"
   encrypted: "true"
   regionID: "beijing001"
