@@ -3,4 +3,4 @@ kind: CSIDriver
 metadata:
   name: block.csi.cds.net
 spec:
-  attachRequired: false
+  attachRequired: true
