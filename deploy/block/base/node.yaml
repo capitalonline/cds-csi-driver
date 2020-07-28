@@ -57,7 +57,7 @@ spec:
         - name: ADDRESS
           value: /var/lib/kubelet/plugins/block.csi.cds.net/csi.sock
         - name: DRIVER_REG_SOCK_PATH
-          value: /var/lib/kubelet/plugins/nlock.csi.cds.net/csi.sock
+          value: /var/lib/kubelet/plugins/block.csi.cds.net/csi.sock
         volumeMounts:
         - name: kubelet-dir
           mountPath: /var/lib/kubelet/
