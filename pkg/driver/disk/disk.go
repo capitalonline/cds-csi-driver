@@ -19,6 +19,7 @@ func NewDriver(driverName, nodeId, endpoint string) *DiskDriver {
 	d.csiDriver = csicommon.NewCSIDriver(driverName, common.GetVersion().Version, nodeId)
 	d.idServer = NewIdentityServer(d)
 	d.nodeServer = NewNodeServer(d)
+	d.controllerServer = NewControllerServer(d)
 	return d
 }
 
