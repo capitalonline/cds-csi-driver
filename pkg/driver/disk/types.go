@@ -31,6 +31,6 @@ type DiskVolumeArgs struct {
 	Type      string `json:"type"`
 	FsType    string `json:"fsType"`
 	ReadOnly  bool   `json:"readOnly"`
-	RegionID  string `json:"regionId"`
+	SiteID  string `json:"siteId"`
 	ClusterID string `json:"clusterID"`
 }

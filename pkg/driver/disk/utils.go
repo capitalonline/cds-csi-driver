@@ -18,7 +18,7 @@ func parseDiskVolumeOptions(req *csi.CreateVolumeRequest) (*DiskVolumeArgs, erro
 	}
 
 	// regionID
-	diskVolArgs.RegionID, ok = volOptions["regionID"]
+	diskVolArgs.SiteID, ok = volOptions["siteID"]
 	if !ok {
 		return nil, fmt.Errorf("regionID cannot be empty")
 	}
@@ -39,7 +39,7 @@ func parseDiskVolumeOptions(req *csi.CreateVolumeRequest) (*DiskVolumeArgs, erro
 		// set to default disk_common
 		diskVolArgs.Type = DefaultDisk
 	}
-	if diskVolArgs.Type != HighDisk && diskVolArgs.Type != DefaultDisk {
+	if diskVolArgs.Type != HighDisk {
 		return nil, fmt.Errorf("Illegal required parameter type, only support [disk_high], [disk_common], input is: %s" + diskVolArgs.Type)
 	}
 

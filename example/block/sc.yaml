@@ -6,7 +6,7 @@ parameters:
   fstype: "ext4"
   type: "high_disk"
   readOnly: "true"
-  regionID: "beijing001"
+  siteID: "beijing001"
   clusterID: "volumeID-testing001"
 provisioner: block.csi.cds.net
 reclaimPolicy: Delete
