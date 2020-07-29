@@ -366,5 +366,5 @@ func formatDiskDevice(deviceName, fsType string) error {
 
 	log.Infof("formatDiskDevice: Successfully!")
 
-	return  nil
+	return nil
 }

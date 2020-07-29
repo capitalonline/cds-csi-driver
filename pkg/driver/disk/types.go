@@ -1,7 +1,7 @@
 package disk
 
 import (
-	csicommon "github.com/kubernetes-csi/drivers/pkg/csi-common"
+	"github.com/kubernetes-csi/drivers/pkg/csi-common"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -28,12 +28,12 @@ type IdentityServer struct {
 
 // capitalonline disk parameters
 type DiskVolumeArgs struct {
-	Type             string `json:"type"`
-	FsType           string `json:"fsType"`
-	ReadOnly         bool   `json:"readOnly"`
-	Encrypted        bool   `json:"encrypted"`
-	RegionID         string `json:"regionId"`
-	ClusterID		 string `json:"clusterID"`
+	Type      string `json:"type"`
+	FsType    string `json:"fsType"`
+	ReadOnly  bool   `json:"readOnly"`
+	Encrypted bool   `json:"encrypted"`
+	RegionID  string `json:"regionId"`
+	ClusterID string `json:"clusterID"`
 
 	//ZoneID           string `json:"zoneId"`
 	//KMSKeyID         string `json:"kmsKeyId"`
@@ -41,4 +41,3 @@ type DiskVolumeArgs struct {
 	//ResourceGroupID  string `json:"resourceGroupId"`
 	//DiskTags         string `json:"diskTags"`
 }
-

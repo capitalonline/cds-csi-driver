@@ -146,10 +146,10 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 		nodeID := disk.Data.InstanceID
 		log.Infof("DeleteVolume: findDiskByVolumeID succeed, diskID is: %s, instanceID is: %s", diskID, nodeID)
 
-		if disk.Data.Status == DiskStatusInUse {
+		if disk.Data.Status == StatusInUse {
 			log.Errorf("DeleteVolume: disk [in use], cant delete volumeID: %s from instanceID: %s", diskID, nodeID)
 			return nil, fmt.Errorf("DeleteVolume: disk [in use], cant delete volumeID: %s from instanceID: %s", diskID, nodeID)
-		} else if disk.Data.Status == DiskStatusInIdle {
+		} else if disk.Data.Status == StatusInIdle {
 			log.Infof("DeleteVolume: disk is in [idle], then to delete directly!")
 		} else {
 			log.Warnf("DeleteVolume: disk status is not [in_use] or [idle], need to detach firstly, then to delete it")
@@ -199,7 +199,7 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 	}
 
 	// Step 3: attach disk to node
-	err := attachDisk(diskID, nodeID, DiskShareDefault)
+	err := attachDisk(diskID, nodeID, DefaultShare)
 	if err != nil {
 		log.Errorf("ControllerPublishVolume: attach disk:%s to node: %s with error, err is: %s", diskID, nodeID, err.Error())
 		return nil, err

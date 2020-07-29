@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-func parseDiskVolumeOptions (req *csi.CreateVolumeRequest) (*DiskVolumeArgs, error) {
+func parseDiskVolumeOptions(req *csi.CreateVolumeRequest) (*DiskVolumeArgs, error) {
 	var ok bool
 	diskVolArgs := &DiskVolumeArgs{}
 	volOptions := req.GetParameters()
@@ -37,9 +37,9 @@ func parseDiskVolumeOptions (req *csi.CreateVolumeRequest) (*DiskVolumeArgs, err
 	diskVolArgs.Type, ok = volOptions["type"]
 	if !ok {
 		// set to default disk_common
-		diskVolArgs.Type = DiskCommon
+		diskVolArgs.Type = DefaultDisk
 	}
-	if diskVolArgs.Type != DiskHigh && diskVolArgs.Type != DiskCommon {
+	if diskVolArgs.Type != HighDisk && diskVolArgs.Type != DefaultDisk {
 		return nil, fmt.Errorf("Illegal required parameter type, only support [disk_high], [disk_common], input is: %s" + diskVolArgs.Type)
 	}
 
