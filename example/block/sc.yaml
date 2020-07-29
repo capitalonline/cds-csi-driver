@@ -10,3 +10,4 @@ parameters:
   clusterID: "volumeID-testing001"
 provisioner: block.csi.cds.net
 reclaimPolicy: Delete
+volumeBindingMode: Immediate   # WaitForFirstConsumer
