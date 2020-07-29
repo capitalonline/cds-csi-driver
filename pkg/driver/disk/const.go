@@ -10,5 +10,5 @@ const (
 	FsTypeXfs         = "xfs"
 	StatusInUse       = "in_use"
 	StatusInIdle      = "idle"
-	DefaultShare      = false
+	DefaultNotShare   = false
 )

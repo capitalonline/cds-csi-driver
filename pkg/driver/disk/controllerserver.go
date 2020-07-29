@@ -96,7 +96,6 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 	volumeContext["fsType"] = diskVol.FsType
 	volumeContext["type"] = diskVol.Type
 	volumeContext["readOnly"] = strconv.FormatBool(diskVol.ReadOnly)
-	volumeContext["encrypted"] = strconv.FormatBool(diskVol.Encrypted)
 
 	tmpVol := &csi.Volume{
 		VolumeId:      diskID,
@@ -199,7 +198,7 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 	}
 
 	// Step 3: attach disk to node
-	err := attachDisk(diskID, nodeID, DefaultShare)
+	err := attachDisk(diskID, nodeID, DefaultNotShare)
 	if err != nil {
 		log.Errorf("ControllerPublishVolume: attach disk:%s to node: %s with error, err is: %s", diskID, nodeID, err.Error())
 		return nil, err

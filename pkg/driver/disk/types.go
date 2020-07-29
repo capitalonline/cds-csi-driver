@@ -31,13 +31,6 @@ type DiskVolumeArgs struct {
 	Type      string `json:"type"`
 	FsType    string `json:"fsType"`
 	ReadOnly  bool   `json:"readOnly"`
-	Encrypted bool   `json:"encrypted"`
 	RegionID  string `json:"regionId"`
 	ClusterID string `json:"clusterID"`
-
-	//ZoneID           string `json:"zoneId"`
-	//KMSKeyID         string `json:"kmsKeyId"`
-	//PerformanceLevel string `json:"performanceLevel"`
-	//ResourceGroupID  string `json:"resourceGroupId"`
-	//DiskTags         string `json:"diskTags"`
 }

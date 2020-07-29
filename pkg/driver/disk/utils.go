@@ -56,18 +56,18 @@ func parseDiskVolumeOptions(req *csi.CreateVolumeRequest) (*DiskVolumeArgs, erro
 		}
 	}
 
-	// encrypted or not
-	value, ok = volOptions["encrypted"]
-	if !ok {
-		diskVolArgs.Encrypted = false
-	} else {
-		value = strings.ToLower(value)
-		if value == "yes" || value == "true" || value == "1" {
-			diskVolArgs.Encrypted = true
-		} else {
-			diskVolArgs.Encrypted = false
-		}
-	}
+	//// encrypted or not
+	//value, ok = volOptions["encrypted"]
+	//if !ok {
+	//	diskVolArgs.Encrypted = false
+	//} else {
+	//	value = strings.ToLower(value)
+	//	if value == "yes" || value == "true" || value == "1" {
+	//		diskVolArgs.Encrypted = true
+	//	} else {
+	//		diskVolArgs.Encrypted = false
+	//	}
+	//}
 
 	return diskVolArgs, nil
 }

@@ -6,7 +6,6 @@ parameters:
   fstype: "ext4"
   type: "high_disk"
   readOnly: "true"
-  encrypted: "true"
   regionID: "beijing001"
   clusterID: "volumeID-testing001"
 provisioner: block.csi.cds.net
