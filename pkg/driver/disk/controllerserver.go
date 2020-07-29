@@ -84,7 +84,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 	}
 
 	// Step 4: create disk
-	diskID, err := createDisk(pvName, diskVol.FsType, diskVol.Type, diskVol.RegionID, diskVol.ClusterID, int(diskRequestGB), diskVol.ReadOnly)
+	diskID, err := createDisk(pvName, diskVol.FsType, diskVol.StorageType, diskVol.SiteID, diskVol.ClusterID, int(diskRequestGB), diskVol.ReadOnly)
 	if err != nil {
 		log.Errorf("CreateVolume: createDisk error, err is: %s", err.Error())
 		return nil, fmt.Errorf("CreateVolume: createDisk error, err is: %s", err.Error())
@@ -94,7 +94,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 	volumeContext := map[string]string{}
 
 	volumeContext["fsType"] = diskVol.FsType
-	volumeContext["type"] = diskVol.Type
+	volumeContext["storageType"] = diskVol.StorageType
 	volumeContext["readOnly"] = strconv.FormatBool(diskVol.ReadOnly)
 
 	tmpVol := &csi.Volume{
@@ -104,7 +104,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 		AccessibleTopology: []*csi.Topology{
 			{
 				Segments: map[string]string{
-					TopologyRegionKey: diskVol.RegionID,
+					TopologyRegionKey: diskVol.SiteID,
 				},
 			},
 		},
@@ -259,12 +259,12 @@ func createDisk(diskName, diskFsType, diskType, diskClusterID, diskRegionID stri
 
 	// create disk
 	res, err := cdsDisk.CreateDisk(&cdsDisk.CreateDiskArgs{
-		Name: 	   diskName,
-		ClusterID: diskClusterID,
-		RegionID:  diskRegionID,
-		Fstype:    diskFsType,
-		Type:      diskType,
-		ReadOnly:  diskReadOnly,
+		Name:        diskName,
+		ClusterID:   diskClusterID,
+		RegionID:    diskRegionID,
+		Fstype:      diskFsType,
+		StorageType: diskType,
+		ReadOnly:    diskReadOnly,
 	})
 
 	if err != nil {

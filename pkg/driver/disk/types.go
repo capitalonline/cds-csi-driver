@@ -28,9 +28,9 @@ type IdentityServer struct {
 
 // capitalonline disk parameters
 type DiskVolumeArgs struct {
-	Type      string `json:"type"`
-	FsType    string `json:"fsType"`
-	ReadOnly  bool   `json:"readOnly"`
-	SiteID  string `json:"siteId"`
-	ClusterID string `json:"clusterID"`
+	StorageType string `json:"storageType"`
+	FsType      string `json:"fsType"`
+	ReadOnly    bool   `json:"readOnly"`
+	SiteID      string `json:"siteId"`
+	ClusterID   string `json:"clusterID"`
 }

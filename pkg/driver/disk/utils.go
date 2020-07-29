@@ -34,12 +34,12 @@ func parseDiskVolumeOptions(req *csi.CreateVolumeRequest) (*DiskVolumeArgs, erro
 	}
 
 	// disk Type
-	diskVolArgs.Type, ok = volOptions["type"]
+	diskVolArgs.StorageType, ok = volOptions["storageType"]
 	if !ok {
 		// set to default disk_common
-		diskVolArgs.Type = DefaultDisk
+		diskVolArgs.StorageType = DefaultDisk
 	}
-	if diskVolArgs.Type != HighDisk {
+	if diskVolArgs.StorageType != HighDisk {
 		return nil, fmt.Errorf("Illegal required parameter type, only support [disk_high], [disk_common], input is: %s" + diskVolArgs.Type)
 	}
 

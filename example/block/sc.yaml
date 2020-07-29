@@ -4,7 +4,7 @@ metadata:
   name: block-csi-csd-sc
 parameters:
   fstype: "ext4"
-  type: "high_disk"
+  StorageType: "high_disk"
   readOnly: "true"
   siteID: "beijing001"
   clusterID: "volumeID-testing001"
