@@ -15,6 +15,8 @@ import (
 	log "github.com/sirupsen/logrus"
 	core "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
+
+	cdsNas "github.com/capitalonline/cck-sdk-go/pkg/cck"
 )
 
 func (opts *NfsOpts) parsNfsOpts() error {
@@ -618,6 +620,13 @@ func getDeleteVolumeSubpathOptions(pv *core.PersistentVolume, sc *storage.Storag
 
 // parse ServerList that support multi servers in one SC
 func ParseServerList(serverList []string) []*NfsServer {
+	// delete usage > 80 server
+	res := DeleteUsageFullServers(serverList)
+	if len(res) != 0 {
+		serverList = res
+	}
+
+	// params
 	servers := make([]*NfsServer, 0)
 	for _, server := range serverList {
 
@@ -658,6 +667,7 @@ func SelectServerRoundRobin(servers []*NfsServer, uniqueSelectString string) *Nf
 	if length == 0 {
 		return nil
 	}
+
 	return servers[count%length]
 }
 
@@ -667,4 +677,26 @@ func SelectServerRandom(servers []*NfsServer) *NfsServer {
 		return nil
 	}
 	return servers[rand.Intn(length)]
+}
+
+func DeleteUsageFullServers(serverList []string) []string{
+	var tmpServers []string
+
+	for k, v := range serverList {
+		addrPath := strings.SplitN(strings.TrimSpace(v), "/", 2)
+		addr := strings.TrimSpace(addrPath[0])
+		log.Infof("cdsNas.DescribeMountPoint: addr is: %s", addr)
+		res, err := cdsNas.DescribeNasUsage("", addr)
+		if err != nil {
+			continue
+		}
+		log.Infof("cdsNas.DescribeMountPoint: res is: %v", res)
+
+		if res != nil {
+			if  usageInt, _ := strconv.Atoi(strings.TrimSuffix(res.Data.NasInfo[0].UsageRate, "%")); usageInt < defaultNasUsage {
+				tmpServers = append(tmpServers, serverList[k])
+			}
+		}
+	}
+	return tmpServers
 }
