@@ -686,7 +686,7 @@ func DeleteUsageFullServers(serverList []string) []string{
 		addrPath := strings.SplitN(strings.TrimSpace(v), "/", 2)
 		addr := strings.TrimSpace(addrPath[0])
 		log.Infof("cdsNas.DescribeMountPoint: addr is: %s", addr)
-		res, err := cdsNas.DescribeNasUsage("", addr)
+		res, err := cdsNas.DescribeNasUsage(os.Getenv(defaultClusterID), addr)
 		if err != nil {
 			continue
 		}
