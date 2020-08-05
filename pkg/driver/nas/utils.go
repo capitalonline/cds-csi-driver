@@ -284,7 +284,6 @@ func parseVolumeCreateSubpathOptions(req *csi.CreateVolumeRequest) (*VolumeCreat
 	if err != nil {
 		return nil, err
 	}
-	log.Infof("idleServerSlice is: %s", servers)
 
 	var nfsServer *NfsServer
 
@@ -637,6 +636,7 @@ func ParseServerList(serverList []string, threshold int) ([]*NfsServer, error) {
 	if err != nil {
 		return nil, err
 	}
+	log.Infof("idleServerSlice is: %s", idleServerList)
 	if len(idleServerList) == 0 {
 		return nil, nil
 	}
@@ -706,6 +706,7 @@ func DeleteUsageFullServers(serverList []string, threshold int) ([]string, error
 		}
 
 		if res != nil {
+			log.Infof("DeleteUsageFullServers: res is: %v", res)
 			usageInt, _ := strconv.Atoi(strings.TrimSuffix(res.Data.NasInfo[0].UsageRate, "%"))
 			log.Infof("DeleteUsageFullServers: addr is: %s, usageInt is: %d", addr, usageInt)
 			if usageInt < threshold {
