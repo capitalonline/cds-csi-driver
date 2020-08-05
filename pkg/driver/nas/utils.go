@@ -659,7 +659,7 @@ func ParseServerList(serverList []string, threshold int) ([]*NfsServer, error) {
 		}
 		servers = append(servers, &NfsServer{Address: addr, Path: filepath.Join("/", path)})
 	}
-	return servers
+	return servers, nil 
 }
 
 func SelectServer(servers []*NfsServer, uniqueSelectString string, strategy string) *NfsServer {
