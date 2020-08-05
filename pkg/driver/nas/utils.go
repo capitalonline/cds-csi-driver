@@ -272,9 +272,10 @@ func parseVolumeCreateSubpathOptions(req *csi.CreateVolumeRequest) (*VolumeCreat
 	if opts.Server != "" {
 		serverSlice = append(serverSlice, strings.Join([]string{opts.Server, strings.TrimPrefix(opts.Path, "/")}, "/"))
 	}
-	log.Infof("serverSlice is: %s", serverSlice)
 
+	log.Infof("serverSlice is: %s", serverSlice)
 	servers := ParseServerList(serverSlice)
+	log.Infof("idleServerSlice is: %s", servers)
 
 	var nfsServer *NfsServer
 
