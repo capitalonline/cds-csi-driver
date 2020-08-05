@@ -206,6 +206,11 @@ func newVolumeCreateSubpathOptions(param map[string]string) *VolumeCreateSubpath
 	opts.Mode = param["mode"]
 	opts.ModeType = param["modeType"]
 	opts.Strategy = param["strategy"]
+	if param["threshold"] == "" {
+		opts.Threshold = defaultNasUsage
+	} else {
+		opts.Threshold = param["threshold"]
+	}
 
 	return opts
 }
@@ -274,7 +279,11 @@ func parseVolumeCreateSubpathOptions(req *csi.CreateVolumeRequest) (*VolumeCreat
 	}
 
 	log.Infof("serverSlice is: %s", serverSlice)
-	servers := ParseServerList(serverSlice)
+	thresholdInt, _ := strconv.Atoi(opts.Threshold)
+	servers, err := ParseServerList(serverSlice, thresholdInt)
+	if err != nil {
+		return nil, err
+	}
 	log.Infof("idleServerSlice is: %s", servers)
 
 	var nfsServer *NfsServer
@@ -622,11 +631,14 @@ func getDeleteVolumeSubpathOptions(pv *core.PersistentVolume, sc *storage.Storag
 }
 
 // parse ServerList that support multi servers in one SC
-func ParseServerList(serverList []string) []*NfsServer {
+func ParseServerList(serverList []string, threshold int) ([]*NfsServer, error) {
 	// delete usage > 80 server
-	idleServerList := DeleteUsageFullServers(serverList)
+	idleServerList, err := DeleteUsageFullServers(serverList, threshold)
+	if err != nil {
+		return nil, err
+	}
 	if len(idleServerList) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	// params
@@ -682,24 +694,27 @@ func SelectServerRandom(servers []*NfsServer) *NfsServer {
 	return servers[rand.Intn(length)]
 }
 
-func DeleteUsageFullServers(serverList []string) []string{
+func DeleteUsageFullServers(serverList []string, threshold int) ([]string, error){
 	var tmpServers []string
 
 	for k, v := range serverList {
 		addrPath := strings.SplitN(strings.TrimSpace(v), "/", 2)
 		addr := strings.TrimSpace(addrPath[0])
-		log.Infof("cdsNas.DescribeMountPoint: addr is: %s", addr)
 		res, err := cdsNas.DescribeNasUsage(os.Getenv(defaultClusterID), addr)
 		if err != nil {
-			continue
+			return nil, err
 		}
-		log.Infof("cdsNas.DescribeMountPoint: res is: %v", res)
 
 		if res != nil {
-			if  usageInt, _ := strconv.Atoi(strings.TrimSuffix(res.Data.NasInfo[0].UsageRate, "%")); usageInt < defaultNasUsage {
+			usageInt, _ := strconv.Atoi(strings.TrimSuffix(res.Data.NasInfo[0].UsageRate, "%"))
+			log.Infof("DeleteUsageFullServers: addr is: %s, usageInt is: %d", addr, usageInt)
+			if usageInt < threshold {
 				tmpServers = append(tmpServers, serverList[k])
 			}
+		} else {
+			log.Errorf("DeleteUsageFullServers: cdsNas.DescribeNasUsage res is nil")
+			return nil, fmt.Errorf("DeleteUsageFullServers: cdsNas.DescribeNasUsage res is nil")
 		}
 	}
-	return tmpServers
+	return tmpServers, nil
 }
