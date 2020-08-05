@@ -273,12 +273,14 @@ func parseVolumeCreateSubpathOptions(req *csi.CreateVolumeRequest) (*VolumeCreat
 		serverSlice = append(serverSlice, strings.Join([]string{opts.Server, strings.TrimPrefix(opts.Path, "/")}, "/"))
 	}
 	log.Infof("serverSlice is: %s", serverSlice)
+
 	servers := ParseServerList(serverSlice)
+
 	var nfsServer *NfsServer
 
 	switch len(servers) {
 	case 0:
-		return nil, fmt.Errorf("nas, fatel error, server or servers is missing on volume as subpath")
+		return nil, fmt.Errorf("nas, fatel error, [server or servers is missing ] or [servers usage all > 80] on volume as subpath")
 	case 1:
 		opts.Server = servers[0].Address
 		opts.Path = servers[0].Path
@@ -621,14 +623,14 @@ func getDeleteVolumeSubpathOptions(pv *core.PersistentVolume, sc *storage.Storag
 // parse ServerList that support multi servers in one SC
 func ParseServerList(serverList []string) []*NfsServer {
 	// delete usage > 80 server
-	res := DeleteUsageFullServers(serverList)
-	if len(res) != 0 {
-		serverList = res
+	idleServerList := DeleteUsageFullServers(serverList)
+	if len(idleServerList) == 0 {
+		return nil
 	}
 
 	// params
 	servers := make([]*NfsServer, 0)
-	for _, server := range serverList {
+	for _, server := range idleServerList {
 
 		addrPath := strings.SplitN(strings.TrimSpace(server), "/", 2)
 		if len(addrPath) < 2 {
