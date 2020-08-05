@@ -15,6 +15,8 @@ import (
 	log "github.com/sirupsen/logrus"
 	core "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
+
+	cdsNas "github.com/capitalonline/cck-sdk-go/pkg/cck"
 )
 
 func (opts *NfsOpts) parsNfsOpts() error {
@@ -270,13 +272,16 @@ func parseVolumeCreateSubpathOptions(req *csi.CreateVolumeRequest) (*VolumeCreat
 	if opts.Server != "" {
 		serverSlice = append(serverSlice, strings.Join([]string{opts.Server, strings.TrimPrefix(opts.Path, "/")}, "/"))
 	}
+
 	log.Infof("serverSlice is: %s", serverSlice)
 	servers := ParseServerList(serverSlice)
+	log.Infof("idleServerSlice is: %s", servers)
+
 	var nfsServer *NfsServer
 
 	switch len(servers) {
 	case 0:
-		return nil, fmt.Errorf("nas, fatel error, server or servers is missing on volume as subpath")
+		return nil, fmt.Errorf("nas, fatel error, [server or servers is missing ] or [servers usage all > 80] on volume as subpath")
 	case 1:
 		opts.Server = servers[0].Address
 		opts.Path = servers[0].Path
@@ -618,8 +623,15 @@ func getDeleteVolumeSubpathOptions(pv *core.PersistentVolume, sc *storage.Storag
 
 // parse ServerList that support multi servers in one SC
 func ParseServerList(serverList []string) []*NfsServer {
+	// delete usage > 80 server
+	idleServerList := DeleteUsageFullServers(serverList)
+	if len(idleServerList) == 0 {
+		return nil
+	}
+
+	// params
 	servers := make([]*NfsServer, 0)
-	for _, server := range serverList {
+	for _, server := range idleServerList {
 
 		addrPath := strings.SplitN(strings.TrimSpace(server), "/", 2)
 		if len(addrPath) < 2 {
@@ -658,6 +670,7 @@ func SelectServerRoundRobin(servers []*NfsServer, uniqueSelectString string) *Nf
 	if length == 0 {
 		return nil
 	}
+
 	return servers[count%length]
 }
 
@@ -667,4 +680,26 @@ func SelectServerRandom(servers []*NfsServer) *NfsServer {
 		return nil
 	}
 	return servers[rand.Intn(length)]
+}
+
+func DeleteUsageFullServers(serverList []string) []string{
+	var tmpServers []string
+
+	for k, v := range serverList {
+		addrPath := strings.SplitN(strings.TrimSpace(v), "/", 2)
+		addr := strings.TrimSpace(addrPath[0])
+		log.Infof("cdsNas.DescribeMountPoint: addr is: %s", addr)
+		res, err := cdsNas.DescribeNasUsage(os.Getenv(defaultClusterID), addr)
+		if err != nil {
+			continue
+		}
+		log.Infof("cdsNas.DescribeMountPoint: res is: %v", res)
+
+		if res != nil {
+			if  usageInt, _ := strconv.Atoi(strings.TrimSuffix(res.Data.NasInfo[0].UsageRate, "%")); usageInt < defaultNasUsage {
+				tmpServers = append(tmpServers, serverList[k])
+			}
+		}
+	}
+	return tmpServers
 }
