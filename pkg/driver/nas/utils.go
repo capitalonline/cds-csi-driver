@@ -712,9 +712,8 @@ func DeleteUsageFullServers(serverList []string, thresholdFloat64 float64) ([]st
 		}
 
 		if res != nil {
-			log.Infof("DeleteUsageFullServers: res is: %v", res)
 			usageFloat64, _ := strconv.ParseFloat(strings.TrimSuffix(res.Data.NasInfo[0].UsageRate, "%"), 32)
-			log.Infof("DeleteUsageFullServers: addr is: %s, usageFloat64 is: %s, thresholdFloat64 is: %s", addr, usageFloat64, thresholdFloat64)
+			log.Infof("DeleteUsageFullServers: addr is: %s, usageFloat64 is: %f, thresholdFloat64 is: %f", addr, usageFloat64, thresholdFloat64)
 			if usageFloat64 < thresholdFloat64 {
 				tmpServers = append(tmpServers, serverList[k])
 			}
