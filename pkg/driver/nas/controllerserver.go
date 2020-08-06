@@ -67,7 +67,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 
 	if !ok {
 		volumeAs = subpathLiteral
-	} else if volumeAs != "filesystem" && volumeAs != "subpath"  {
+	} else if volumeAs != "filesystem" && volumeAs != "subpath" {
 		return nil, fmt.Errorf("Required parameter [parameter.volumeAs] must be [filesystem] or [subpath]")
 	}
 
@@ -124,7 +124,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 			log.Infof("CreateVolume: nas, provisioning filesystem volume, req: %+v", req)
 
 			// 1-create filesystem,
-			storageSize := req.CapacityRange.RequiredBytes/(1024 * 1024 * 1024)
+			storageSize := req.CapacityRange.RequiredBytes / (1024 * 1024 * 1024)
 			createFileSystemsNasRes, err := cdsNas.CreateNas(opts.SiteID, pvName[0:29], opts.StorageType, int(storageSize), 1)
 
 			if err != nil {
@@ -438,7 +438,6 @@ func (c ControllerServer) ValidateVolumeCapabilities(ctx context.Context, req *c
 func (c ControllerServer) ControllerExpandVolume(context.Context, *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "")
 }
-
 
 func describeTaskStatus(taskID string) error {
 

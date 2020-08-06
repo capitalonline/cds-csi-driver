@@ -278,9 +278,15 @@ func parseVolumeCreateSubpathOptions(req *csi.CreateVolumeRequest) (*VolumeCreat
 		serverSlice = append(serverSlice, strings.Join([]string{opts.Server, strings.TrimPrefix(opts.Path, "/")}, "/"))
 	}
 
+	thresholdFloat64, _ := strconv.ParseFloat(opts.Threshold, 64)
+	thresholdFloat64 = thresholdFloat64 * 100
+	if thresholdFloat64 < 0 || thresholdFloat64 > 100 {
+		return nil, fmt.Errorf("nas, fatel error, threshold should be within [0-1], but input is: %s", opts.Threshold)
+	}
+
 	log.Infof("serverSlice is: %s", serverSlice)
-	thresholdInt, _ := strconv.Atoi(opts.Threshold)
-	servers, err := ParseServerList(serverSlice, thresholdInt)
+
+	servers, err := ParseServerList(serverSlice, thresholdFloat64)
 	if err != nil {
 		return nil, err
 	}
@@ -630,9 +636,9 @@ func getDeleteVolumeSubpathOptions(pv *core.PersistentVolume, sc *storage.Storag
 }
 
 // parse ServerList that support multi servers in one SC
-func ParseServerList(serverList []string, threshold int) ([]*NfsServer, error) {
+func ParseServerList(serverList []string, thresholdFloat64 float64) ([]*NfsServer, error) {
 	// delete usage > 80 server
-	idleServerList, err := DeleteUsageFullServers(serverList, threshold)
+	idleServerList, err := DeleteUsageFullServers(serverList, thresholdFloat64)
 	if err != nil {
 		return nil, err
 	}
@@ -694,7 +700,7 @@ func SelectServerRandom(servers []*NfsServer) *NfsServer {
 	return servers[rand.Intn(length)]
 }
 
-func DeleteUsageFullServers(serverList []string, threshold int) ([]string, error){
+func DeleteUsageFullServers(serverList []string, thresholdFloat64 float64) ([]string, error){
 	var tmpServers []string
 
 	for k, v := range serverList {
@@ -706,11 +712,9 @@ func DeleteUsageFullServers(serverList []string, threshold int) ([]string, error
 		}
 
 		if res != nil {
-			log.Infof("DeleteUsageFullServers: res is: %v", res)
-			usageFloat32, _ := strconv.ParseFloat(strings.TrimSuffix(res.Data.NasInfo[0].UsageRate, "%"), 32)
-			usageInt := int(usageFloat32)
-			log.Infof("DeleteUsageFullServers: addr is: %s, usageInt is: %d", addr, usageInt)
-			if usageInt < threshold {
+			usageFloat64, _ := strconv.ParseFloat(strings.TrimSuffix(res.Data.NasInfo[0].UsageRate, "%"), 32)
+			log.Infof("DeleteUsageFullServers: addr is: %s, usageFloat64 is: %f, thresholdFloat64 is: %f", addr, usageFloat64, thresholdFloat64)
+			if usageFloat64 < thresholdFloat64 {
 				tmpServers = append(tmpServers, serverList[k])
 			}
 		} else {
