@@ -6,8 +6,14 @@ parameters:
   fstype: "ext4"
   StorageType: "high_disk"
   readOnly: "true"
-  siteID: "beijing001"
-  clusterID: "volumeID-testing001"
+  siteId: "beijing001"
+  clusterId: "volumeID-testing001"
+  zoneId: "WuxiA-POD10-CLU02"
 provisioner: block.csi.cds.net
 reclaimPolicy: Delete
-volumeBindingMode: Immediate   # WaitForFirstConsumer
+volumeBindingMode: WaitForFirstConsumer    # Immediate
+allowedTopologies:
+- matchLabelExpressions:
+  - key: topology.kubernetes.io/zone
+    values:
+    - WuxiA-POD10-CLU02

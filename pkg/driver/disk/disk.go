@@ -10,7 +10,7 @@ import (
 const (
 	driverName        = "block.csi.cds.net"
 	csiVersion        = "1.0.0"
-	TopologyRegionKey = "topology." + driverName + "/region"
+	TopologyZoneKey = "topology.kubernetes.io/zone"
 )
 
 func NewDriver(driverName, nodeId, endpoint string) *DiskDriver {

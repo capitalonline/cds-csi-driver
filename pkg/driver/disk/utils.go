@@ -12,19 +12,25 @@ func parseDiskVolumeOptions(req *csi.CreateVolumeRequest) (*DiskVolumeArgs, erro
 	volOptions := req.GetParameters()
 
 	// clusterID
-	diskVolArgs.ClusterID, ok = volOptions["clusterID"]
+	diskVolArgs.ClusterID, ok = volOptions["clusterId"]
 	if !ok {
-		return nil, fmt.Errorf("clusterID cannot be empty")
+		return nil, fmt.Errorf("clusterId cannot be empty")
 	}
 
 	// regionID
-	diskVolArgs.SiteID, ok = volOptions["siteID"]
+	diskVolArgs.SiteID, ok = volOptions["siteId"]
 	if !ok {
-		return nil, fmt.Errorf("regionID cannot be empty")
+		return nil, fmt.Errorf("regionId cannot be empty")
+	}
+
+	// zoneID
+	diskVolArgs.ZoneID, ok = volOptions["zoneId"]
+	if !ok {
+		return nil, fmt.Errorf("zone cannot be empty")
 	}
 
 	// fstype
-	diskVolArgs.FsType, ok = volOptions["fstype"]
+	diskVolArgs.FsType, ok = volOptions["fsType"]
 	if !ok {
 		// set to default ext4
 		diskVolArgs.FsType = DefaultFsTypeExt4
