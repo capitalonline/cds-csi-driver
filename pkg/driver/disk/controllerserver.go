@@ -19,11 +19,15 @@ import (
 )
 
 // the map of req.Name and csi.Volume.
-var pvcMap = map[string]*csi.Volume{}
+var pvcCreatedMap = map[string]*csi.Volume{}
 
 // the map of diskId and pvName
 // diskId and pvName is not same under csi plugin
 var diskIdPvMap = map[string]string{}
+
+// the map od diskID and pvName
+// storing the disk in creating status
+var diskProcessingMap = map[string]string{}
 
 func NewControllerServer(d *DiskDriver) *ControllerServer {
 	config, err := rest.InClusterConfig()
@@ -46,7 +50,13 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 	log.Infof("CreateVolume: Starting CreateVolume, req is:%v", req)
 
 	pvName := req.Name
-	// Step 1: check critical params
+	// Step 1: check the pvc(req.Name) is created or not. return pv directly if created, else do creation
+	if value, ok := pvcCreatedMap[pvName]; ok {
+		log.Warnf("CreateVolume: volume has been created, pvName: %s, volumeContext: %v, return directly", pvName, value.VolumeContext)
+		return &csi.CreateVolumeResponse{Volume: value}, nil
+	}
+
+	// Step 2: check critical params
 	if pvName == "" {
 		log.Errorf("CreateVolume: pv Name (req.Name) cannot be empty")
 		return nil, status.Error(codes.InvalidArgument, "pv Name (req.Name) cannot be empty")
@@ -70,12 +80,6 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 		return nil, fmt.Errorf("CreateVolume: require disk size should > 100 GB, input is: %d", diskRequestGB)
 	}
 
-	// Step 2: check the pvc(req.Name) is created or not. return pv directly if created, else do creation
-	if value, ok := pvcMap[pvName]; ok {
-		log.Warnf("CreateVolume: volume already be created, pvName: %s, volumeContext: %v, return directly", pvName, value.VolumeContext)
-		return &csi.CreateVolumeResponse{Volume: value}, nil
-	}
-
 	// Step 3: parse DiskVolume params
 	diskVol, err := parseDiskVolumeOptions(req)
 	if err != nil {
@@ -84,13 +88,40 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 	}
 
 	// Step 4: create disk
-	diskID, err := createDisk(pvName, diskVol.FsType, diskVol.StorageType, diskVol.SiteID, diskVol.ClusterID, int(diskRequestGB), diskVol.ReadOnly)
+	// check if disk is in creating
+	if value, ok := diskProcessingMap[pvName]; ok {
+		log.Warnf("CreateVolume: Disk Volume(%s)'s diskID: %s is in creating, please wait", pvName, value)
+		if tmpVol, ok := pvcCreatedMap[pvName]; ok {
+			log.Infof("CreateVolume: Disk Volume(%s)'s diskID: %s creating process finished, return context", pvName, value)
+			return &csi.CreateVolumeResponse{Volume: tmpVol}, nil
+		} else {
+			return nil, fmt.Errorf("CreateVolume: Disk Volume(%s)'s diskID: %s is in creating, please wait", pvName, value)
+		}
+	}
+
+	// do creation
+	createRes, err := createDisk(pvName, diskVol.FsType, diskVol.StorageType, diskVol.SiteID, diskVol.ClusterID, int(diskRequestGB), diskVol.ReadOnly)
 	if err != nil {
 		log.Errorf("CreateVolume: createDisk error, err is: %s", err.Error())
 		return nil, fmt.Errorf("CreateVolume: createDisk error, err is: %s", err.Error())
 	}
 
-	// Step 5: generate return volume
+	diskID := createRes.Data.VolumeID
+	taskID := createRes.TaskID
+
+	// store creating disk
+	diskProcessingMap[pvName] = diskID
+
+	err = describeTaskStatus(taskID)
+	if err != nil {
+		log.Errorf("createDisk: describeTaskStatus task result failed, err is: %s", err.Error())
+		return nil, err
+	}
+
+	// clean creating disk
+	delete(diskProcessingMap, pvName)
+
+	// Step 5: generate return volume context
 	volumeContext := map[string]string{}
 
 	volumeContext["fsType"] = diskVol.FsType
@@ -114,7 +145,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 	// store diskId and pvName(pvName is equal to pvcName)
 	diskIdPvMap[diskID] = pvName
 	// store req.Name and csi.Volume
-	pvcMap[pvName] = tmpVol
+	pvcCreatedMap[pvName] = tmpVol
 
 	log.Infof("CreateVolume: store [diskIdPvMap] and [pvcMap] succeed")
 	log.Infof("CreateVolume: successfully create disk, pvName is: %s, diskID is: %s", pvName, diskID)
@@ -171,9 +202,9 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 
 	log.Infof("DeleteVolume: delete disk successfully!")
 
-	// Step 5: delete pvcMap and diskIdPvMap
+	// Step 5: delete pvcCreatedMap and diskIdPvMap
 	if pvName, ok := diskIdPvMap[diskID]; ok {
-		delete(pvcMap, pvName)
+		delete(pvcCreatedMap, pvName)
 		delete(diskIdPvMap, diskID)
 	}
 
@@ -253,9 +284,9 @@ func (c *ControllerServer) ControllerExpandVolume(context.Context, *csi.Controll
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
-func createDisk(diskName, diskFsType, diskType, diskClusterID, diskRegionID string, diskRequestGB int, diskReadOnly bool) (string, error) {
+func createDisk(diskName, diskFsType, diskType, diskClusterID, diskRegionID string, diskRequestGB int, diskReadOnly bool) (*cdsDisk.CreateDiskResponse, error) {
 
-	log.Infof("createDisk: diskFstype: %s, diskType: %s, diskClusterID: %s, diskRegionID: %s, diskRequestGB: %d, diskReadOnly: %t", diskFsType, diskType, diskClusterID, diskRegionID, diskRequestGB, diskReadOnly)
+	log.Infof("createDisk: diskName: %s, diskFstype: %s, diskType: %s, diskClusterID: %s, diskRegionID: %s, diskRequestGB: %d, diskReadOnly: %t", diskName, diskFsType, diskType, diskClusterID, diskRegionID, diskRequestGB, diskReadOnly)
 
 	// create disk
 	res, err := cdsDisk.CreateDisk(&cdsDisk.CreateDiskArgs{
@@ -269,22 +300,12 @@ func createDisk(diskName, diskFsType, diskType, diskClusterID, diskRegionID stri
 
 	if err != nil {
 		log.Errorf("createDisk: cdsDisk.CreateDisk api error, err is: %s", err.Error())
-		return "", err
-	}
-
-	// check task status
-	taskID := res.TaskID
-	log.Infof("createDisk: cdsDisk.CreateDisk task creation succeed, taskID is: %s", res.TaskID)
-
-	err = describeTaskStatus(taskID)
-	if err != nil {
-		log.Errorf("createDisk: cdsDisk.CreateDisk task result failed, err is: %s", err.Error())
-		return "", err
+		return nil, err
 	}
 
 	log.Infof("createDisk: successfully!")
 
-	return res.Data.VolumeID, nil
+	return res, nil
 }
 
 func deleteDisk(diskID string) error {
