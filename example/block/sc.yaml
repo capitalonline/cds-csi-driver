@@ -11,8 +11,3 @@ parameters:
 provisioner: block.csi.cds.net
 reclaimPolicy: Delete
 volumeBindingMode: WaitForFirstConsumer    # Immediate
-allowedTopologies:
-- matchLabelExpressions:
-  - key: topology.kubernetes.io/zone
-    values:
-    - WuxiA-POD10-CLU02
