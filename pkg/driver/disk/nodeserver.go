@@ -64,18 +64,9 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 		return nil, status.Error(codes.InvalidArgument, "NodePublishVolume:: step 1, req.Targetpath can not be empty")
 	}
 
-	// Step 2: find deviceName
-	deviceName, err := findDeviceNameByVolumeID(req.VolumeId)
-
-	if err != nil {
-		log.Errorf("NodePublishVolume:: step 2, findDeviceNameByVolumeID failed, err is: %s", err.Error())
-	}
-
-	log.Infof("NodePublishVolume: step 2, deviceName is: %s", deviceName)
-
-	// Step 3: check podPath
+	// Step 2: check podPath
 	if !utils.FileExisted(podPath) {
-		if err = utils.CreateDir(podPath, mountPointMode); err != nil {
+		if err := utils.CreateDir(podPath, mountPointMode); err != nil {
 			log.Errorf("NodePublishVolume:: step 3, req.TargetPath(podPath): %s is not exist, but unable to create it, err is: %s", podPath, err.Error())
 			return nil, fmt.Errorf("NodePublishVolume:: step 3, req.TargetPath(podPath): %s is not exist, but unable to create it, err is: %s", podPath, err.Error())
 		}
@@ -88,8 +79,8 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 		return &csi.NodePublishVolumeResponse{}, nil
 	}
 
-	// Step 4: bind stagingTargetPath to pod directory
-	err = bindMountGlobalPathToPodPath(volumeID, stagingTargetPath, podPath)
+	// Step 3: bind stagingTargetPath to pod directory
+	err := bindMountGlobalPathToPodPath(volumeID, stagingTargetPath, podPath)
 	if err != nil {
 		log.Errorf("NodePublishVolume:: step 4, bindMountGlobalPathToPodPath failed, err is: %s", err.Error())
 		return nil, fmt.Errorf("NodePublishVolume:: step 4, bindMountGlobalPathToPodPath failed, err is: %s", err.Error())
