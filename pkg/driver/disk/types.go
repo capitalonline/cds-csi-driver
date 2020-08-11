@@ -30,8 +30,7 @@ type IdentityServer struct {
 type DiskVolumeArgs struct {
 	StorageType string `json:"storageType"`
 	FsType      string `json:"fsType"`
-	ReadOnly    bool   `json:"readOnly"`
 	SiteID      string `json:"siteId"`
 	ClusterID   string `json:"clusterId"`
-	ZoneID  		string `json:"zoneId"`
+	ZoneID  	string `json:"zoneId"`
 }

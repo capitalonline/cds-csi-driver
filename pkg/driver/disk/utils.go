@@ -3,7 +3,6 @@ package disk
 import (
 	"fmt"
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"strings"
 )
 
 func parseDiskVolumeOptions(req *csi.CreateVolumeRequest) (*DiskVolumeArgs, error) {
@@ -26,7 +25,11 @@ func parseDiskVolumeOptions(req *csi.CreateVolumeRequest) (*DiskVolumeArgs, erro
 	// zoneID
 	diskVolArgs.ZoneID, ok = volOptions["zoneId"]
 	if !ok {
-		return nil, fmt.Errorf("zone cannot be empty")
+		// topology aware feature to get zoneid
+		diskVolArgs.ZoneID = pickZone(req.GetAccessibilityRequirements())
+		if diskVolArgs.ZoneID == "" {
+			return nil, fmt.Errorf("zoneId cannot be empty")
+		}
 	}
 
 	// fstype
@@ -49,31 +52,26 @@ func parseDiskVolumeOptions(req *csi.CreateVolumeRequest) (*DiskVolumeArgs, erro
 		return nil, fmt.Errorf("Illegal required parameter type, only support [disk_high], [disk_common], input is: %s" + diskVolArgs.Type)
 	}
 
-	// readonly, default false
-	value, ok := volOptions["readOnly"]
-	if !ok {
-		diskVolArgs.ReadOnly = false
-	} else {
-		value = strings.ToLower(value)
-		if value == "yes" || value == "true" || value == "1" {
-			diskVolArgs.ReadOnly = true
-		} else {
-			diskVolArgs.ReadOnly = false
+	return diskVolArgs, nil
+}
+
+// pickZone selects 1 zone given topology requirement.
+// if not found, empty string is returned.
+func pickZone(requirement *csi.TopologyRequirement) string {
+	if requirement == nil {
+		return ""
+	}
+	for _, topology := range requirement.GetPreferred() {
+		zone, exists := topology.GetSegments()[TopologyZoneKey]
+		if exists {
+			return zone
 		}
 	}
-
-	//// encrypted or not
-	//value, ok = volOptions["encrypted"]
-	//if !ok {
-	//	diskVolArgs.Encrypted = false
-	//} else {
-	//	value = strings.ToLower(value)
-	//	if value == "yes" || value == "true" || value == "1" {
-	//		diskVolArgs.Encrypted = true
-	//	} else {
-	//		diskVolArgs.Encrypted = false
-	//	}
-	//}
-
-	return diskVolArgs, nil
+	for _, topology := range requirement.GetRequisite() {
+		zone, exists := topology.GetSegments()[TopologyZoneKey]
+		if exists {
+			return zone
+		}
+	}
+	return ""
 }

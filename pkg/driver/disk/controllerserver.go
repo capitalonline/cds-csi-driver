@@ -100,7 +100,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 	}
 
 	// do creation
-	createRes, err := createDisk(pvName, diskVol.FsType, diskVol.StorageType, diskVol.SiteID, diskVol.ClusterID, int(diskRequestGB), diskVol.ReadOnly)
+	createRes, err := createDisk(pvName, diskVol.FsType, diskVol.StorageType, diskVol.SiteID, diskVol.ClusterID, int(diskRequestGB))
 	if err != nil {
 		log.Errorf("CreateVolume: createDisk error, err is: %s", err.Error())
 		return nil, fmt.Errorf("CreateVolume: createDisk error, err is: %s", err.Error())
@@ -126,7 +126,9 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 
 	volumeContext["fsType"] = diskVol.FsType
 	volumeContext["storageType"] = diskVol.StorageType
-	volumeContext["readOnly"] = strconv.FormatBool(diskVol.ReadOnly)
+	volumeContext["zoneId"] = diskVol.ZoneID
+	volumeContext["siteID"] = diskVol.SiteID
+	volumeContext["clusterId"] = diskVol.ClusterID
 
 	tmpVol := &csi.Volume{
 		VolumeId:      diskID,
@@ -291,7 +293,7 @@ func (c *ControllerServer) ControllerExpandVolume(context.Context, *csi.Controll
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
-func createDisk(diskName, diskFsType, diskType, diskClusterID, diskRegionID string, diskRequestGB int, diskReadOnly bool) (*cdsDisk.CreateDiskResponse, error) {
+func createDisk(diskName, diskFsType, diskType, diskClusterID, diskRegionID string, diskRequestGB int) (*cdsDisk.CreateDiskResponse, error) {
 
 	log.Infof("createDisk: diskName: %s, diskFstype: %s, diskType: %s, diskClusterID: %s, diskRegionID: %s, diskRequestGB: %d, diskReadOnly: %t", diskName, diskFsType, diskType, diskClusterID, diskRegionID, diskRequestGB, diskReadOnly)
 
@@ -302,7 +304,6 @@ func createDisk(diskName, diskFsType, diskType, diskClusterID, diskRegionID stri
 		RegionID:    diskRegionID,
 		Fstype:      diskFsType,
 		StorageType: diskType,
-		ReadOnly:    diskReadOnly,
 	})
 
 	if err != nil {
