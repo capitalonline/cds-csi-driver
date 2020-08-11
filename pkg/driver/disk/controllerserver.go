@@ -3,7 +3,6 @@ package disk
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"time"
 
 	cdsDisk "github.com/capitalonline/cck-sdk-go/pkg/cck/disk"
@@ -100,7 +99,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 	}
 
 	// do creation
-	createRes, err := createDisk(pvName, diskVol.FsType, diskVol.StorageType, diskVol.SiteID, diskVol.ClusterID, int(diskRequestGB))
+	createRes, err := createDisk(pvName, diskVol.FsType, diskVol.StorageType, diskVol.SiteID, diskVol.ClusterID, diskVol.ZoneID, int(diskRequestGB))
 	if err != nil {
 		log.Errorf("CreateVolume: createDisk error, err is: %s", err.Error())
 		return nil, fmt.Errorf("CreateVolume: createDisk error, err is: %s", err.Error())
@@ -175,7 +174,7 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 
 	// Step 3: check disk detached from node or not, detach it firstly if not
 	if disk != nil {
-		nodeID := disk.Data.InstanceID
+		nodeID := disk.Data.NodeID
 		log.Infof("DeleteVolume: findDiskByVolumeID succeed, diskID is: %s, instanceID is: %s", diskID, nodeID)
 
 		if disk.Data.Status == StatusInUse {
@@ -293,9 +292,9 @@ func (c *ControllerServer) ControllerExpandVolume(context.Context, *csi.Controll
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
-func createDisk(diskName, diskFsType, diskType, diskClusterID, diskRegionID string, diskRequestGB int) (*cdsDisk.CreateDiskResponse, error) {
+func createDisk(diskName, diskFsType, diskType, diskClusterID, diskRegionID, diskZoneID string, diskRequestGB int) (*cdsDisk.CreateDiskResponse, error) {
 
-	log.Infof("createDisk: diskName: %s, diskFstype: %s, diskType: %s, diskClusterID: %s, diskRegionID: %s, diskRequestGB: %d, diskReadOnly: %t", diskName, diskFsType, diskType, diskClusterID, diskRegionID, diskRequestGB, diskReadOnly)
+	log.Infof("createDisk: diskName: %s, diskFstype: %s, diskType: %s, diskClusterID: %s, diskRegionID: %s, diskZoneID: %s, diskRequestGB: %d", diskName, diskFsType, diskType, diskClusterID, diskRegionID, diskZoneID, diskRequestGB)
 
 	// create disk
 	res, err := cdsDisk.CreateDisk(&cdsDisk.CreateDiskArgs{
@@ -304,6 +303,7 @@ func createDisk(diskName, diskFsType, diskType, diskClusterID, diskRegionID stri
 		RegionID:    diskRegionID,
 		Fstype:      diskFsType,
 		StorageType: diskType,
+		ZoneID:      diskZoneID,
 	})
 
 	if err != nil {

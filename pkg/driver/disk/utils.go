@@ -28,7 +28,7 @@ func parseDiskVolumeOptions(req *csi.CreateVolumeRequest) (*DiskVolumeArgs, erro
 		// topology aware feature to get zoneid
 		diskVolArgs.ZoneID = pickZone(req.GetAccessibilityRequirements())
 		if diskVolArgs.ZoneID == "" {
-			return nil, fmt.Errorf("zoneId cannot be empty")
+			return nil, fmt.Errorf("zoneId cannot be empty, please input [zoneId] in parameters or add [allowedTopologies.matchLabelExpressions.key and values] in SC")
 		}
 	}
 
