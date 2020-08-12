@@ -70,6 +70,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 	if !ok {
 		volumeAs = subpathLiteral
 	} else if volumeAs != "filesystem" && volumeAs != "subpath" {
+		utils.SentrySendError(fmt.Errorf("Required parameter [parameter.volumeAs] must be [filesystem] or [subpath]"))
 		return nil, fmt.Errorf("Required parameter [parameter.volumeAs] must be [filesystem] or [subpath]")
 	}
 
@@ -85,11 +86,13 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 		log.Infof("CreateVolume:: nas, provisioning subpath volume, nfs opts: %+v", opts)
 
 		if err != nil {
+			utils.SentrySendError(fmt.Errorf("CreateVolume:: nas, failed to parse subpath create volume req, error is: %s", err.Error()))
 			return nil, fmt.Errorf("CreateVolume:: nas, failed to parse subpath create volume req, error is: %s", err.Error())
 		}
 
 		// step3-subpath-2: make dir on the nas server
 		if err := opts.createNasSubDir(createVolumeRoot, pvName); err != nil {
+			utils.SentrySendError(fmt.Errorf("CreateVolume:: nas, failed to create subpath on the nas server, error is: %s", err.Error()))
 			return nil, fmt.Errorf("CreateVolume:: nas, failed to create subpath on the nas server, error is: %s", err.Error())
 		}
 
@@ -269,16 +272,19 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 	if volumeAs == subpathLiteral {
 		// step1: get pv's StorageClass info
 		if pv.Spec.StorageClassName == "" {
+			utils.SentrySendError(fmt.Errorf("DeleteVolume:: nas, volume spec with empty storagecless: %s, Spec: %+v", req.VolumeId, pv.Spec))
 			return nil, fmt.Errorf("DeleteVolume:: nas, volume spec with empty storagecless: %s, Spec: %+v", req.VolumeId, pv.Spec)
 		}
 		sc, err := c.Client.StorageV1().StorageClasses().Get(pv.Spec.StorageClassName, metav1.GetOptions{})
 		if err != nil {
+			utils.SentrySendError(fmt.Errorf("DeleteVolume:: nas, cannot get storageclass of pv %s: %s", req.VolumeId, err.Error()))
 			return nil, fmt.Errorf("DeleteVolume:: nas, cannot get storageclass of pv %s: %s", req.VolumeId, err.Error())
 		}
 		opts := getDeleteVolumeSubpathOptions(pv, sc)
 
 		pvPath := opts.Path
 		if pvPath == "/" || pvPath == "" {
+			utils.SentrySendError(fmt.Errorf("DeleteVolume:: nas, pvPath cannot be / or empty"))
 			return nil, fmt.Errorf("DeleteVolume:: nas, pvPath cannot be / or empty")
 		}
 
