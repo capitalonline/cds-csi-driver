@@ -111,6 +111,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 
 		if err != nil {
 			log.Errorf("CreateVolume:: nas, failed to parse filesystem create volume req, error is: %s", err.Error())
+			utils.SentrySendError(fmt.Errorf("CreateVolume:: nas, failed to parse filesystem create volume req, error is: %s", err.Error()))
 			return nil, fmt.Errorf("CreateVolume:: nas, failed to parse filesystem create volume req, error is: %s", err.Error())
 		}
 
@@ -129,6 +130,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 
 			if err != nil {
 				log.Errorf("CreateVolume: Create NAS filesystem task api error, error is: %s", err.Error())
+				utils.SentrySendError(fmt.Errorf("CreateVolume: Create NAS filesystem task api error, error is: %s", err.Error()))
 				return nil, fmt.Errorf("CreateVolume: Create NAS filesystem task api error, error is: %s", err.Error())
 			}
 
@@ -148,6 +150,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 
 			if err != nil {
 				log.Errorf("CreateVolume: describeTaskStatus error, err is: %s", err.Error())
+				utils.SentrySendError(fmt.Errorf("CreateVolume: describeTaskStatus error, err is: %s", err.Error()))
 				return nil, fmt.Errorf("CreateVolume: describeTaskStatus error, err is: %s", err.Error())
 			}
 			log.Infof("CreateVolume: create Nas succeed, then to mount Nas to cluster")
@@ -157,6 +160,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 
 			if err != nil {
 				log.Errorf("CreateVolume: Create mount Nas task api error, err is: %s", err.Error())
+				utils.SentrySendError(fmt.Errorf("CreateVolume: Create mount Nas task api error, err is: %s", err.Error()))
 				return nil, fmt.Errorf("CreateVolume: Create mount Nas task api error, err is: %s", err.Error())
 			}
 
@@ -168,6 +172,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 
 			if err != nil {
 				log.Errorf("CreateVolume: describeTaskStatus error, err is: %s", err.Error())
+				utils.SentrySendError(fmt.Errorf("CreateVolume: describeTaskStatus error, err is: %s", err.Error()))
 				return nil, fmt.Errorf("CreateVolume: describeTaskStatus error, err is: %s", err.Error())
 			}
 			log.Infof("CreateVolume: mount nas: %s to cluster: %s succeed", fileSystemNasID, opts.ClusterID)
@@ -225,6 +230,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 		}
 	} else {
 		log.Errorf("CreateVolume:: nas, unsupported volumeAs: %s, [parameter.volumeAs] must be [filesystem] or [subpath]", volumeAs)
+		utils.SentrySendError(fmt.Errorf("CreateVolume:: nas, unsupported volumeAs: %s, [parameter.volumeAs] must be [filesystem] or [subpath]", volumeAs))
 		return nil, fmt.Errorf("CreateVolume:: nas, unsupported volumeAs: %s, [parameter.volumeAs] must be [filesystem] or [subpath]", volumeAs)
 	}
 
@@ -239,7 +245,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
 	// log.Infof("DeleteVolume:: nas, delete volumeId(pvName) is: %s", req.GetVolumeId())
 
-	pv, err := c.Client.CoreV1().PersistentVolumes().Get(req.VolumeId, metav1.GetOptions{})
+	pv, err := c.Client.CoreV1().PersistentVolumes().Get(ctx, req.VolumeId, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("DeleteVolume:: nas, get Volume: %s from cluster error: %s", req.VolumeId, err.Error())
 	}
@@ -263,7 +269,7 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 		if pv.Spec.StorageClassName == "" {
 			return nil, fmt.Errorf("DeleteVolume:: nas, volume spec with empty storagecless: %s, Spec: %+v", req.VolumeId, pv.Spec)
 		}
-		sc, err := c.Client.StorageV1().StorageClasses().Get(pv.Spec.StorageClassName, metav1.GetOptions{})
+		sc, err := c.Client.StorageV1().StorageClasses().Get(ctx, pv.Spec.StorageClassName, metav1.GetOptions{})
 		if err != nil {
 			return nil, fmt.Errorf("DeleteVolume:: nas, cannot get storageclass of pv %s: %s", req.VolumeId, err.Error())
 		}
@@ -279,14 +285,17 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 		mountPoint := filepath.Join(deleteVolumeRoot, req.VolumeId+"-delete")
 		if err := utils.CreateDir(mountPoint, mountPointMode); err != nil {
 			log.Errorf("DeleteVolume:: nas, unable to create directory %s: %s", mountPoint, err)
+			utils.SentrySendError(fmt.Errorf("DeleteVolume:: nas, unable to create directory %s: %s", mountPoint, err))
 		}
 		mntCmd := fmt.Sprintf("mount -t nfs -o vers=%s %s:%s %s", opts.Vers, opts.Server, nasPath, mountPoint)
 		if _, err := utils.RunCommand(mntCmd); err != nil {
 			log.Errorf("DeleteVolume:: nas, failed to mount %s: %s", mntCmd, err)
+			utils.SentrySendError(fmt.Errorf("DeleteVolume:: nas, failed to mount %s: %s", mntCmd, err))
 		}
 		defer func() {
 			if err := utils.Unmount(mountPoint); err != nil {
 				log.Errorf("DeleteVolume:: nas, failed to unmount %s: %s", mountPoint, err)
+				utils.SentrySendError(fmt.Errorf("DeleteVolume:: nas, failed to unmount %s: %s", mountPoint, err))
 			}
 		}()
 
@@ -299,6 +308,8 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 				if err := os.Rename(deletePath, archivePath); err != nil {
 					log.Errorf("DeleteVolume:: nas, failed to archive volume %s from path %s to %s with error: %s",
 						req.VolumeId, deletePath, archivePath, err.Error())
+					utils.SentrySendError(fmt.Errorf("DeleteVolume:: nas, failed to archive volume %s from path %s to %s with error: %s",
+						req.VolumeId, deletePath, archivePath, err.Error()))
 					return nil, fmt.Errorf("DeleteVolume:: nas, failed to archive volume %s from path %s to %s: %s",
 						req.VolumeId, deletePath, archivePath, err.Error())
 				}
@@ -329,6 +340,7 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 			// step2: check pv's params
 			if value, ok := pv.Spec.CSI.VolumeAttributes["fileSystemId"]; !ok {
 				log.Errorf("DeleteVolume: nas, volumeID is: %s, fileSystemId is empty", req.VolumeId)
+				utils.SentrySendError(fmt.Errorf("DeleteVolume: nas, volumeID is: %s, fileSystemId is empty", req.VolumeId))
 				return nil, fmt.Errorf("DeleteVolume: nas, volumeID is: %s, fileSystemId is empty", req.VolumeId)
 			} else {
 				fileSystemNasID = value
@@ -356,7 +368,8 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 				fileSystemNasIP = value
 				log.Infof("DeleteVolume: nas, server is: %s", fileSystemNasIP)
 			} else {
-				log.Errorf("DeleteVolume: nas server is empty, CSI is: %v", req.VolumeId, pv.Spec.CSI)
+				log.Errorf("DeleteVolume: nas server is empty, CSI is: %v", pv.Spec.CSI)
+				utils.SentrySendError(fmt.Errorf("DeleteVolume: nas server is empty, CSI is: %v", pv.Spec.CSI))
 				return nil, fmt.Errorf("DeleteVolume: nas server is empty, CSI is: %v", pv.Spec.CSI)
 			}
 
@@ -365,7 +378,8 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 				mountTargetPath = value
 				log.Infof("DeleteVolume: nas, path is: %s", mountTargetPath)
 			} else {
-				log.Errorf("DeleteVolume: path is empty, CSI is: %v", req.VolumeId, pv.Spec.CSI)
+				log.Errorf("DeleteVolume: path is empty, CSI is: %v", pv.Spec.CSI)
+				utils.SentrySendError(fmt.Errorf("DeleteVolume: path is empty, CSI is: %v", pv.Spec.CSI))
 				return nil, fmt.Errorf("DeleteVolume: path is empty, CSI is: %v", pv.Spec.CSI)
 			}
 
@@ -379,6 +393,7 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 			unMountNasRes, err := cdsNas.UnMountNas(fileSystemNasID)
 			if err != nil {
 				log.Errorf("DeleteVolume: cdsNas.UnMountNas api error, err is: %s", err)
+				utils.SentrySendError(fmt.Errorf("DeleteVolume: cdsNas.UnMountNas api error, err is: %s", err))
 			}
 
 			// get unmount task status
@@ -389,6 +404,7 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 
 			if err != nil {
 				log.Errorf("DeleteVolume: describeTaskStatus error, err is: %s", err.Error())
+				utils.SentrySendError(fmt.Errorf("DeleteVolume: describeTaskStatus error, err is: %s", err.Error()))
 				return nil, fmt.Errorf("CreateVolume: describeTaskStatus error, err is: %s", err.Error())
 			}
 			log.Infof("DeleteVolume: UnMountNas NAS storage succeed")
@@ -398,6 +414,7 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 
 			if err != nil {
 				log.Errorf("DeleteVolume: cdsNas.DeleteNas api error, err is: %s", err)
+				utils.SentrySendError(fmt.Errorf("DeleteVolume: cdsNas.DeleteNas api error, err is: %s", err))
 				return nil, fmt.Errorf("DeleteVolume:cdsNas.DeleteNas api error, err is: %s", err)
 			}
 
@@ -449,6 +466,7 @@ func describeTaskStatus(taskID string) error {
 
 		if err != nil {
 			log.Errorf("describeTaskStatus: cdsNas.DescribeTaskStatus api error, err is: %s", err)
+			utils.SentrySendError(fmt.Errorf("describeTaskStatus: cdsNas.DescribeTaskStatus api error, err is: %s", err))
 			return fmt.Errorf("apiError")
 		}
 
