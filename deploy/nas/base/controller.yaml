@@ -16,12 +16,11 @@ spec:
         type: csi-provisioner
     spec:
       nodeSelector:
-        beta.kubernetes.io/os: linux
+        node.cck.net/role.infra: "True" 
       serviceAccount: cds-csi-sa
       priorityClassName: system-cluster-critical
       tolerations:
-        - key: CriticalAddonsOnly
-          operator: Exists
+      - operator: Exists
       containers:
         - name: csi-controller-server
           image: registry-bj.capitalonline.net/cck/cds-csi-driver:latest

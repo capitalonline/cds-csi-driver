@@ -269,12 +269,11 @@ spec:
         - mountPath: /csi
           name: socket-dir
       nodeSelector:
-        beta.kubernetes.io/os: linux
+        node.cck.net/role.infra: "True"
       priorityClassName: system-cluster-critical
       serviceAccount: cds-csi-sa
       tolerations:
-      - key: CriticalAddonsOnly
-        operator: Exists
+      - operator: Exists
       volumes:
       - emptyDir: {}
         name: socket-dir
