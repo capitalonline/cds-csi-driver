@@ -38,10 +38,12 @@ func NewControllerServer(d *NasDriver) *ControllerServer {
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		log.Fatalf("NewControllerServer:: Failed to create kubernetes config: %v", err)
+		utils.SentrySendError(fmt.Errorf("NewControllerServer:: Failed to create kubernetes config: %v", err))
 	}
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		log.Fatalf("NewControllerServer:: Failed to create kubernetes client: %v", err)
+		utils.SentrySendError(fmt.Errorf("NewControllerServer:: Failed to create kubernetes client: %v", err))
 	}
 
 	return &ControllerServer{
