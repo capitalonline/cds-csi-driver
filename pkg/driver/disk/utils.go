@@ -3,6 +3,8 @@ package disk
 import (
 	"fmt"
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/wxnacy/wgo/arrays"
+	"strconv"
 )
 
 func parseDiskVolumeOptions(req *csi.CreateVolumeRequest) (*DiskVolumeArgs, error) {
@@ -45,11 +47,21 @@ func parseDiskVolumeOptions(req *csi.CreateVolumeRequest) (*DiskVolumeArgs, erro
 	// disk Type
 	diskVolArgs.StorageType, ok = volOptions["storageType"]
 	if !ok {
-		// set to default disk_common
-		diskVolArgs.StorageType = DefaultDisk
+		// no default
+		return nil, fmt.Errorf("[storageType] cant be empty")
 	}
-	if diskVolArgs.StorageType != HighDisk {
-		return nil, fmt.Errorf("Illegal required parameter type, only support [disk_high], [disk_common], input is: %s" + diskVolArgs.Type)
+	if diskVolArgs.StorageType != HighDisk && diskVolArgs.StorageType != SsdDisk {
+		return nil, fmt.Errorf("Illegal required parameter type, only support [high_disk], [ssd_disk], input is: %s" + diskVolArgs.StorageType)
+	}
+
+	// disk iops
+	diskVolArgs.Iops, ok = volOptions["iops"]
+	if !ok {
+		return nil, fmt.Errorf("[iops] cant be empty")
+	}
+	iopsInt64, _ := strconv.ParseInt(diskVolArgs.Iops, 10, 64)
+	if arrays.ContainsInt(IopsArrayInt64, iopsInt64) == -1 {
+		return nil, fmt.Errorf("[iops] should be in one of [3000|5000|7500|10000], but input is: %s", diskVolArgs.Iops)
 	}
 
 	return diskVolArgs, nil
