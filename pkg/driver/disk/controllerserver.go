@@ -109,7 +109,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 	}
 
 	diskID := createRes.Data.VolumeID
-	taskID := createRes.TaskId
+	taskID := createRes.TaskID
 
 	// store creating disk
 	diskProcessingMap[pvName] = diskID
