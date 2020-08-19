@@ -10,8 +10,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"strings"
-
-	cdsDisk "github.com/capitalonline/cck-sdk-go/pkg/cck/disk"
 )
 
 func NewNodeServer(d *DiskDriver) *NodeServer {
@@ -129,9 +127,16 @@ func (n *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 
 	// Step 2: format disk
 	// Step 2-1: get deviceName
-	deviceName, err := findDeviceNameByVolumeID(diskID)
+	res, err := findDiskByVolumeID(diskID)
 	if err != nil {
-		log.Errorf("NodeStageVolume: findDeviceNameByVolumeID(cdsDisk.FindDeviceNameByVolumeID) error, err is: %s", err.Error())
+		log.Errorf("NodeStageVolume: find disk uuid failed, err is: %s", err)
+		return nil, err
+	}
+
+	diskUuid := res.Data[0].Uuid
+	deviceName, err := findDeviceNameByUuid(diskUuid)
+	if err != nil {
+		log.Errorf("NodeStageVolume: findDeviceNameByUuid error, err is: %s", err.Error())
 		return nil, err
 	}
 
@@ -206,26 +211,37 @@ func (n *NodeServer) NodeExpandVolume(context.Context, *csi.NodeExpandVolumeRequ
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
-func findDeviceNameByVolumeID(volumeID string) (string, error) {
-	log.Infof("findDeviceNameByVolumeID: volumeID is: %s", volumeID)
+func findDeviceNameByUuid(diskUuid string) (string, error) {
+	log.Infof("findDeviceNameByVolumeID: diskUuid is: %s", diskUuid)
 
-	res, err := cdsDisk.FindDeviceNameByVolumeID(&cdsDisk.FindDeviceNameByVolumeIDArgs{
-		VolumeID: volumeID,
-	})
-
+	cmdScan := "ls /dev/sd[a-z]"
+	out, err := utils.RunCommand(cmdScan)
 	if err != nil {
-		log.Errorf("findDeviceNameByVolumeID: cdsDisk.FindDeviceNameByVolumeID api error, err is: %s", err)
+		log.Errorf("findDeviceNameByVolumeID: cmdScan: %s failed, err is: %s", cmdScan, err)
 		return "", err
 	}
 
-	if res.Data.DeviceName == "" {
-		log.Errorf("findDeviceNameByVolumeID: cdsDisk.FindDeviceNameByVolumeID res is None")
-		return "", fmt.Errorf("findDeviceNameByVolumeID: cdsDisk.FindDeviceNameByVolumeID res is None")
+	// get device such as /dev/sda
+	deviceNameUuid := map[string]string{}
+	for _, deviceName := range strings.Split(out, "") {
+		cmdGetUid := fmt.Sprintf("/lib/udev/scsi_id -g -u %s", deviceName)
+
+		uuidStr, err := utils.RunCommand(cmdGetUid)
+		if err != nil {
+			log.Errorf("findDeviceNameByVolumeID: cmdGetUid: %s failed, err is: %s", cmdGetUid, err)
+			return "", err
+		}
+
+		deviceNameUuid[strings.TrimSpace(strings.TrimPrefix(uuidStr, "3"))] = deviceName
 	}
 
-	log.Infof("findDeviceNameByVolumeID: successfully!")
+	// compare
+	if _, ok := deviceNameUuid[diskUuid]; !ok {
+		log.Errorf("findDeviceNameByVolumeID: diskUuid: %s is not exist", diskUuid)
+		return "", fmt.Errorf("findDeviceNameByVolumeID: diskUuid: %s is not exist", diskUuid)
+	}
 
-	return res.Data.DeviceName, nil
+	return deviceNameUuid[diskUuid], nil
 }
 
 func bindMountGlobalPathToPodPath(volumeID, stagingTargetPath, podPath string) error {
