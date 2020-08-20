@@ -366,8 +366,6 @@ func formatDiskDevice(deviceName, fsType string) error {
 		formatDeviceCmd = fmt.Sprintf("mkfs.ext4 %s", deviceName)
 	} else if fsType == FsTypeExt3 {
 		formatDeviceCmd = fmt.Sprintf("mkfs.ext3 %s", deviceName)
-	} else if fsType == FsTypeExt2 {
-		formatDeviceCmd = fmt.Sprintf("mkfs.ext2 %s", deviceName)
 	} else if fsType == FsTypeXfs {
 		formatDeviceCmd = fmt.Sprintf("mkfs.xfs %s", deviceName)
 	} else {
