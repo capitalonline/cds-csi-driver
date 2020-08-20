@@ -131,7 +131,6 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 	volumeContext["zoneId"] = diskVol.ZoneID
 	volumeContext["siteID"] = diskVol.SiteID
 	volumeContext["iops"] = diskVol.Iops
-	volumeContext["clusterId"] = diskVol.ClusterID
 
 	tmpVol := &csi.Volume{
 		VolumeId:      diskID,

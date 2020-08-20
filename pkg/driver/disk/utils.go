@@ -12,12 +12,6 @@ func parseDiskVolumeOptions(req *csi.CreateVolumeRequest) (*DiskVolumeArgs, erro
 	diskVolArgs := &DiskVolumeArgs{}
 	volOptions := req.GetParameters()
 
-	// clusterID
-	diskVolArgs.ClusterID, ok = volOptions["clusterId"]
-	if !ok {
-		return nil, fmt.Errorf("clusterId cannot be empty")
-	}
-
 	// regionID
 	diskVolArgs.SiteID, ok = volOptions["siteId"]
 	if !ok {

@@ -31,7 +31,6 @@ type DiskVolumeArgs struct {
 	StorageType string `json:"storageType"`
 	FsType      string `json:"fsType"`
 	SiteID      string `json:"siteId"`
-	ClusterID   string `json:"clusterId"`
 	ZoneID      string `json:"zoneId"`
 	Iops        string `json:"iops"`
 }
