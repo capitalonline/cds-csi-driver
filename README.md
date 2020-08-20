@@ -170,3 +170,49 @@ Description:
 | akId         | <access_key>                   | yes      | Get it from your own bucket's in CDS web |
 | akSecret     | <acckedd_key_secret>           | yes      | Get it from your own bucket's in CDS web |
 | path         | <bucket_path>                  | yes      | Bucket path, default is `/`              |
+
+
+
+## To use the block driver 
+
+### Static PV
+
+### Dynamic PV
+
+sc.yaml
+
+```yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: block-csi-cds-sc
+parameters:
+  fstype: "ext4"
+  storageType: "high_disk"
+  iops: "3000"
+  siteId: "beijing001"
+  zoneId: "WuxiA-POD10-CLU02"
+provisioner: block.csi.cds.net
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer    
+```
+
+Description:
+
+|        Key        | Value                             | Required | Description                                                  |
+| :---------------: | :-------------------------------- | :------: | :----------------------------------------------------------- |
+|    provisioner    | block.csi.cds.net                 |   yes    | CDS csi driver's name                                        |
+|   reclaimPolicy   | Delete \| Retain                  |   yes    | `Delete` means that PV will be deleted with PVC delete<br />`Retain` means that PV will be retained when PVC delete |
+| volumeBindingMode | WaitForFirstConsumer \| Immediate |   yes    | Default is `Immediate`<br />`Immediate` means that PV will be created immediately when PVC is claim.<br />`WaitForFirstConsumer` means that PV will be delayed until PVC is consumed by pod. <br />Recommend selecting `WaitForFirstConsumer` mode. |
+|      fstype       | ext4 \| ext3 \| xfs               |   yes    | Support linux filesystem type "ext4", "ext3" and "xfs".      |
+|    storageType    | high_disk \| ssd_disk             |   yes    | `high_disk` means that normal disk and iops only support 3000.<br />`ssd_disk` means that high-performance disk and iops support 5000、7500 and 10000. |
+|       iops        | 3000 \| 5000 \| 7500 \| 10000     |   yes    | `3000` only used for `high_disk`.<br />`5000` `7500` and `1000` are used for `ssd_disk`. |
+|      siteId       | eg: "beijing001"                  |   yes    | Cluster's site id.                                           |
+|      zoneId       | eg: "WuxiA-POD10-CLU02"           |   yes    | Declare node's zone id which nodes you are going to use with block disk. |
+
+Kindly Remind: 
+
+​	a) server and path are as a whole to use.
+
+​	b) servers and server cant be empty together. It means that servers or server is not empty at least in one yaml. 
+
