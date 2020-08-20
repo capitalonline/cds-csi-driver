@@ -5,8 +5,8 @@ metadata:
 parameters:
   fstype: "ext4"
   storageType: "high_disk"
+  iops: 3000
   siteId: "beijing001"
-  clusterId: "volumeID-testing001"
   zoneId: "WuxiA-POD10-CLU02"
 provisioner: block.csi.cds.net
 reclaimPolicy: Delete
