@@ -212,36 +212,45 @@ func (n *NodeServer) NodeExpandVolume(context.Context, *csi.NodeExpandVolumeRequ
 }
 
 func findDeviceNameByUuid(diskUuid string) (string, error) {
-	log.Infof("findDeviceNameByVolumeID: diskUuid is: %s", diskUuid)
+	log.Infof("findDeviceNameByUuid: diskUuid is: %s", diskUuid)
 
 	cmdScan := "ls /dev/sd[a-z]"
-	out, err := utils.RunCommand(cmdScan)
+	deviceNameStr, err := utils.RunCommand(cmdScan)
 	if err != nil {
-		log.Errorf("findDeviceNameByVolumeID: cmdScan: %s failed, err is: %s", cmdScan, err)
+		log.Errorf("findDeviceNameByUuid: cmdScan: %s failed, err is: %s", cmdScan, err)
 		return "", err
 	}
 
 	// get device such as /dev/sda
 	deviceNameUuid := map[string]string{}
-	for _, deviceName := range strings.Split(out, "") {
+	for _, deviceName := range strings.Split(deviceNameStr, "  ") {
 		cmdGetUid := fmt.Sprintf("/lib/udev/scsi_id -g -u %s", deviceName)
 
 		uuidStr, err := utils.RunCommand(cmdGetUid)
 		if err != nil {
-			log.Errorf("findDeviceNameByVolumeID: cmdGetUid: %s failed, err is: %s", cmdGetUid, err)
+			log.Errorf("findDeviceNameByUuid: get deviceName: %s uuid failed, err is: %s", deviceName, err)
 			return "", err
 		}
 
 		deviceNameUuid[strings.TrimSpace(strings.TrimPrefix(uuidStr, "3"))] = deviceName
 	}
 
+	log.Infof("findDeviceNameByUuid: deviceNameUuid is: %+v", deviceNameUuid)
+
 	// compare
 	if _, ok := deviceNameUuid[diskUuid]; !ok {
-		log.Errorf("findDeviceNameByVolumeID: diskUuid: %s is not exist", diskUuid)
-		return "", fmt.Errorf("findDeviceNameByVolumeID: diskUuid: %s is not exist", diskUuid)
+		log.Errorf("findDeviceNameByUuid: diskUuid: %s is not exist", diskUuid)
+		return "", fmt.Errorf("findDeviceNameByUuid: diskUuid: %s is not exist", diskUuid)
 	}
 
-	return deviceNameUuid[diskUuid], nil
+	deviceName := deviceNameUuid[diskUuid]
+	if deviceName == "" {
+		log.Errorf("findDeviceNameByUuid: diskUuid: %s, deviceName is empty", diskUuid)
+	}
+
+	log.Infof("findDeviceNameByUuid: successfully, diskUuid: %s, deviceName is: %s", diskUuid, deviceNameUuid[diskUuid])
+
+	return deviceName, nil
 }
 
 func bindMountGlobalPathToPodPath(volumeID, stagingTargetPath, podPath string) error {
