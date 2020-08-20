@@ -204,7 +204,7 @@ Description:
 |    provisioner    | block.csi.cds.net                 |   yes    | CDS csi driver's name                                        |
 |   reclaimPolicy   | Delete \| Retain                  |   yes    | `Delete` means that PV will be deleted with PVC delete<br />`Retain` means that PV will be retained when PVC delete |
 | volumeBindingMode | WaitForFirstConsumer \| Immediate |   yes    | Default is `Immediate`<br />`Immediate` means that PV will be created immediately when PVC is claim.<br />`WaitForFirstConsumer` means that PV will be delayed until PVC is consumed by pod. <br />Recommend selecting `WaitForFirstConsumer` mode. |
-|      fstype       | ext4 \| ext3 \| xfs               |   yes    | Support linux filesystem type "ext4", "ext3" and "xfs".      |
+|      fstype       | ext4 \| ext3                      |   yes    | Support linux filesystem type "ext4", and "ext3".            |
 |    storageType    | high_disk \| ssd_disk             |   yes    | `high_disk` means that normal disk and iops only support 3000.<br />`ssd_disk` means that high-performance disk and iops support 5000、7500 and 10000. |
 |       iops        | 3000 \| 5000 \| 7500 \| 10000     |   yes    | `3000` only used for `high_disk`.<br />`5000` `7500` and `1000` are used for `ssd_disk`. |
 |      siteId       | eg: "beijing001"                  |   yes    | Cluster's site id.                                           |
