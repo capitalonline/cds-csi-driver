@@ -29,6 +29,10 @@ var diskIdPvMap = map[string]string{}
 // storing the disk in creating status
 var diskProcessingMap = map[string]string{}
 
+// storing deleting disk
+var diskDeletingMap = map[string]string{}
+
+
 func NewControllerServer(d *DiskDriver) *ControllerServer {
 	config, err := rest.InClusterConfig()
 	if err != nil {
@@ -168,6 +172,17 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 		return nil, fmt.Errorf("DeleteVolume: req.VolumeID cannot be empty")
 	}
 
+	// check if deleting or not
+	if value, ok := diskDeletingMap[diskID]; ok {
+		if value == "deleting" || value == "detaching" {
+			log.Warnf("DeleteVolume: diskID: %s is in deleting status, please wait", diskID)
+			return nil, fmt.Errorf("DeleteVolume: diskID: %s is in deleting status, please wait", diskID)
+		} else if value == "failed" {
+			log.Errorf("DeleteVolume: diskID: %s has been deleted but failed, please manual deal with it", diskID)
+			return nil, fmt.Errorf("DeleteVolume: diskID: %s has been deleted but failed, please manual deal with it", diskID)
+		}
+	}
+
 	// Step 2: find disk by volumeID
 	disk, err := findDiskByVolumeID(req.VolumeId)
 	if err != nil {
@@ -192,6 +207,7 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 				log.Errorf("DeleteVolume: detach disk: %s from node: %s firstly with error, err is: %s", diskID, nodeID, err.Error())
 				return nil, err
 			}
+			diskDeletingMap[diskID] = "detaching"
 			if err := describeTaskStatus(taskID); err != nil {
 				log.Errorf("DeleteVolume: cdsDisk.detachDisk task result failed, err is: %s", err)
 				return nil, fmt.Errorf("DeleteVolume: cdsDisk.detachDisk task result failed, err is: %s", err)
@@ -209,9 +225,13 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 		log.Errorf("DeleteVolume: delete disk error, err is: %s", err)
 	}
 
+	// store deleting disk status
+	diskDeletingMap[diskID] = "deleting"
+
 	taskID := deleteRes.TaskID
 	if err := describeTaskStatus(taskID); err != nil {
 		log.Errorf("deleteDisk: cdsDisk.DeleteDisk task result failed, err is: %s", err)
+		diskDeletingMap[diskID] = "failed"
 		return nil, fmt.Errorf("deleteDisk: cdsDisk.DeleteDisk task result failed, err is: %s", err)
 	}
 
@@ -221,7 +241,10 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 		delete(pvcCreatedMap, pvName)
 	}
 
-	log.Infof("DeleteVolume: clean [diskIdPvMap] and [pvcMap] succeed!")
+	// Step 6: clear diskDeletingMap
+	delete(diskDeletingMap, diskID)
+
+	log.Infof("DeleteVolume: clean [diskIdPvMap] and [pvcMap] and [diskDeletingMap] succeed!")
 	log.Infof("DeleteVolume: Successfully delete diskID: %s !", diskID)
 
 	return &csi.DeleteVolumeResponse{}, nil
