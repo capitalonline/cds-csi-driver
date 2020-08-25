@@ -94,12 +94,17 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 	// Step 4: create disk
 	// check if disk is in creating
 	if value, ok := diskProcessingMap[pvName]; ok {
-		log.Warnf("CreateVolume: Disk Volume(%s)'s diskID: %s is in creating, please wait", pvName, value)
-		if tmpVol, ok := pvcCreatedMap[pvName]; ok {
-			log.Infof("CreateVolume: Disk Volume(%s)'s diskID: %s creating process finished, return context", pvName, value)
-			return &csi.CreateVolumeResponse{Volume: tmpVol}, nil
-		} else {
-			return nil, fmt.Errorf("CreateVolume: Disk Volume(%s)'s diskID: %s is in creating, please wait", pvName, value)
+		if value == "creating" {
+			log.Warnf("CreateVolume: Disk Volume(%s)'s diskID: %s is in creating, please wait", pvName, value)
+			if tmpVol, ok := pvcCreatedMap[pvName]; ok {
+				log.Infof("CreateVolume: Disk Volume(%s)'s diskID: %s creating process finished, return context", pvName, value)
+				return &csi.CreateVolumeResponse{Volume: tmpVol}, nil
+			} else {
+				return nil, fmt.Errorf("CreateVolume: Disk Volume(%s)'s diskID: %s is in creating, please wait", pvName, value)
+			}
+		} else if value == "failed" {
+			log.Errorf("CreateVolume: Disk Volume(%s)'s has been created but failed", pvName)
+			return nil, fmt.Errorf("CreateVolume: Disk Volume(%s)'s has been created but failed", pvName)
 		}
 	}
 
@@ -116,11 +121,12 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 	taskID := createRes.TaskID
 
 	// store creating disk
-	diskProcessingMap[pvName] = diskID
+	diskProcessingMap[pvName] = "creating"
 
 	err = describeTaskStatus(taskID)
 	if err != nil {
 		log.Errorf("createDisk: describeTaskStatus task result failed, err is: %s", err.Error())
+		diskProcessingMap[pvName] = "failed"
 		return nil, err
 	}
 
@@ -154,6 +160,9 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 	diskIdPvMap[diskID] = pvName
 	// store req.Name and csi.Volume
 	pvcCreatedMap[pvName] = tmpVol
+
+	// Step 7: clean
+	delete(diskProcessingMap, pvName)
 
 	log.Infof("CreateVolume: store [diskIdPvMap] and [pvcMap] succeed")
 	log.Infof("CreateVolume: successfully create disk, pvName is: %s, diskID is: %s", pvName, diskID)
