@@ -133,7 +133,7 @@ func (n *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 		return nil, err
 	}
 
-	diskUuid := res.Data[0].Uuid
+	diskUuid := res.Data.DiskSlice[0].Uuid
 	deviceName, err := findDeviceNameByUuid(diskUuid)
 	if err != nil {
 		log.Errorf("NodeStageVolume: findDeviceNameByUuid error, err is: %s", err.Error())
