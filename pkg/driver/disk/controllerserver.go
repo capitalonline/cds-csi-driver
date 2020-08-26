@@ -201,19 +201,18 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 
 	// Step 3: check disk detached from node or not, detach it firstly if not
 	if disk != nil {
-		nodeID := disk.Data.DiskSlice[0].NodeID
-		log.Infof("DeleteVolume: findDiskByVolumeID succeed, diskID is: %s, instanceID is: %s", diskID, nodeID)
+		log.Infof("DeleteVolume: findDiskByVolumeID succeed, diskID is: %s", diskID)
 
 		if disk.Data.DiskSlice[0].Status == StatusInMounted {
-			log.Errorf("DeleteVolume: disk [mounted], cant delete volumeID: %s from instanceID: %s", diskID, nodeID)
-			return nil, fmt.Errorf("DeleteVolume: disk [mounted], cant delete volumeID: %s from instanceID: %s", diskID, nodeID)
+			log.Errorf("DeleteVolume: disk [mounted], cant delete volumeID: %s ", diskID)
+			return nil, fmt.Errorf("DeleteVolume: disk [mounted], cant delete volumeID: %s", diskID)
 		} else if disk.Data.DiskSlice[0].Status == StatusInOK {
 			log.Infof("DeleteVolume: disk is in [idle], then to delete directly!")
 		} else {
 			log.Warnf("DeleteVolume: disk status is not [mounted] or [ok], need to detach firstly, then to delete it")
 			taskID, err := detachDisk(req.VolumeId)
 			if err != nil {
-				log.Errorf("DeleteVolume: detach disk: %s from node: %s firstly with error, err is: %s", diskID, nodeID, err.Error())
+				log.Errorf("DeleteVolume: detach disk: %s firstly with error, err is: %s", diskID, err.Error())
 				return nil, err
 			}
 			diskDeletingMap[diskID] = "detaching"
@@ -221,7 +220,7 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 				log.Errorf("DeleteVolume: cdsDisk.detachDisk task result failed, err is: %s", err)
 				return nil, fmt.Errorf("DeleteVolume: cdsDisk.detachDisk task result failed, err is: %s", err)
 			}
-			log.Warnf("DeleteVolume: detach disk: %s from node: %s firstly successfully! Then to delete it!", diskID, nodeID)
+			log.Warnf("DeleteVolume: detach disk: %s firstly successfully! Then to delete it!", diskID)
 		}
 	} else {
 		log.Error("DeleteVolume: findDiskByVolumeID(cdsDisk.FindDiskByVolumeID) response is nil")
