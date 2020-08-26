@@ -205,7 +205,8 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 	}
 
 	// Step 3: check disk detached from node or not, detach it firstly if not
-	if disk.Data.DiskSlice != nil {
+
+	if len(disk.Data.DiskSlice) != 0 {
 		log.Infof("DeleteVolume: findDiskByVolumeID succeed, diskID is: %s", diskID)
 		if disk.Data.DiskSlice[0].Status == StatusInMounted {
 			log.Errorf("DeleteVolume: disk [mounted], cant delete volumeID: %s ", diskID)
