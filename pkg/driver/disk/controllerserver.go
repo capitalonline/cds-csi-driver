@@ -95,7 +95,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 	// check if disk is in creating
 	if value, ok := diskProcessingMap[pvName]; ok {
 		if value == "creating" {
-			log.Warnf("CreateVolume: Disk Volume(%s)'s diskID: %s is in creating, please wait", pvName, value)
+			log.Warnf("CreateVolume: Disk Volume(%s)'s is in creating, please wait", pvName)
 			if tmpVol, ok := pvcCreatedMap[pvName]; ok {
 				log.Infof("CreateVolume: Disk Volume(%s)'s diskID: %s creating process finished, return context", pvName, value)
 				return &csi.CreateVolumeResponse{Volume: tmpVol}, nil
