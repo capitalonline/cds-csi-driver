@@ -3,6 +3,7 @@ package disk
 import (
 	"context"
 	"fmt"
+	cdsDisk "github.com/capitalonline/cck-sdk-go/pkg/cck/disk"
 	"github.com/capitalonline/cds-csi-driver/pkg/driver/utils"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/kubernetes-csi/drivers/pkg/csi-common"
@@ -127,7 +128,7 @@ func (n *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 
 	// Step 2: format disk
 	// Step 2-1: get deviceName
-	res, err := findDiskByVolumeID(diskID)
+	res, err := findDiskByVolumeIdNodeServer(diskID)
 	if err != nil {
 		log.Errorf("NodeStageVolume: find disk uuid failed, err is: %s", err)
 		return nil, err
@@ -386,4 +387,22 @@ func formatDiskDevice(deviceName, fsType string) error {
 	log.Infof("formatDiskDevice: Successfully!")
 
 	return nil
+}
+
+func findDiskByVolumeIdNodeServer(volumeID string) (*cdsDisk.FindDiskByVolumeIDResponse, error) {
+
+	log.Infof("findDiskByVolumeID: volumeID is: %s", volumeID)
+
+	res, err := cdsDisk.FindDiskByVolumeID(&cdsDisk.FindDiskByVolumeIDArgs{
+		VolumeID: volumeID,
+	})
+
+	if err != nil {
+		log.Errorf("findDiskByVolumeID: cdsDisk.FindDiskByVolumeID [api error], err is: %s", err)
+		return nil, err
+	}
+
+	log.Infof("findDiskByVolumeID: Successfully!")
+
+	return res, nil
 }
