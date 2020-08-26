@@ -34,6 +34,16 @@ spec:
         env:
         - name: CSI_ENDPOINT
           value: unix://var/lib/kubelet/plugins/block.csi.cds.net/csi.sock
+        - name: ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              key: access_key_id
+              name: cck-secrets
+        - name: ACCESS_KEY_SECRET
+          valueFrom:
+            secretKeyRef:
+              key: access_key_secret
+              name: cck-secrets
         volumeMounts:
         - name: kubelet-dir
           mountPath: /var/lib/kubelet/
