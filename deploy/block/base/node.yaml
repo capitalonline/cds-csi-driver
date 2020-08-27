@@ -44,6 +44,11 @@ spec:
             secretKeyRef:
               key: access_key_secret
               name: cck-secrets
+        - name: CDS_OVERSEA
+          valueFrom:
+            configMapKeyRef:
+              name: cds-properties
+              key: oversea
         volumeMounts:
         - name: kubelet-dir
           mountPath: /var/lib/kubelet/

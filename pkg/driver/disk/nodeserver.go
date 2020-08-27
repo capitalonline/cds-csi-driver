@@ -3,7 +3,6 @@ package disk
 import (
 	"context"
 	"fmt"
-	cdsDisk "github.com/capitalonline/cck-sdk-go/pkg/cck/disk"
 	"github.com/capitalonline/cds-csi-driver/pkg/driver/utils"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/kubernetes-csi/drivers/pkg/csi-common"
@@ -12,6 +11,7 @@ import (
 	"google.golang.org/grpc/status"
 	"strings"
 )
+
 
 func NewNodeServer(d *DiskDriver) *NodeServer {
 	return &NodeServer{
@@ -128,19 +128,22 @@ func (n *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 
 	// Step 2: format disk
 	// Step 2-1: get deviceName
-	res, err := findDiskByVolumeIdNodeServer(diskID)
+	res, err := findDiskByVolumeID(diskID)
 	if err != nil {
 		log.Errorf("NodeStageVolume: find disk uuid failed, err is: %s", err)
 		return nil, err
 	}
-
-	if len(res.Data.DiskSlice) == 0 {
-		log.Errorf("NodeStageVolume: findDeviceNameByVolumeID res uuid is nil")
-		return nil, fmt.Errorf("NodeStageVolume: findDeviceNameByVolumeID res uuid is nil")
+	if res.Data.DiskSlice == nil {
+		log.Errorf("NodeStageVolume: findDiskByVolumeID res is nil")
+		return nil, fmt.Errorf("NodeStageVolume: findDiskByVolumeID res is nil")
 	}
 
-	diskUuid := res.Data.DiskSlice[0].Uuid
-	deviceName, err := findDeviceNameByUuid(diskUuid)
+	if res.Data.DiskSlice[0].Uuid == "" {
+		log.Errorf("NodeStageVolume: findDeviceNameByVolumeID res uuid is null")
+		return nil, fmt.Errorf("NodeStageVolume: findDeviceNameByVolumeID res uuid is null")
+	}
+
+	deviceName, err := findDeviceNameByUuid(res.Data.DiskSlice[0].Uuid)
 	if err != nil {
 		log.Errorf("NodeStageVolume: findDeviceNameByUuid error, err is: %s", err.Error())
 		return nil, err
@@ -387,22 +390,4 @@ func formatDiskDevice(deviceName, fsType string) error {
 	log.Infof("formatDiskDevice: Successfully!")
 
 	return nil
-}
-
-func findDiskByVolumeIdNodeServer(volumeID string) (*cdsDisk.FindDiskByVolumeIDResponse, error) {
-
-	log.Infof("findDiskByVolumeID: volumeID is: %s", volumeID)
-
-	res, err := cdsDisk.FindDiskByVolumeID(&cdsDisk.FindDiskByVolumeIDArgs{
-		VolumeID: volumeID,
-	})
-
-	if err != nil {
-		log.Errorf("findDiskByVolumeID: cdsDisk.FindDiskByVolumeID [api error], err is: %s", err)
-		return nil, err
-	}
-
-	log.Infof("findDiskByVolumeID: Successfully!")
-
-	return res, nil
 }
