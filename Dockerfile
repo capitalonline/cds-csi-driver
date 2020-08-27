@@ -28,5 +28,6 @@ RUN s3fs --version
 
 COPY --from=build-env /cds-csi-driver /cds-csi-driver
 RUN apk add udev
+RUN apk add e2fsprogs
 
 ENTRYPOINT ["/cds-csi-driver"]

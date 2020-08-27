@@ -223,6 +223,7 @@ func (n *NodeServer) NodeExpandVolume(context.Context, *csi.NodeExpandVolumeRequ
 func findDeviceNameByUuid(diskUuid string) (string, error) {
 	log.Infof("findDeviceNameByUuid: diskUuid is: %s", diskUuid)
 
+	diskUuidFormat := strings.ReplaceAll(diskUuid, "-", "")
 	cmdScan := "ls /dev/sd[a-z]"
 	deviceNameStr, err := utils.RunCommand(cmdScan)
 	if err != nil {
@@ -253,17 +254,17 @@ func findDeviceNameByUuid(diskUuid string) (string, error) {
 	log.Infof("findDeviceNameByUuid: deviceNameUuid is: %+v", deviceNameUuid)
 
 	// compare
-	if _, ok := deviceNameUuid[strings.ReplaceAll(diskUuid, "-", "")]; !ok {
-		log.Errorf("findDeviceNameByUuid: diskUuid: %s is not exist", diskUuid)
-		return "", fmt.Errorf("findDeviceNameByUuid: diskUuid: %s is not exist", diskUuid)
+	if _, ok := deviceNameUuid[diskUuidFormat]; !ok {
+		log.Errorf("findDeviceNameByUuid: diskUuid: %s is not exist", diskUuidFormat)
+		return "", fmt.Errorf("findDeviceNameByUuid: diskUuid: %s is not exist", diskUuidFormat)
 	}
 
-	deviceName := deviceNameUuid[strings.ReplaceAll(diskUuid, "-", "")]
+	deviceName := deviceNameUuid[diskUuidFormat]
 	if deviceName == "" {
-		log.Errorf("findDeviceNameByUuid: diskUuid: %s, deviceName is empty", diskUuid)
+		log.Errorf("findDeviceNameByUuid: diskUuid: %s, deviceName is empty", diskUuidFormat)
 	}
 
-	log.Infof("findDeviceNameByUuid: successfully, diskUuid: %s, deviceName is: %s", diskUuid, deviceNameUuid[diskUuid])
+	log.Infof("findDeviceNameByUuid: successfully, diskUuid: %s, deviceName is: %s", diskUuidFormat, deviceNameUuid[diskUuidFormat])
 
 	return deviceName, nil
 }
