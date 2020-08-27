@@ -234,7 +234,7 @@ func findDeviceNameByUuid(diskUuid string) (string, error) {
 	deviceNameUuid := map[string]string{}
 	for _, deviceName := range strings.Split(deviceNameStr, "  ") {
 		cmdGetUid := fmt.Sprintf("/lib/udev/scsi_id -g -u %s", deviceName)
-
+		log.Infof("findDeviceNameByUuid: cmdGetUid is: %s", cmdGetUid)
 		uuidStr, err := utils.RunCommand(cmdGetUid)
 		if err != nil {
 			log.Errorf("findDeviceNameByUuid: get deviceName: %s uuid failed, err is: %s", deviceName, err)

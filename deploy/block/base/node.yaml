@@ -22,9 +22,9 @@ spec:
       - name: block-csi-node-server
         securityContext:
           privileged: true
-          capabilities:
-            add: ["SYS_ADMIN"]
-          allowPrivilegeEscalation: true
+#          capabilities:
+#            add: ["SYS_ADMIN"]
+#          allowPrivilegeEscalation: true
         image: registry-bj.capitalonline.net/cck/cds-csi-driver:latest
         imagePullPolicy: "Always"
         args:
