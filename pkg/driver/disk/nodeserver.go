@@ -253,12 +253,12 @@ func findDeviceNameByUuid(diskUuid string) (string, error) {
 	log.Infof("findDeviceNameByUuid: deviceNameUuid is: %+v", deviceNameUuid)
 
 	// compare
-	if _, ok := deviceNameUuid[diskUuid]; !ok {
+	if _, ok := deviceNameUuid[strings.ReplaceAll(diskUuid, "-", "")]; !ok {
 		log.Errorf("findDeviceNameByUuid: diskUuid: %s is not exist", diskUuid)
 		return "", fmt.Errorf("findDeviceNameByUuid: diskUuid: %s is not exist", diskUuid)
 	}
 
-	deviceName := deviceNameUuid[diskUuid]
+	deviceName := deviceNameUuid[strings.ReplaceAll(diskUuid, "-", "")]
 	if deviceName == "" {
 		log.Errorf("findDeviceNameByUuid: diskUuid: %s, deviceName is empty", diskUuid)
 	}
