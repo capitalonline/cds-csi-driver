@@ -216,20 +216,22 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 		return nil, fmt.Errorf("DeleteVolume: disk [mounted], cant delete volumeID: %s", diskID)
 	} else if diskStatus == StatusInOK {
 		log.Infof("DeleteVolume: disk is in [idle], then to delete directly!")
-	} else {
-		log.Warnf("DeleteVolume: disk status is not [mounted] or [ok], need to detach firstly, then to delete it")
-		taskID, err := detachDisk(req.VolumeId)
-		if err != nil {
-			log.Errorf("DeleteVolume: detach disk: %s firstly with error, err is: %s", diskID, err.Error())
-			return nil, err
-		}
-		diskDeletingMap[diskID] = "detaching"
-		if err := describeTaskStatus(taskID); err != nil {
-			diskDeletingMap[diskID] = "error"
-			log.Errorf("DeleteVolume: cdsDisk.detachDisk task result failed, err is: %s", err)
-			return nil, fmt.Errorf("DeleteVolume: cdsDisk.detachDisk task result failed, err is: %s", err)
-		}
-		log.Warnf("DeleteVolume: detach disk: %s firstly successfully! Then to delete it!", diskID)
+	} else if diskStatus == StatusInDeleted {
+		log.Warnf("DeleteVolume: disk had been deleted")
+		return &csi.DeleteVolumeResponse{}, nil
+		//log.Warnf("DeleteVolume: disk status is not [mounted] or [ok], need to detach firstly, then to delete it")
+		//taskID, err := detachDisk(req.VolumeId)
+		//if err != nil {
+		//	log.Errorf("DeleteVolume: detach disk: %s firstly with error, err is: %s", diskID, err.Error())
+		//	return nil, err
+		//}
+		//diskDeletingMap[diskID] = "detaching"
+		//if err := describeTaskStatus(taskID); err != nil {
+		//	diskDeletingMap[diskID] = "error"
+		//	log.Errorf("DeleteVolume: cdsDisk.detachDisk task result failed, err is: %s", err)
+		//	return nil, fmt.Errorf("DeleteVolume: cdsDisk.detachDisk task result failed, err is: %s", err)
+		//}
+		//log.Warnf("DeleteVolume: detach disk: %s firstly successfully! Then to delete it!", diskID)
 	}
 
 	// Step 4: delete disk
@@ -291,14 +293,14 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 
 	diskStatus := res.Data.DiskSlice[0].Status
 	diskMountedNodeID := res.Data.DiskSlice[0].NodeID
-	if diskStatus == "mounted" {
+	if diskStatus == StatusInMounted {
 		if diskMountedNodeID == nodeID {
 			log.Warnf("ControllerPublishVolume: diskID: %s has been mounted to nodeID: %s", diskID, nodeID)
 			return &csi.ControllerPublishVolumeResponse{}, nil
 		}
 		log.Warnf("ControllerPublishVolume: diskID: %s has been mounted to nodeID: %s, but different from current nodeID: %s", diskID, diskMountedNodeID, nodeID)
 		return nil, fmt.Errorf("ControllerPublishVolume: diskID: %s has been mounted to nodeID: %s, but different from current nodeID: %s", diskID, diskMountedNodeID, nodeID)
-	} else if diskStatus == "deleted" || diskStatus == "error" {
+	} else if diskStatus == StatusInDeleted || diskStatus == StatusInError {
 		log.Errorf("ControllerPublishVolume: diskID: %s was in [deleted|error], cant attach to nodeID", diskID)
 		return nil, fmt.Errorf("ControllerPublishVolume: diskID: %s was in [deleted|error], cant attach to nodeID", diskID)
 	}

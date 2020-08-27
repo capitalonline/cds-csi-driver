@@ -10,6 +10,8 @@ const (
 	FsTypeXfs         = "xfs"
 	StatusInMounted   = "mounted"
 	StatusInOK        = "ok"
+	StatusInDeleted   = "deleted"
+	StatusInError	  = "error"
 )
 
 var IopsArrayInt64 = []int64{3000, 5000, 7500, 10000}
