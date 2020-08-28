@@ -15,7 +15,7 @@ spec:
       tolerations:
       - operator: Exists
       priorityClassName: system-node-critical
-      serviceAccount: cds-csi-sa
+      serviceAccount: oss-cds-csi-sa
       hostNetwork: true
       hostPID: true
       containers:
