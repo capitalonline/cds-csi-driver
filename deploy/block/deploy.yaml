@@ -1,13 +1,13 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: cds-csi-sa
+  name: block-cds-csi-sa
   namespace: kube-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: cds-csi-cluster-role
+  name: block-cds-csi-cluster-role
 rules:
 - apiGroups:
   - ""
@@ -162,29 +162,29 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: cds-csi-cluster-role-bind
+  name: block-cds-csi-cluster-role-bind
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: cds-csi-cluster-role
+  name: block-cds-csi-cluster-role
 subjects:
 - kind: ServiceAccount
-  name: cds-csi-sa
+  name: block-cds-csi-sa
   namespace: kube-system
 ---
 apiVersion: v1
 kind: Service
 metadata:
   labels:
-    name: csi-provisioner
-  name: csi-provisioner
+    name: block-csi-provisioner
+  name: block-csi-provisioner
   namespace: kube-system
 spec:
   ports:
   - name: healthz
     port: 9808
   selector:
-    type: csi-provisioner
+    type: block-csi-provisioner
 ---
 apiVersion: apps/v1
 kind: StatefulSet
@@ -196,7 +196,7 @@ spec:
   selector:
     matchLabels:
       app: block-csi-cds-controller
-  serviceName: csi-provisioner
+  serviceName: block-csi-provisioner
   template:
     metadata:
       labels:
@@ -226,7 +226,7 @@ spec:
             configMapKeyRef:
               key: oversea
               name: cds-properties
-        image: registry-bj.capitalonline.net/cck/cds-csi-driver:v1.2.6
+        image: registry-bj.capitalonline.net/cck/cds-csi-driver:v2.0.0
         imagePullPolicy: Always
         livenessProbe:
           exec:
@@ -290,7 +290,7 @@ spec:
       nodeSelector:
         beta.kubernetes.io/os: linux
       priorityClassName: system-cluster-critical
-      serviceAccount: cds-csi-sa
+      serviceAccount: block-cds-csi-sa
       tolerations:
       - key: CriticalAddonsOnly
         operator: Exists
@@ -345,7 +345,7 @@ spec:
             configMapKeyRef:
               key: oversea
               name: cds-properties
-        image: registry-bj.capitalonline.net/cck/cds-csi-driver:v1.2.6
+        image: registry-bj.capitalonline.net/cck/cds-csi-driver:v2.0.0
         imagePullPolicy: Always
         name: block-csi-node-server
         securityContext:
@@ -363,7 +363,9 @@ spec:
         - mountPath: /host/etc
           name: etc
         - mountPath: /proc
-          name: node-proc
+          name: host-proc
+        - mountPath: /dev
+          name: host-dev
       - args:
         - --v=5
         - --csi-address=$(ADDRESS)
@@ -419,7 +421,10 @@ spec:
         name: etc
       - hostPath:
           path: /proc
-        name: node-proc
+        name: host-proc
+      - hostPath:
+          path: /dev
+        name: host-dev
   updateStrategy:
     type: RollingUpdate
 ---
