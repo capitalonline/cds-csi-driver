@@ -96,7 +96,7 @@ spec:
         - name: socket-dir
           mountPath: /csi
       - name: csi-attacher
-        image: quay.io/k8scsi/csi-attacher:v1.2.0
+        image: registry-bj.capitalonline.net/cck/csi-attacher:v1.2.0
         args:
         - --csi-address=$(ADDRESS)
         - --v=5
