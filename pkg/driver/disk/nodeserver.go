@@ -31,8 +31,6 @@ func NewNodeServer(d *DiskDriver) *NodeServer {
 }
 
 func (n *NodeServer) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
-	log.Infof("NodeGetCapabilities: starting to get node capabilities req is: %v", req)
-
 	nodeCap := &csi.NodeServiceCapability{
 		Type: &csi.NodeServiceCapability_Rpc{
 			Rpc: &csi.NodeServiceCapability_RPC{
@@ -43,8 +41,6 @@ func (n *NodeServer) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCa
 
 	// Disk Metric enable config
 	nodeSvcCap := []*csi.NodeServiceCapability{nodeCap}
-
-	log.Infof("NodeGetCapabilities: Successfully, nodeSvcCap is: %s", nodeSvcCap)
 
 	return &csi.NodeGetCapabilitiesResponse{
 		Capabilities: nodeSvcCap,
@@ -163,7 +159,7 @@ func (n *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 	targetGlobalPath := req.GetStagingTargetPath()
 
 	if diskID == "" || targetGlobalPath == "" {
-		log.Error("NodeStageVolume: [diskID/NodeStageVolume] cant not be empty")
+		log.Errorf("NodeStageVolume: [diskID/NodeStageVolume] cant not be empty")
 		return nil, fmt.Errorf("NodeStageVolume: [diskID/NodeStageVolume] cant not be empty")
 	}
 
@@ -223,7 +219,7 @@ func (n *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 
 	// Step 3: mount disk to node's global path
 	// Step 3-1: check targetGlobalPath
-	log.Infof("NodeStageVolume: exist flag: %t", utils.FileExisted(targetGlobalPath))
+	// log.Infof("NodeStageVolume: exist flag: %t", utils.FileExisted(targetGlobalPath))
 	if !utils.FileExisted(targetGlobalPath) {
 		if err = utils.CreateDir(targetGlobalPath, mountPointMode); err != nil {
 			diskStagingMap[diskID] = "error"
@@ -252,7 +248,7 @@ func (n *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 
 // unmount deviceName from node's global path
 func (n *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
-	log.Infof("NodeUnstageVolume: starting to unstage with req: %v", req)
+	log.Infof("NodeUnstageVolume: starting to unstage with req: %+v", req)
 
 	// Step 1: get necessary params
 	volumeID := req.VolumeId
@@ -311,7 +307,7 @@ func findDeviceNameByUuid(diskUuid string) (string, error) {
 		return "", err
 	}
 
-	log.Infof("findDeviceNameByUuid: deviceNameStr : %s", deviceNameStr)
+	// log.Infof("findDeviceNameByUuid: deviceNameStr : %s", deviceNameStr)
 	// get device such as /dev/sda
 	deviceNameStr = strings.ReplaceAll(deviceNameStr, "\n", " ")
 	log.Infof("findDeviceNameByUuid: deviceNameStr : %s", deviceNameStr)
@@ -321,7 +317,7 @@ func findDeviceNameByUuid(diskUuid string) (string, error) {
 			continue
 		}
 		cmdGetUid := fmt.Sprintf("/lib/udev/scsi_id -g -u %s", deviceName)
-		log.Infof("findDeviceNameByUuid: cmdGetUid is: %s", cmdGetUid)
+		// log.Infof("findDeviceNameByUuid: cmdGetUid is: %s", cmdGetUid)
 		uuidStr, err := utils.RunCommand(cmdGetUid)
 		if err != nil {
 			log.Errorf("findDeviceNameByUuid: get deviceName: %s uuid failed, err is: %s", deviceName, err)

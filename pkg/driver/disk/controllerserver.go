@@ -57,7 +57,7 @@ func NewControllerServer(d *DiskDriver) *ControllerServer {
 
 // to create disk
 func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
-	log.Infof("CreateVolume: Starting CreateVolume, req is:%v", req)
+	log.Infof("CreateVolume: Starting CreateVolume, req is:%+v", req)
 
 	pvName := req.Name
 	// Step 1: check the pvc(req.Name) is created or not. return pv directly if created, else do creation
@@ -177,7 +177,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 
 // to delete disk
 func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
-	log.Infof("DeleteVolume: Starting deleting volume, req is: %v", req)
+	log.Infof("DeleteVolume: Starting deleting volume, req is: %+v", req)
 
 	// Step 1: check params
 	diskID := req.VolumeId
@@ -210,7 +210,7 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 
 	// Step 3: check disk detached from node or not, detach it firstly if not
 	diskStatus := disk.Data.DiskSlice[0].Status
-	log.Infof("DeleteVolume: findDiskByVolumeID succeed, diskID is: %s, diskStatus is: %s", diskID, diskStatus)
+	// log.Infof("DeleteVolume: findDiskByVolumeID succeed, diskID is: %s, diskStatus is: %s", diskID, diskStatus)
 	if diskStatus == StatusInMounted {
 		log.Errorf("DeleteVolume: disk [mounted], cant delete volumeID: %s ", diskID)
 		return nil, fmt.Errorf("DeleteVolume: disk [mounted], cant delete volumeID: %s", diskID)
@@ -219,19 +219,6 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 	} else if diskStatus == StatusInDeleted {
 		log.Warnf("DeleteVolume: disk had been deleted")
 		return &csi.DeleteVolumeResponse{}, nil
-		//log.Warnf("DeleteVolume: disk status is not [mounted] or [ok], need to detach firstly, then to delete it")
-		//taskID, err := detachDisk(req.VolumeId)
-		//if err != nil {
-		//	log.Errorf("DeleteVolume: detach disk: %s firstly with error, err is: %s", diskID, err.Error())
-		//	return nil, err
-		//}
-		//diskDeletingMap[diskID] = "detaching"
-		//if err := describeTaskStatus(taskID); err != nil {
-		//	diskDeletingMap[diskID] = "error"
-		//	log.Errorf("DeleteVolume: cdsDisk.detachDisk task result failed, err is: %s", err)
-		//	return nil, fmt.Errorf("DeleteVolume: cdsDisk.detachDisk task result failed, err is: %s", err)
-		//}
-		//log.Warnf("DeleteVolume: detach disk: %s firstly successfully! Then to delete it!", diskID)
 	}
 
 	// Step 4: delete disk
