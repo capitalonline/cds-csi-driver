@@ -17,7 +17,7 @@ spec:
     spec:
       nodeSelector:
         beta.kubernetes.io/os: linux
-      serviceAccount: cds-csi-sa
+      serviceAccount: block-cds-csi-sa
       priorityClassName: system-cluster-critical
       tolerations:
       - key: CriticalAddonsOnly
