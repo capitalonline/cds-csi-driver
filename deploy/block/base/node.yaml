@@ -22,9 +22,9 @@ spec:
       - name: block-csi-node-server
         securityContext:
           privileged: true
-#          capabilities:
-#            add: ["SYS_ADMIN"]
-#          allowPrivilegeEscalation: true
+          capabilities:
+            add: ["SYS_ADMIN"]
+          allowPrivilegeEscalation: true
         image: registry-bj.capitalonline.net/cck/cds-csi-driver:latest
         imagePullPolicy: "Always"
         args:
@@ -57,6 +57,8 @@ spec:
           mountPath: /var/log/
         - name: etc
           mountPath: /host/etc
+        - name: node-proc
+          mountPath: /proc
       - name: block-driver-registrar
         image: registry-bj.capitalonline.net/cck/csi-node-driver-registrar:v1.2.0
         imagePullPolicy: Always
@@ -101,5 +103,8 @@ spec:
       - name: etc
         hostPath:
           path: /etc
+      - name: node-proc
+        hostPath:
+          path: /proc
   updateStrategy:
     type: "RollingUpdate"
