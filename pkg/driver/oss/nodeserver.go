@@ -25,6 +25,7 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 	opts.NodePublishPath = req.GetTargetPath()
 	if opts.NodePublishPath == "" {
 		log.Errorf("oss mountPath is necessary but input empty")
+		utils.SentrySendError(fmt.Errorf("oss mountPath is necessary but input empty"))
 		return nil, errors.New("oss mountPath is necessary but input empty")
 	}
 	for key, value := range req.VolumeContext {
@@ -66,6 +67,7 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 		}
 	} else {
 		log.Errorf("AuthType verify error, AuthType is only support %s", AuthTypeDefault)
+		utils.SentrySendError(fmt.Errorf("AuthType verify error, AuthType is only support %s", AuthTypeDefault))
 		return nil, errors.New("AuthType verify error, not support, it should to be saveAkFile")
 	}
 
@@ -75,11 +77,13 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 	log.Infof("mntCmd is: %s", mntCmd)
 	if _, err := utils.RunCommand(mntCmd); err != nil {
 		log.Errorf("Mount oss bucket to mountPath failed, error is: %s", err)
+		utils.SentrySendError(fmt.Errorf("Mount oss bucket to mountPath failed, error is: %s", err))
 		return nil, err
 	}
 	// recheck oss mount result
 	if !utils.Mounted(opts.NodePublishPath) {
 		log.Errorf("Remote bucket path [%s:%s] is not exist, please create it firstly", opts.Bucket, opts.Path)
+		utils.SentrySendError(fmt.Errorf("Remote bucket path [%s:%s] is not exist, please create it firstly", opts.Bucket, opts.Path))
 		errMsg := fmt.Sprintf("Remote bucket path [%s:%s] is not exist, please create it firstly", opts.Bucket, opts.Path)
 		return nil, errors.New(errMsg)
 	}

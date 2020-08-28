@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"github.com/capitalonline/cds-csi-driver/pkg/driver/disk"
+	"fmt"
 	"github.com/capitalonline/cds-csi-driver/pkg/driver/oss"
 	"os"
 	"path"
@@ -60,10 +61,12 @@ func main() {
 
 	if err := os.MkdirAll(path.Join(rootDir, "plugins", driverName, "controller"), os.FileMode(0755)); err != nil {
 		log.Errorf("failed to create persistent storage for controller: %v", err)
+		utils.SentrySendError(fmt.Errorf("failed to create persistent storage for controller: %v", err))
 		os.Exit(1)
 	}
 	if err := os.MkdirAll(path.Join(rootDir, "plugins", driverName, "node"), os.FileMode(0755)); err != nil {
 		log.Errorf("failed to create persistent storage for node: %v", err)
+		utils.SentrySendError(fmt.Errorf("failed to create persistent storage for node: %v", err))
 		os.Exit(1)
 	}
 

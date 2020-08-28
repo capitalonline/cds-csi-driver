@@ -18,4 +18,6 @@ const (
 	defaultNfsVersion = "4.0"
 	defaultDeleteNas  = "false"
 	defaultNfsPath    = "/nfsshare"
+	defaultNasUsage   = "1"
+	defaultClusterID  = "CDS_CLUSTER_ID"
 )

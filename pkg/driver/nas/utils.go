@@ -15,6 +15,8 @@ import (
 	log "github.com/sirupsen/logrus"
 	core "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
+
+	cdsNas "github.com/capitalonline/cck-sdk-go/pkg/cck"
 )
 
 func (opts *NfsOpts) parsNfsOpts() error {
@@ -204,6 +206,11 @@ func newVolumeCreateSubpathOptions(param map[string]string) *VolumeCreateSubpath
 	opts.Mode = param["mode"]
 	opts.ModeType = param["modeType"]
 	opts.Strategy = param["strategy"]
+	if param["threshold"] == "" {
+		opts.Threshold = defaultNasUsage
+	} else {
+		opts.Threshold = param["threshold"]
+	}
 
 	return opts
 }
@@ -270,13 +277,25 @@ func parseVolumeCreateSubpathOptions(req *csi.CreateVolumeRequest) (*VolumeCreat
 	if opts.Server != "" {
 		serverSlice = append(serverSlice, strings.Join([]string{opts.Server, strings.TrimPrefix(opts.Path, "/")}, "/"))
 	}
+
+	thresholdFloat64, _ := strconv.ParseFloat(opts.Threshold, 64)
+	thresholdFloat64 = thresholdFloat64 * 100
+	if thresholdFloat64 < 0 || thresholdFloat64 > 100 {
+		return nil, fmt.Errorf("nas, fatel error, threshold should be within [0-1], but input is: %s", opts.Threshold)
+	}
+
 	log.Infof("serverSlice is: %s", serverSlice)
-	servers := ParseServerList(serverSlice)
+
+	servers, err := ParseServerList(serverSlice, thresholdFloat64)
+	if err != nil {
+		return nil, err
+	}
+
 	var nfsServer *NfsServer
 
 	switch len(servers) {
 	case 0:
-		return nil, fmt.Errorf("nas, fatel error, server or servers is missing on volume as subpath")
+		return nil, fmt.Errorf("nas, fatel error, [server or servers is missing ] or [servers usage all > 80] on volume as subpath")
 	case 1:
 		opts.Server = servers[0].Address
 		opts.Path = servers[0].Path
@@ -617,9 +636,20 @@ func getDeleteVolumeSubpathOptions(pv *core.PersistentVolume, sc *storage.Storag
 }
 
 // parse ServerList that support multi servers in one SC
-func ParseServerList(serverList []string) []*NfsServer {
+func ParseServerList(serverList []string, thresholdFloat64 float64) ([]*NfsServer, error) {
+	// delete usage > 80 server
+	idleServerList, err := DeleteUsageFullServers(serverList, thresholdFloat64)
+	if err != nil {
+		return nil, err
+	}
+	log.Infof("idleServerSlice is: %s", idleServerList)
+	if len(idleServerList) == 0 {
+		return nil, nil
+	}
+
+	// params
 	servers := make([]*NfsServer, 0)
-	for _, server := range serverList {
+	for _, server := range idleServerList {
 
 		addrPath := strings.SplitN(strings.TrimSpace(server), "/", 2)
 		if len(addrPath) < 2 {
@@ -635,7 +665,7 @@ func ParseServerList(serverList []string) []*NfsServer {
 		}
 		servers = append(servers, &NfsServer{Address: addr, Path: filepath.Join("/", path)})
 	}
-	return servers
+	return servers, nil 
 }
 
 func SelectServer(servers []*NfsServer, uniqueSelectString string, strategy string) *NfsServer {
@@ -658,6 +688,7 @@ func SelectServerRoundRobin(servers []*NfsServer, uniqueSelectString string) *Nf
 	if length == 0 {
 		return nil
 	}
+
 	return servers[count%length]
 }
 
@@ -667,4 +698,29 @@ func SelectServerRandom(servers []*NfsServer) *NfsServer {
 		return nil
 	}
 	return servers[rand.Intn(length)]
+}
+
+func DeleteUsageFullServers(serverList []string, thresholdFloat64 float64) ([]string, error){
+	var tmpServers []string
+
+	for k, v := range serverList {
+		addrPath := strings.SplitN(strings.TrimSpace(v), "/", 2)
+		addr := strings.TrimSpace(addrPath[0])
+		res, err := cdsNas.DescribeNasUsage(os.Getenv(defaultClusterID), addr)
+		if err != nil {
+			return nil, err
+		}
+
+		if res != nil {
+			usageFloat64, _ := strconv.ParseFloat(strings.TrimSuffix(res.Data.NasInfo[0].UsageRate, "%"), 32)
+			log.Infof("DeleteUsageFullServers: addr is: %s, usageFloat64 is: %f, thresholdFloat64 is: %f", addr, usageFloat64, thresholdFloat64)
+			if usageFloat64 < thresholdFloat64 {
+				tmpServers = append(tmpServers, serverList[k])
+			}
+		} else {
+			log.Errorf("DeleteUsageFullServers: cdsNas.DescribeNasUsage res is nil")
+			return nil, fmt.Errorf("DeleteUsageFullServers: cdsNas.DescribeNasUsage res is nil")
+		}
+	}
+	return tmpServers, nil
 }

@@ -3,6 +3,7 @@ package utils
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/getsentry/sentry-go"
 	"io/ioutil"
 	"net"
 	"os"
@@ -136,4 +137,20 @@ func ServerReachable(host, port string, timeout time.Duration) bool {
 	}
 	defer conn.Close()
 	return true
+}
+
+func SentrySendError(errorInfo error) {
+	// will init by ENVIRONMENT named "SENTRY_DSN"
+	err := sentry.Init(sentry.ClientOptions{
+	})
+
+	if err != nil {
+		log.Fatalf("sentry.Init: %s", err)
+	}
+
+	// Flush buffered events before the program terminates.
+	defer sentry.Flush(2 * time.Second)
+
+	// 发送错误 sentry.CaptureException(exception error)
+	sentry.CaptureException(errorInfo)
 }

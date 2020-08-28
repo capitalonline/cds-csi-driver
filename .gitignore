@@ -18,3 +18,4 @@ bin
 .idea
 
 .test_tmp
+.idea/workspace.xml
