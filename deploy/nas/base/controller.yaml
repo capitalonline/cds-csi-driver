@@ -5,7 +5,7 @@ metadata:
   namespace: kube-system
 spec:
   replicas: 1
-  serviceName: csi-provisioner
+  serviceName: nas-csi-provisioner
   selector:
     matchLabels:
       app: nas-csi-cds-controller
@@ -17,7 +17,7 @@ spec:
     spec:
       nodeSelector:
         beta.kubernetes.io/os: linux
-      serviceAccount: cds-csi-sa
+      serviceAccount: nas-cds-csi-sa
       priorityClassName: system-cluster-critical
       tolerations:
         - key: CriticalAddonsOnly
