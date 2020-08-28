@@ -12,6 +12,17 @@ import (
 	"strings"
 )
 
+// storing staging disk
+var diskStagingMap = map[string]string{}
+
+// storing unstaging disk
+var diskUnstagingMap = map[string]string{}
+
+// storing publishing disk
+var diskPublishingMap = map[string]string{}
+
+// storing unpublishing disk
+var diskUnpublishingMap = map[string]string{}
 
 func NewNodeServer(d *DiskDriver) *NodeServer {
 	return &NodeServer{
@@ -79,12 +90,28 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 	}
 
 	// Step 3: bind stagingTargetPath to pod directory
+	if value, ok := diskPublishingMap[volumeID]; ok {
+		if value == "publishing" {
+			log.Warnf("NodePublishVolume: volumeID: %s is in publishing, please wait", volumeID)
+			return nil, fmt.Errorf("NodePublishVolume: volumeID: %s is in publishing, please wait", volumeID)
+		} else if value == "error" {
+			log.Errorf("NodePublishVolume: volumeID: %s publishing process error", volumeID)
+			return nil, fmt.Errorf("NodePublishVolume: volumeID: %s publishing process error", volumeID)
+		}
+
+		log.Errorf("NodePublishVolume: volumeID: %s has been published", volumeID)
+		return &csi.NodePublishVolumeResponse{}, nil
+	}
+
+	diskPublishingMap[volumeID] = "publishing"
 	err := bindMountGlobalPathToPodPath(volumeID, stagingTargetPath, podPath)
 	if err != nil {
+		diskPublishingMap[volumeID] = "error"
 		log.Errorf("NodePublishVolume:: step 4, bindMountGlobalPathToPodPath failed, err is: %s", err.Error())
 		return nil, fmt.Errorf("NodePublishVolume:: step 4, bindMountGlobalPathToPodPath failed, err is: %s", err.Error())
 	}
 
+	diskPublishingMap[volumeID] = "ok"
 	log.Infof("NodePublishVolume:: Successfully!")
 
 	return &csi.NodePublishVolumeResponse{}, nil
@@ -102,12 +129,28 @@ func (n *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpub
 	}
 
 	// Step 2: unbind mount targetPath
+	if value, ok := diskUnpublishingMap[targetPath]; ok {
+		if value == "unPublishing" {
+			log.Warnf("NodeUnpublishVolume: targetPath: %s is in unPublishing, please wait", targetPath)
+			return nil, fmt.Errorf("NodePublishVolume: targetPath: %s is in unPublishing, please wait", targetPath)
+		} else if value == "error" {
+			log.Errorf("NodeUnpublishVolume: targetPath: %s unPublishing process error", targetPath)
+			return nil, fmt.Errorf("NodeUnpublishVolume: targetPath: %s unPublishing process error", targetPath)
+		}
+
+		log.Errorf("NodeUnpublishVolume: targetPath: %s has been unPublished", targetPath)
+		return &csi.NodeUnpublishVolumeResponse{}, nil
+	}
+
+	diskUnpublishingMap[targetPath] = "unPublishing"
 	err := unBindMountGlobalPathFromPodPath(targetPath)
 	if err != nil {
+		diskUnpublishingMap[targetPath] = "error"
 		log.Errorf("NodeUnpublishVolume:: step 2, unmount req.TargetPath(podPath): %s failed, err is: %s", targetPath, err.Error())
 		return nil, fmt.Errorf("NodeUnpublishVolume:: step 2, unmount req.TargetPath(podPath): %s failed, err is: %s", targetPath, err.Error())
 	}
 
+	diskUnpublishingMap[targetPath] = "ok"
 	log.Infof("NodeUnpublishVolume:: Successfully!")
 
 	return &csi.NodeUnpublishVolumeResponse{}, nil
@@ -125,6 +168,20 @@ func (n *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 	}
 
 	log.Infof("NodeStageVolume: starting to stage volumeID: %s, targetGlobalPath is: %s", diskID, targetGlobalPath)
+
+	// Step 2: check disk formatted or not, disk staged or not
+	if value, ok := diskStagingMap[diskID]; ok {
+		if value == "staging" {
+			log.Warnf("NodeStageVolume: diskID: %s is in staging, please wait", diskID)
+			return nil, fmt.Errorf("NodeStageVolume: diskID: %s is in staging, please wait", diskID)
+		} else if value == "error" {
+			log.Errorf("NodeStageVolume: diskID: %s staging process error, please deal with it manual", diskID)
+			return nil, fmt.Errorf("NodeStageVolume: diskID: %s staging process error, please deal with it manual", diskID)
+		}
+
+		log.Warnf("NodeStageVolume: diskID: %s has been staged to targetGlobalPath: %s", diskID, targetGlobalPath)
+		return &csi.NodeStageVolumeResponse{}, nil
+	}
 
 	// Step 2: format disk
 	// Step 2-1: get deviceName
@@ -155,7 +212,9 @@ func (n *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 	diskVol := req.GetVolumeContext()
 	fsType := diskVol["fsType"]
 
+	diskStagingMap[diskID] = "staging"
 	if err = formatDiskDevice(deviceName, fsType); err != nil {
+		diskStagingMap[diskID] = "error"
 		log.Errorf("NodeStageVolume: format deviceName: %s failed, err is: %s", deviceName, err.Error())
 		return nil, err
 	}
@@ -166,19 +225,22 @@ func (n *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 	// Step 3-1: check targetGlobalPath
 	if !utils.FileExisted(targetGlobalPath) {
 		if err = utils.CreateDir(targetGlobalPath, mountPointMode); err != nil {
+			diskStagingMap[diskID] = "error"
 			log.Errorf("NodeStageVolume: Step 1, targetGlobalPath is not exist, but unable to create it, err is: %s", err.Error())
 			return nil, fmt.Errorf("NodeStageVolume: Step 1, targetGlobalPath is not exist, but unable to create it, err is: %s", err.Error())
 		}
 	}
 
 	// Step 3-2: mount deviceName to node's global path
-	err = mountDiskDeviceToNodeGlobalPath(deviceName, targetGlobalPath)
+	err = mountDiskDeviceToNodeGlobalPath(strings.TrimSuffix(deviceName, "\n"), strings.TrimSuffix(targetGlobalPath, "\n"))
 
 	if err != nil {
+		diskStagingMap[diskID] = "error"
 		log.Errorf("NodeStageVolume: Step 2, mountDeviceToNodeGlobalPath failed, err is: %s", err.Error())
 		return nil, fmt.Errorf("NodeStageVolume: Step 2, mountDeviceToNodeGlobalPath failed, err is: %s", err.Error())
 	}
 
+	diskStagingMap[diskID] = "ok"
 	log.Infof("NodeStageVolume: Step 2, mountDiskDeviceToNodeGlobalPath successfully!")
 
 	log.Infof("NodeStageVolume: Successfully!")
@@ -205,15 +267,31 @@ func (n *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstage
 	}
 
 	// Step 2: umount disk device from node global path
+	if value, ok := diskUnstagingMap[volumeID]; ok {
+		if value == "unstaing" {
+			log.Warnf("NodeUnstageVolume: volumeID: %s in is unstaging process, please wait", volumeID)
+			return nil, fmt.Errorf("NodeUnstageVolume: volumeID: %s in is unstaging process, please wait", volumeID)
+		} else if value == "error" {
+			log.Errorf("NodeUnstageVolume: volumeID: %s unstaging process error", volumeID)
+			return nil, fmt.Errorf("NodeUnstageVolume: volumeID: %s unstaging process error", volumeID)
+		}
+
+		log.Warnf("NodeUnstageVolume: volumeID: %s has been unstaged", volumeID)
+		return &csi.NodeUnstageVolumeResponse{}, nil
+	}
+
+	diskUnstagingMap[volumeID] = "unstaging"
 	err := unMountDiskDeviceFromNodeGlobalPath(volumeID, unStagingPath)
 	if err != nil {
+		diskUnstagingMap[volumeID] = "error"
 		log.Errorf("NodeUnstageVolume: step 2, unMountDiskDeviceFromNodeGlobalPath failed, err is: %s", err)
 		return nil, fmt.Errorf("NodeUnstageVolume: step 2, unMountDiskDeviceFromNodeGlobalPath failed, err is: %s", err)
 	}
 
+	diskUnstagingMap[volumeID] = "ok"
 	log.Infof("NodeUnstageVolume: Successfully!")
 
-	return nil, status.Error(codes.Unimplemented, "")
+	return &csi.NodeUnstageVolumeResponse{}, nil
 }
 
 func (n *NodeServer) NodeExpandVolume(context.Context, *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
@@ -321,9 +399,9 @@ func unBindMountGlobalPathFromPodPath(targetPath string) error {
 func mountDiskDeviceToNodeGlobalPath(deviceName, targetGlobalPath string) error {
 	log.Infof("mountDiskDeviceToNodeGlobalPath: deviceName is: %s, targetGlobalPath is: %s", deviceName, targetGlobalPath)
 
-	cmd := fmt.Sprintf("mount %s %s", deviceName, targetGlobalPath)
+	cmd := fmt.Sprintf("mount %s %s",deviceName, targetGlobalPath)
 	if _, err := utils.RunCommand(cmd); err != nil {
-		log.Errorf("mountDiskDeviceToNodeGlobalPath: mount deviceName: %s to targetGlobalPath: %s failed, err is: %s", deviceName, targetGlobalPath, err.Error())
+		log.Errorf("mountDiskDeviceToNodeGlobalPath: err is: %s", err)
 		return err
 	}
 
