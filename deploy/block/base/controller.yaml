@@ -5,7 +5,7 @@ metadata:
   namespace: kube-system
 spec:
   replicas: 1
-  serviceName: csi-provisioner
+  serviceName: block-csi-provisioner
   selector:
     matchLabels:
       app: block-csi-cds-controller
