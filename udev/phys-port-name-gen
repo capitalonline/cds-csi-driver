@@ -1,0 +1,37 @@
+#!/bin/bash
+
+SYSPATH="/sys/class/net/$1"
+DEV_ID=$(<"${SYSPATH}/dev_id")
+DEV_PORT=$(<"${SYSPATH}/dev_port")
+PHYS_PORT_NAME=$(<"${SYSPATH}/phys_port_name")
+
+#if PHYS_PORT_NAME is empty we are safe
+[ -z "${PHYS_PORT_NAME}" ] && exit 0
+
+# On-board index based names
+if [ -n "${ID_NET_NAME_ONBOARD}" ]; then
+    ID_NET_NAME_ONBOARD="${ID_NET_NAME_ONBOARD%d${DEV_PORT}}n${PHYS_PORT_NAME}"
+fi
+
+if [ -n "${DEV_ID}" ]; then
+    DEV_ID=$(printf "%u" "${DEV_ID}")
+    if [ "${DEV_ID}" -eq "0" ] && [ -n "${DEV_PORT}" ]; then
+        # dev_port is decimal string, but we have a bug in net_id and we convert it to integer using base 16
+        DEV_ID=$(printf "%u" "0x${DEV_PORT}")
+    fi
+fi
+
+# PCI hot plug slot number based names
+if [ -n "${ID_NET_NAME_SLOT}" ]; then
+    ID_NET_NAME_SLOT="${ID_NET_NAME_SLOT%d${DEV_ID}}n${PHYS_PORT_NAME}"
+fi
+
+# PCI path based names
+if [ -n "${ID_NET_NAME_PATH}" ]; then
+    ID_NET_NAME_PATH="${ID_NET_NAME_PATH%d${DEV_ID}}n${PHYS_PORT_NAME}"
+fi
+
+[ -n "${ID_NET_NAME_ONBOARD}" ] && echo "ID_NET_NAME_ONBOARD=${ID_NET_NAME_ONBOARD}"
+[ -n "${ID_NET_NAME_SLOT}" ] && echo "ID_NET_NAME_SLOT=${ID_NET_NAME_SLOT}"
+[ -n "${ID_NET_NAME_PATH}" ] && echo "ID_NET_NAME_PATH=${ID_NET_NAME_PATH}"
+

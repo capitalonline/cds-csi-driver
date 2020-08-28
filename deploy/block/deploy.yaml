@@ -147,6 +147,17 @@ rules:
   - list
   - watch
   - delete
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - get
+  - watch
+  - list
+  - delete
+  - update
+  - create
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -329,6 +340,11 @@ spec:
             secretKeyRef:
               key: access_key_secret
               name: cck-secrets
+        - name: CDS_OVERSEA
+          valueFrom:
+            configMapKeyRef:
+              key: oversea
+              name: cds-properties
         image: registry-bj.capitalonline.net/cck/cds-csi-driver:v1.2.6
         imagePullPolicy: Always
         name: block-csi-node-server
@@ -346,6 +362,8 @@ spec:
           name: host-log
         - mountPath: /host/etc
           name: etc
+        - mountPath: /proc
+          name: node-proc
       - args:
         - --v=5
         - --csi-address=$(ADDRESS)
@@ -399,6 +417,9 @@ spec:
       - hostPath:
           path: /etc
         name: etc
+      - hostPath:
+          path: /proc
+        name: node-proc
   updateStrategy:
     type: RollingUpdate
 ---
