@@ -57,8 +57,6 @@ spec:
           mountPath: /var/log/
         - name: etc
           mountPath: /host/etc
-        - name: host-proc
-          mountPath: /proc
         - name: host-dev
           mountPath: /dev
       - name: block-driver-registrar
@@ -105,9 +103,6 @@ spec:
       - name: etc
         hostPath:
           path: /etc
-      - name: host-proc
-        hostPath:
-          path: /proc
       - name: host-dev
         hostPath:
           path: /dev
