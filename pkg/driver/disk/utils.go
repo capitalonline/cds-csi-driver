@@ -3,6 +3,7 @@ package disk
 import (
 	"fmt"
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/sirupsen/logrus"
 	"github.com/wxnacy/wgo/arrays"
 	"strconv"
 )
@@ -64,20 +65,28 @@ func parseDiskVolumeOptions(req *csi.CreateVolumeRequest) (*DiskVolumeArgs, erro
 // pickZone selects 1 zone given topology requirement.
 // if not found, empty string is returned.
 func pickZone(requirement *csi.TopologyRequirement) string {
+	logrus.Infof("pickZone: requirement is: %+v", requirement)
 	if requirement == nil {
 		return ""
 	}
+	logrus.Infof("pickZone: requirement.GetPreferred() is: %+v", requirement.GetPreferred())
 	for _, topology := range requirement.GetPreferred() {
 		zone, exists := topology.GetSegments()[TopologyZoneKey]
+		logrus.Infof("pickZone: exists is: %t", exists)
+		logrus.Infof("pickZone: zone is: %+v", zone)
 		if exists {
 			return zone
 		}
 	}
+	logrus.Infof("pickZone: requirement.GetRequisite() is: %+v", requirement.GetRequisite())
 	for _, topology := range requirement.GetRequisite() {
 		zone, exists := topology.GetSegments()[TopologyZoneKey]
+		logrus.Infof("pickZone: exists is: %t", exists)
+		logrus.Infof("pickZone: zone is: %+v", zone)
 		if exists {
 			return zone
 		}
 	}
+	logrus.Infof("pickZone: return null")
 	return ""
 }
