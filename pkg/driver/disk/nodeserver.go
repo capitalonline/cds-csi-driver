@@ -219,7 +219,7 @@ func (n *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 
 	// Step 3: mount disk to node's global path
 	// Step 3-1: check targetGlobalPath
-	// log.Infof("NodeStageVolume: exist flag: %t", utils.FileExisted(targetGlobalPath))
+	log.Infof("NodeStageVolume: targetGlobalPath exist flag: %t", utils.FileExisted(targetGlobalPath))
 	if !utils.FileExisted(targetGlobalPath) {
 		if err = utils.CreateDir(targetGlobalPath, mountPointMode); err != nil {
 			diskStagingMap[diskID] = "error"
