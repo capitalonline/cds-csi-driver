@@ -22,10 +22,6 @@ type ControllerServer struct {
 	Client *kubernetes.Clientset
 }
 
-type IdentityServer struct {
-	*csicommon.DefaultIdentityServer
-}
-
 // capitalonline disk parameters
 type DiskVolumeArgs struct {
 	StorageType string `json:"storageType"`
