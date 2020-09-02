@@ -230,7 +230,7 @@ func (n *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 	}
 
 	// Step 3-2: mount deviceName to node's global path
-	err = mountDiskDeviceToNodeGlobalPath(strings.TrimSuffix(deviceName, "\n"), strings.TrimSuffix(targetGlobalPath, "\n"))
+	err = mountDiskDeviceToNodeGlobalPath(strings.TrimSuffix(deviceName, "\n"), strings.TrimSuffix(targetGlobalPath, "\n"), fsType)
 
 	if err != nil {
 		diskStagingMap[diskID] = "error"
@@ -394,10 +394,10 @@ func unBindMountGlobalPathFromPodPath(targetPath string) error {
 
 }
 
-func mountDiskDeviceToNodeGlobalPath(deviceName, targetGlobalPath string) error {
-	log.Infof("mountDiskDeviceToNodeGlobalPath: deviceName is: %s, targetGlobalPath is: %s", deviceName, targetGlobalPath)
+func mountDiskDeviceToNodeGlobalPath(deviceName, targetGlobalPath, fstype string) error {
+	log.Infof("mountDiskDeviceToNodeGlobalPath: deviceName is: %s, targetGlobalPath is: %s, fstype is: %s", deviceName, targetGlobalPath, fstype)
 
-	cmd := fmt.Sprintf("mount %s %s",deviceName, targetGlobalPath)
+	cmd := fmt.Sprintf("mount -t %s %s %s", fstype, deviceName, targetGlobalPath)
 	if _, err := utils.RunCommand(cmd); err != nil {
 		log.Errorf("mountDiskDeviceToNodeGlobalPath: err is: %s", err)
 		return err
