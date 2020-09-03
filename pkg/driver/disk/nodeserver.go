@@ -96,7 +96,7 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 		}
 
 		log.Errorf("NodePublishVolume: volumeID: %s has been published to stagingTargetPath: %s", volumeID, stagingTargetPath)
-		return &csi.NodePublishVolumeResponse{}, nil
+		return nil, fmt.Errorf("NodePublishVolume: volumeID: %s has been published to stagingTargetPath: %s", volumeID, stagingTargetPath)
 	}
 
 	diskPublishingMap[volumeID] = "publishing"
