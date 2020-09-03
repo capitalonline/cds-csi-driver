@@ -225,6 +225,7 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 	deleteRes, err := deleteDisk(diskID)
 	if err != nil {
 		log.Errorf("DeleteVolume: delete disk error, err is: %s", err)
+		return nil, fmt.Errorf("DeleteVolume: delete disk error, err is: %s", err)
 	}
 
 	// store deleting disk status

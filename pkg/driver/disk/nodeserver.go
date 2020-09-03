@@ -341,6 +341,7 @@ func findDeviceNameByUuid(diskUuid string) (string, error) {
 	deviceName := deviceNameUuid[diskUuidFormat]
 	if deviceName == "" {
 		log.Errorf("findDeviceNameByUuid: diskUuid: %s, deviceName is empty", diskUuidFormat)
+		return "", fmt.Errorf("findDeviceNameByUuid: diskUuid: %s, deviceName is empty", diskUuidFormat)
 	}
 
 	log.Infof("findDeviceNameByUuid: successfully, diskUuid: %s, deviceName is: %s", diskUuidFormat, deviceNameUuid[diskUuidFormat])
