@@ -95,7 +95,7 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 			return nil, fmt.Errorf("NodePublishVolume: volumeID: %s publishing process error", volumeID)
 		}
 
-		log.Errorf("NodePublishVolume: volumeID: %s has been published", volumeID)
+		log.Errorf("NodePublishVolume: volumeID: %s has been published to stagingTargetPath: %s", volumeID, stagingTargetPath)
 		return &csi.NodePublishVolumeResponse{}, nil
 	}
 
@@ -119,6 +119,7 @@ func (n *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpub
 
 	// Step 1: check targetPath
 	targetPath := req.GetTargetPath()
+	volumeID := req.VolumeId
 	if !utils.FileExisted(targetPath) {
 		log.Error("NodeUnpublishVolume:: step 1, req.TargetPath(podPath) is not exist")
 		return nil, fmt.Errorf("NodeUnpublishVolume:: step 1, req.TargetPath(podPath) is not exist")
@@ -147,6 +148,7 @@ func (n *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpub
 	}
 
 	diskUnpublishingMap[targetPath] = "ok"
+	delete(diskPublishingMap, volumeID)
 	log.Infof("NodeUnpublishVolume:: Successfully!")
 
 	return &csi.NodeUnpublishVolumeResponse{}, nil
@@ -287,6 +289,7 @@ func (n *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstage
 	}
 
 	diskUnstagingMap[volumeID] = "ok"
+	delete(diskStagingMap, volumeID)
 	log.Infof("NodeUnstageVolume: Successfully!")
 
 	return &csi.NodeUnstageVolumeResponse{}, nil
