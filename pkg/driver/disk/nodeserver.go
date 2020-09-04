@@ -107,7 +107,10 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 
 	// check if device mounted to node global, if not mount it
 	if _, ok := diskFormattedMap[volumeID]; ok {
+		log.Warnf("NodePublishVolume: formatted")
+		log.Warnf("NodePublishVolume: diskStagingMap is: %+v", diskStagingMap)
 		if value, ok := diskStagingMap[stagingTargetPath]; ok {
+			log.Warnf("NodePublishVolume: value is: %s", value)
 			if value != stagingTargetPath {
 				log.Warnf("NodePublishVolume: diskID: %s staged to stagingTargetPath: %s, unstage firstly", volumeID, value)
 				err := unMountDiskDeviceFromNodeGlobalPath(volumeID, value)
@@ -338,12 +341,12 @@ func (n *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstage
 	diskUnstagingMap[unStagingPath] = "unstaging"
 	err := unMountDiskDeviceFromNodeGlobalPath(volumeID, unStagingPath)
 	if err != nil {
-		diskUnstagingMap[volumeID] = "error"
+		diskUnstagingMap[unStagingPath] = "error"
 		log.Errorf("NodeUnstageVolume: step 2, unMountDiskDeviceFromNodeGlobalPath failed, err is: %s", err)
 		return nil, fmt.Errorf("NodeUnstageVolume: step 2, unMountDiskDeviceFromNodeGlobalPath failed, err is: %s", err)
 	}
 
-	diskUnstagingMap[unStagingPath] = "ok"
+	delete(diskUnstagingMap, unStagingPath)
 	delete(diskStagingMap, unStagingPath)
 	log.Infof("NodeUnstageVolume: Successfully!")
 
