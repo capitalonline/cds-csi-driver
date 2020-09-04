@@ -267,6 +267,21 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 		return nil, status.Error(codes.InvalidArgument, "ControllerPublishVolume missing [VolumeId/NodeId] in request")
 	}
 
+	// check attaching status
+	if value, ok := diskAttachingMap[diskID]; ok {
+		if value == "attaching" {
+			log.Warnf("ControllerPublishVolume: diskID: %s is in attaching, please wait", diskID)
+			return nil, fmt.Errorf("ControllerPublishVolume: diskID: %s is in attaching, please wait", diskID)
+		} else if value == "error" {
+			log.Errorf("ControllerPublishVolume: diskID: %s attaching process was error", diskID)
+			return nil, fmt.Errorf("ControllerPublishVolume: diskID: %s attaching process was error", diskID)
+		} else if value == "ok" {
+			log.Warnf("ControllerPublishVolume: diskID: %s attaching process finished, return context", diskID)
+			return &csi.ControllerPublishVolumeResponse{}, nil
+		}
+
+	}
+
 	// Step 3: check disk status
 	res, err := findDiskByVolumeID(diskID)
 	if err != nil {
@@ -279,16 +294,6 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 		return nil, fmt.Errorf("ControllerPublishVolume: findDiskByVolumeID res is nil")
 	}
 
-	if value, ok := diskAttachingMap[diskID]; ok {
-		if value == "attaching" {
-			log.Warnf("ControllerPublishVolume: diskID: %s is in attaching, please wait", diskID)
-			return nil, fmt.Errorf("ControllerPublishVolume: diskID: %s is in attaching, please wait", diskID)
-		}
-
-		log.Errorf("ControllerPublishVolume: diskID: %s processing was error", diskID)
-		return nil, fmt.Errorf("ControllerPublishVolume: diskID: %s processing was error", diskID)
-	}
-	
 	diskStatus := res.Data.DiskSlice[0].Status
 	diskMountedNodeID := res.Data.DiskSlice[0].NodeID
 	if diskStatus == StatusInMounted {
@@ -317,7 +322,8 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 		return nil, err
 	}
 
-	delete(diskAttachingMap, diskID)
+	// delete(diskAttachingMap, diskID)
+	diskAttachingMap[diskID] = "ok"
 	log.Infof("ControllerPublishVolume: Successfully attach disk: %s to node: %s", diskID, nodeID)
 
 	return &csi.ControllerPublishVolumeResponse{}, nil
