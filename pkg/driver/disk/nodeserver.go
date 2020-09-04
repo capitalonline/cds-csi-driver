@@ -359,12 +359,12 @@ func findDeviceNameByUuid(diskUuid string) (string, error) {
 }
 
 func bindMountGlobalPathToPodPath(volumeID, stagingTargetPath, podPath string) error {
-	log.Infof("mountDeviceToPodPath: volumeID: %s, stagingTargetPath:%s, targetPath:%s", volumeID, stagingTargetPath, podPath)
+	log.Infof("bindMountGlobalPathToPodPath: volumeID: %s, stagingTargetPath:%s, targetPath:%s", volumeID, stagingTargetPath, podPath)
 
 	cmd := fmt.Sprintf("mount --bind %s %s", stagingTargetPath, podPath)
 	if _, err := utils.RunCommand(cmd); err != nil {
-		log.Errorf("mountDeviceToPodPath: volumeID:%s, bind mount stagingTargetPath: %s to podPath: %s failed, err is: %s", volumeID, stagingTargetPath, podPath, err.Error())
-		return fmt.Errorf("mountDeviceToPodPath: volumeID:%s, bind mount stagingTargetPath: %s to podPath: %s failed, err is: %s", volumeID, stagingTargetPath, podPath, err.Error())
+		log.Errorf("bindMountGlobalPathToPodPath: volumeID:%s, bind mount stagingTargetPath: %s to podPath: %s failed, err is: %s", volumeID, stagingTargetPath, podPath, err.Error())
+		return fmt.Errorf("bindMountGlobalPathToPodPath: volumeID:%s, bind mount stagingTargetPath: %s to podPath: %s failed, err is: %s", volumeID, stagingTargetPath, podPath, err.Error())
 	}
 
 	log.Infof("bindMountGlobalPathToPodPath: Successfully!")

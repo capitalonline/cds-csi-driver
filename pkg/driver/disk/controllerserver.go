@@ -279,20 +279,6 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 		return nil, fmt.Errorf("ControllerPublishVolume: findDiskByVolumeID res is nil")
 	}
 
-	diskStatus := res.Data.DiskSlice[0].Status
-	diskMountedNodeID := res.Data.DiskSlice[0].NodeID
-	if diskStatus == StatusInMounted {
-		if diskMountedNodeID == nodeID {
-			log.Warnf("ControllerPublishVolume: diskID: %s has been mounted to nodeID: %s", diskID, nodeID)
-			return &csi.ControllerPublishVolumeResponse{}, nil
-		}
-		log.Warnf("ControllerPublishVolume: diskID: %s has been mounted to nodeID: %s, but different from current nodeID: %s", diskID, diskMountedNodeID, nodeID)
-		return nil, fmt.Errorf("ControllerPublishVolume: diskID: %s has been mounted to nodeID: %s, but different from current nodeID: %s", diskID, diskMountedNodeID, nodeID)
-	} else if diskStatus == StatusInDeleted || diskStatus == StatusInError {
-		log.Errorf("ControllerPublishVolume: diskID: %s was in [deleted|error], cant attach to nodeID", diskID)
-		return nil, fmt.Errorf("ControllerPublishVolume: diskID: %s was in [deleted|error], cant attach to nodeID", diskID)
-	}
-
 	if value, ok := diskAttachingMap[diskID]; ok {
 		if value == "attaching" {
 			log.Warnf("ControllerPublishVolume: diskID: %s is in attaching, please wait", diskID)
@@ -301,7 +287,20 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 
 		log.Errorf("ControllerPublishVolume: diskID: %s processing was error", diskID)
 		return nil, fmt.Errorf("ControllerPublishVolume: diskID: %s processing was error", diskID)
-
+	}
+	
+	diskStatus := res.Data.DiskSlice[0].Status
+	diskMountedNodeID := res.Data.DiskSlice[0].NodeID
+	if diskStatus == StatusInMounted {
+		if diskMountedNodeID == nodeID {
+			log.Warnf("ControllerPublishVolume: diskID: %s had been attached to nodeID: %s", diskID, nodeID)
+			return &csi.ControllerPublishVolumeResponse{}, nil
+		}
+		log.Warnf("ControllerPublishVolume: diskID: %s had been attached to nodeID: %s different from current nodeID: %s, next to attach again", diskID, diskMountedNodeID, nodeID)
+		// return nil, fmt.Errorf("ControllerPublishVolume: diskID: %s has been attached to nodeID: %s, but different from current nodeID: %s", diskID, diskMountedNodeID, nodeID)
+	} else if diskStatus == StatusInDeleted || diskStatus == StatusInError {
+		log.Errorf("ControllerPublishVolume: diskID: %s was in [deleted|error], cant attach to nodeID", diskID)
+		return nil, fmt.Errorf("ControllerPublishVolume: diskID: %s was in [deleted|error], cant attach to nodeID", diskID)
 	}
 
 	// Step 4: attach disk to node
@@ -363,6 +362,7 @@ func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *c
 	}
 
 	delete(diskDetachingMap, diskID)
+	delete(diskAttachingMap, diskID)
 	log.Infof("ControllerUnpublishVolume: Successfully detach disk: %s from node: %s", diskID, nodeID)
 
 	return &csi.ControllerUnpublishVolumeResponse{}, nil
