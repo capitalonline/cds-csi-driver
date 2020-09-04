@@ -107,33 +107,45 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 
 	// check if device mounted to node global, if not mount it
 	if _, ok := diskFormattedMap[volumeID]; ok {
-		res, err := findDiskByVolumeID(volumeID)
-		if err != nil {
-			log.Errorf("NodePublishVolume: find disk uuid failed, err is: %s", err)
-			return nil, err
-		}
-		if res.Data.DiskSlice == nil {
-			log.Errorf("NodePublishVolume: findDiskByVolumeID res is nil")
-			return nil, fmt.Errorf("NodeStageVolume: findDiskByVolumeID res is nil")
-		}
+		if value, ok := diskStagingMap[stagingTargetPath]; ok {
+			if value != stagingTargetPath {
+				log.Warnf("NodePublishVolume: diskID: %s staged to stagingTargetPath: %s, unstage firstly", volumeID, value)
+				err := unMountDiskDeviceFromNodeGlobalPath(volumeID, value)
+				if err != nil {
+					log.Errorf("NodePublishVolume: diskID: %s staged to stagingTargetPath: %s, unstage error", volumeID, value)
+					return nil, fmt.Errorf("NodePublishVolume: diskID: %s staged to stagingTargetPath: %s, unstage error", volumeID, value)
+				}
+				log.Warnf("NodePublishVolume: diskID: %s staged to stagingTargetPath: %s, unstage succeed, then to stage to stagingTargetPath: %s", volumeID, value, stagingTargetPath)
 
-		if res.Data.DiskSlice[0].Uuid == "" {
-			log.Errorf("NodePublishVolume: findDeviceNameByVolumeID res uuid is null")
-			return nil, fmt.Errorf("NodePublishVolume: findDeviceNameByVolumeID res uuid is null")
-		}
+				res, err := findDiskByVolumeID(volumeID)
+				if err != nil {
+					log.Errorf("NodePublishVolume: find disk uuid failed, err is: %s", err)
+					return nil, err
+				}
+				if res.Data.DiskSlice == nil {
+					log.Errorf("NodePublishVolume: findDiskByVolumeID res is nil")
+					return nil, fmt.Errorf("NodeStageVolume: findDiskByVolumeID res is nil")
+				}
 
-		deviceName, err := findDeviceNameByUuid(res.Data.DiskSlice[0].Uuid)
-		if err != nil {
-			log.Errorf("NodePublishVolume: findDeviceNameByUuid error, err is: %s", err.Error())
-			return nil, err
-		}
+				if res.Data.DiskSlice[0].Uuid == "" {
+					log.Errorf("NodePublishVolume: findDeviceNameByVolumeID res uuid is null")
+					return nil, fmt.Errorf("NodePublishVolume: findDeviceNameByVolumeID res uuid is null")
+				}
 
-		diskPublishingMap[podPath] = "publishing"
-		err = mountDiskDeviceToNodeGlobalPath(strings.TrimSuffix(deviceName, "\n"), strings.TrimSuffix(stagingTargetPath, "\n"), diskVol["fsType"])
-		if err != nil {
-			diskStagingMap[stagingTargetPath] = "error"
-			log.Errorf("NodePublishVolume: mountDeviceToNodeGlobalPath failed, err is: %s", err.Error())
-			return nil, fmt.Errorf("NodePublishVolume: mountDeviceToNodeGlobalPath failed, err is: %s", err.Error())
+				deviceName, err := findDeviceNameByUuid(res.Data.DiskSlice[0].Uuid)
+				if err != nil {
+					log.Errorf("NodePublishVolume: findDeviceNameByUuid error, err is: %s", err.Error())
+					return nil, err
+				}
+
+				diskPublishingMap[podPath] = "publishing"
+				err = mountDiskDeviceToNodeGlobalPath(strings.TrimSuffix(deviceName, "\n"), strings.TrimSuffix(stagingTargetPath, "\n"), diskVol["fsType"])
+				if err != nil {
+					diskStagingMap[stagingTargetPath] = "error"
+					log.Errorf("NodePublishVolume: mountDeviceToNodeGlobalPath failed, err is: %s", err.Error())
+					return nil, fmt.Errorf("NodePublishVolume: mountDeviceToNodeGlobalPath failed, err is: %s", err.Error())
+				}
+			}
 		}
 	}
 
