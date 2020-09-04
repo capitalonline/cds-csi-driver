@@ -24,6 +24,9 @@ var diskPublishingMap = map[string]string{}
 // storing unpublishing disk
 var diskUnpublishingMap = map[string]string{}
 
+// storing formatted disk
+var diskFormattedMap = map[string]string{}
+
 func NewNodeServer(d *DiskDriver) *NodeServer {
 	return &NodeServer{
 		DefaultNodeServer: csicommon.NewDefaultNodeServer(d.csiDriver),
@@ -214,13 +217,16 @@ func (n *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 	fsType := diskVol["fsType"]
 
 	diskStagingMap[targetGlobalPath] = "staging"
-	if err = formatDiskDevice(deviceName, fsType); err != nil {
-		diskStagingMap[targetGlobalPath] = "error"
-		log.Errorf("NodeStageVolume: format deviceName: %s failed, err is: %s", deviceName, err.Error())
-		return nil, err
+	if _, ok := diskFormattedMap[diskID]; ok {
+		log.Warnf("NodeStageVolume: diskID: %s had been formatted, ignore multi format", diskID)
+	} else {
+		if err = formatDiskDevice(diskID, deviceName, fsType); err != nil {
+			diskStagingMap[targetGlobalPath] = "error"
+			log.Errorf("NodeStageVolume: format deviceName: %s failed, err is: %s", deviceName, err.Error())
+			return nil, err
+		}
+		log.Infof("NodeStageVolume: Step 1: formatDiskDevice successfully!")
 	}
-
-	log.Infof("NodeStageVolume: Step 1: formatDiskDevice successfully!")
 
 	// Step 3: mount disk to node's global path
 	// Step 3-1: check targetGlobalPath
@@ -418,7 +424,8 @@ func mountDiskDeviceToNodeGlobalPath(deviceName, targetGlobalPath, fstype string
 func unMountDiskDeviceFromNodeGlobalPath(volumeID, unStagingPath string) error {
 	log.Infof("unMountDeviceFromNodeGlobalPath: volumeID is: %s, unStagingPath: %s", volumeID, unStagingPath)
 
-	if err := utils.Unmount(unStagingPath); err != nil {
+	cmdUnstagingPath := fmt.Sprintf("umount -t %s", unStagingPath)
+	if _, err := utils.RunCommand(cmdUnstagingPath); err != nil {
 		if strings.Contains(err.Error(), "target is busy") || strings.Contains(err.Error(), "device is busy") {
 			log.Warnf("unMountDiskDeviceFromNodeGlobalPath: unStagingPath is busy(occupied by another process)")
 
@@ -430,7 +437,7 @@ func unMountDiskDeviceFromNodeGlobalPath(volumeID, unStagingPath string) error {
 
 			log.Warnf("unMountDiskDeviceFromNodeGlobalPath: unStagingPath is busy and kill occupied process succeed!")
 
-			if err = utils.Unmount(unStagingPath); err != nil {
+			if _, err = utils.RunCommand(cmdUnstagingPath); err != nil {
 				log.Errorf("unMountDiskDeviceFromNodeGlobalPath: unmount volumeID:%s from req.StagingTargetPath:%s failed(again), err is: %s", unStagingPath, err.Error())
 				return fmt.Errorf("unMountDiskDeviceFromNodeGlobalPath: unmount volumeID:%s from req.StagingTargetPath:%s failed(again), err is: %s", volumeID, unStagingPath, err.Error())
 			}
@@ -449,7 +456,7 @@ func unMountDiskDeviceFromNodeGlobalPath(volumeID, unStagingPath string) error {
 
 }
 
-func formatDiskDevice(deviceName, fsType string) error {
+func formatDiskDevice(diskId, deviceName, fsType string) error {
 	log.Infof("formatDiskDevice: deviceName is: %s, fsType is: %s", deviceName, fsType)
 
 	// Step 1: check deviceName(disk) is scannable
@@ -476,6 +483,9 @@ func formatDiskDevice(deviceName, fsType string) error {
 		log.Error("formatDiskDevice: formatDeviceCmd: %s failed, err is: %s", formatDeviceCmd, err.Error())
 		return err
 	}
+
+	diskFormattedMap[diskId] = "formatted"
+	// need to inform database to update disk format status
 
 	log.Infof("formatDiskDevice: Successfully!")
 
