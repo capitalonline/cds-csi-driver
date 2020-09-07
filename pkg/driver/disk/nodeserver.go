@@ -10,6 +10,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"strings"
+
+	cdsDisk "github.com/capitalonline/cck-sdk-go/pkg/cck/disk"
 )
 
 // storing staging disk
@@ -106,7 +108,15 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 	}
 
 	// check if device mounted to node global, if not mount it
-	if _, ok := diskFormattedMap[volumeID]; ok {
+	res, err := cdsDisk.FindDiskByVolumeID(&cdsDisk.FindDiskByVolumeIDArgs{
+		VolumeID: volumeID,
+	})
+	if err != nil {
+		log.Errorf("NodePublishVolume: cdsDisk.FindDiskByVolumeID error, err is: %s", err)
+		return nil, fmt.Errorf("NodePublishVolume: cdsDisk.FindDiskByVolumeID error, err is: %s", err)
+	}
+
+	if _, ok := diskFormattedMap[volumeID]; ok || res.Data.DiskSlice[0].IsFormat == 1 {
 		log.Warnf("NodePublishVolume: formatted")
 		log.Warnf("NodePublishVolume: diskStagingMap is: %+v", diskStagingMap)
 		if value, ok := diskStagingMap[stagingTargetPath]; ok {
@@ -153,7 +163,7 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 	}
 
 	diskPublishingMap[podPath] = "publishing"
-	err := bindMountGlobalPathToPodPath(volumeID, stagingTargetPath, podPath)
+	err = bindMountGlobalPathToPodPath(volumeID, stagingTargetPath, podPath)
 	if err != nil {
 		diskPublishingMap[podPath] = "error"
 		log.Errorf("NodePublishVolume:: step 4, bindMountGlobalPathToPodPath failed, err is: %s", err.Error())
@@ -243,6 +253,7 @@ func (n *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 		log.Errorf("NodeStageVolume: find disk uuid failed, err is: %s", err)
 		return nil, err
 	}
+
 	if res.Data.DiskSlice == nil {
 		log.Errorf("NodeStageVolume: findDiskByVolumeID res is nil")
 		return nil, fmt.Errorf("NodeStageVolume: findDiskByVolumeID res is nil")
@@ -266,7 +277,7 @@ func (n *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 	fsType := diskVol["fsType"]
 
 	diskStagingMap[targetGlobalPath] = "staging"
-	if _, ok := diskFormattedMap[diskID]; ok {
+	if _, ok := diskFormattedMap[diskID]; ok || res.Data.DiskSlice[0].IsFormat == 1 {
 		log.Warnf("NodeStageVolume: diskID: %s had been formatted, ignore multi format", diskID)
 	} else {
 		if err = formatDiskDevice(diskID, deviceName, fsType); err != nil {
@@ -291,7 +302,6 @@ func (n *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 
 	// Step 3-2: mount deviceName to node's global path
 	err = mountDiskDeviceToNodeGlobalPath(strings.TrimSuffix(deviceName, "\n"), strings.TrimSuffix(targetGlobalPath, "\n"), fsType)
-
 	if err != nil {
 		diskStagingMap[targetGlobalPath] = "error"
 		log.Errorf("NodeStageVolume: Step 2, mountDeviceToNodeGlobalPath failed, err is: %s", err.Error())
@@ -534,8 +544,16 @@ func formatDiskDevice(diskId, deviceName, fsType string) error {
 		return err
 	}
 
+	// storing formatted disk
 	diskFormattedMap[diskId] = "formatted"
-	// need to inform database to update disk format status
+	res, err := cdsDisk.UpdateBlockFormatFlag(&cdsDisk.UpdateBlockFormatFlagArgs{
+		BlockID: diskId,
+		IsFormat: 1,
+	})
+	if err != nil || res.Code != "Success"{
+		log.Errorf("formatDiskDevice: update  database error, err is: %s", err)
+		return err
+	}
 
 	log.Infof("formatDiskDevice: Successfully!")
 
