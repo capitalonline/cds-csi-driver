@@ -393,7 +393,7 @@ func findDeviceNameByUuid(diskUuid string) (string, error) {
 	// log.Infof("findDeviceNameByUuid: deviceNameStr : %s", deviceNameStr)
 	// get device such as /dev/sda
 	deviceNameStr = strings.ReplaceAll(deviceNameStr, "\n", " ")
-	log.Infof("findDeviceNameByUuid: deviceNameStr : %s", deviceNameStr)
+	// log.Infof("findDeviceNameByUuid: deviceNameStr : %s", deviceNameStr)
 	deviceNameUuid := map[string]string{}
 	for _, deviceName := range strings.Split(deviceNameStr, " ") {
 		if deviceName == "" {
