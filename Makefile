@@ -64,6 +64,7 @@ test-prerequisite:
 	docker build -t $(IMAGE):test . && docker push $(IMAGE):test
 	kubectl kustomize ${NAS_KUSTOMIZATION_TEST_PATH} | kubectl apply -f -
 	kubectl kustomize ${OSS_KUSTOMIZATION_TEST_PATH} | kubectl apply -f -
+	kubectl kustomize ${BLOCK_KUSTOMIZATION_TEST_PATH} | kubectl apply -f -
 
 .PHONY: integration-test
 integration-test:
@@ -80,4 +81,12 @@ oss-test:
 	go test -v -race ./pkg/driver/oss/...
 	@echo "**************************** running oss integration test ****************************"
 	@./test/oss/test.sh
+	@echo "**************************** all tests passed ****************************"
+
+.PHONE: block-test
+block-test:
+	@echo "**************************** running oss unit test ****************************"
+	go test -v -race ./pkg/driver/block/...
+	@echo "**************************** running oss integration test ****************************"
+	@./test/block/test.sh
 	@echo "**************************** all tests passed ****************************"
