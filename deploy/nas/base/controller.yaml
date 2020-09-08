@@ -16,11 +16,11 @@ spec:
         type: csi-provisioner
     spec:
       nodeSelector:
-        beta.kubernetes.io/os: linux
+        node.cck.net/role.infra: "True"
       serviceAccount: nas-cds-csi-sa
       priorityClassName: system-cluster-critical
       tolerations:
-        - key: CriticalAddonsOnly
+        - key:
           operator: Exists
       containers:
         - name: csi-controller-server
