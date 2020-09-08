@@ -9,13 +9,19 @@ The support for the Block Storage will be added soon.
 
 To deploy the CSI NAS driver to your k8s, simply run:
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/capitalonline/cds-csi-driver/master/deploy/nas/deploy.yaml
+kubectl create -f https://raw.githubusercontent.com/capitalonline/cds-csi-driver/master/deploy/nas/deploy.yaml
 ```
 
 To deploy the CSI OSS driver to your k8s, simply run:
 
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/capitalonline/cds-csi-driver/master/deploy/oss/deploy.yaml
+kubectl create -f https://raw.githubusercontent.com/capitalonline/cds-csi-driver/master/deploy/oss/deploy.yaml
+```
+
+To deploy the CSI Block driver to your k8s, simply run:
+
+```bash
+kubectl create -f https://raw.githubusercontent.com/capitalonline/cds-csi-driver/master/deploy/block/deploy.yaml
 ```
 
 ## To run tests
@@ -33,6 +39,12 @@ kubectl apply -f https://raw.githubusercontent.com/capitalonline/cds-csi-driver/
 2. Register a Storage Service in CDS 
 3. Run `make test-prerequisite` to build the image and deploy the driver to your k8s cluster
 4. Run `make oss-test`
+
+**Block：**
+
+1. Make sure that you have a Kubernetes cluster accessible with `kubectl`
+2. Run `make test-prerequisite` to build the image and deploy the driver to your k8s cluster
+3. 
 
 ## To use the NAS driver
 Examples can be found [here](!https://github.com/capitalonline/cds-csi-driver/tree/master/example/nas)
