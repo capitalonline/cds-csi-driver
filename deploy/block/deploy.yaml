@@ -362,8 +362,6 @@ spec:
           name: host-log
         - mountPath: /host/etc
           name: etc
-        - mountPath: /proc
-          name: host-proc
         - mountPath: /dev
           name: host-dev
       - args:
@@ -419,9 +417,6 @@ spec:
       - hostPath:
           path: /etc
         name: etc
-      - hostPath:
-          path: /proc
-        name: host-proc
       - hostPath:
           path: /dev
         name: host-dev
