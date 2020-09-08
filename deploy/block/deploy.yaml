@@ -397,7 +397,7 @@ spec:
       hostNetwork: true
       hostPID: true
       priorityClassName: system-node-critical
-      serviceAccount: cds-csi-sa
+      serviceAccount: block-cds-csi-sa
       tolerations:
       - operator: Exists
       volumes:
