@@ -288,12 +288,10 @@ spec:
         - mountPath: /var/lib/csi/sockets/pluginproxy/
           name: socket-dir
       nodeSelector:
-        beta.kubernetes.io/os: linux
+        node.cck.net/role.infra: "True"
       priorityClassName: system-cluster-critical
       serviceAccount: block-cds-csi-sa
       tolerations:
-      - key: CriticalAddonsOnly
-        operator: Exists
       - key: null
         operator: Exists
       volumes:
