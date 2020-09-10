@@ -3,7 +3,7 @@ kind: StorageClass
 metadata:
   name: block-csi-csd-sc
 parameters:
-  fstype: "ext4"
+  fsType: "ext4"
   storageType: "high_disk"
   iops: "3000"
   siteId: "beijing001"

@@ -4,7 +4,7 @@ const (
 	HighDisk          = "high_disk"
 	SsdDisk           = "ssd_disk"
 	mountPointMode    = 0777
-	DefaultFsTypeExt4 = "ext4"
+	DefaultFsTypeXfs  = "xfs"
 	FsTypeExt3        = "ext3"
 	FsTypeExt2        = "ext2"
 	FsTypeXfs         = "xfs"
