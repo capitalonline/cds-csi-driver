@@ -85,11 +85,6 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 
 	log.Infof("CreateVolume: diskRequestGB is: %d", diskRequestGB)
 
-	if diskRequestGB < 100 {
-		log.Error("CreateVolume: require disk size should > 100 GB, input is: %d", diskRequestGB)
-		return nil, fmt.Errorf("CreateVolume: require disk size should > 100 GB, input is: %d", diskRequestGB)
-	}
-
 	// Step 3: parse DiskVolume params
 	diskVol, err := parseDiskVolumeOptions(req)
 	if err != nil {
