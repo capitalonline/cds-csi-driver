@@ -182,7 +182,7 @@ metadata:
 spec:
   ports:
   - name: healthz
-    port: 9808
+    port: 9810
   selector:
     type: block-csi-provisioner
 ---
@@ -287,6 +287,8 @@ spec:
         volumeMounts:
         - mountPath: /var/lib/csi/sockets/pluginproxy/
           name: socket-dir
+      hostNetwork: true
+      hostPID: true
       nodeSelector:
         node.cck.net/role.infra: "True"
       priorityClassName: system-cluster-critical

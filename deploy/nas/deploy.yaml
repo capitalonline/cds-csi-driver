@@ -134,7 +134,7 @@ metadata:
 spec:
   ports:
   - name: healthz
-    port: 9808
+    port: 9809
   selector:
     type: nas-csi-provisioner
 ---
