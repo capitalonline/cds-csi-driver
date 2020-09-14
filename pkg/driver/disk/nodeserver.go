@@ -540,11 +540,11 @@ func formatDiskDevice(diskId, deviceName, fsType string) error {
 
 	// Step 2: format deviceName(disk)
 	var formatDeviceCmd string
-	if fsType == DefaultFsTypeExt4 {
+	if fsType == DefaultFsTypeXfs {
 		formatDeviceCmd = fmt.Sprintf("mkfs.ext4 %s", deviceName)
 	} else if fsType == FsTypeExt3 {
 		formatDeviceCmd = fmt.Sprintf("mkfs.ext3 %s", deviceName)
-	} else if fsType == FsTypeXfs {
+	} else if fsType == FsTypeExt4 {
 		formatDeviceCmd = fmt.Sprintf("mkfs.xfs %s", deviceName)
 	} else {
 		log.Error("formatDiskDevice: fsType not support, should be [ext4/ext3/ext2/xfs]")

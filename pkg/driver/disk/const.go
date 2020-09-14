@@ -5,8 +5,8 @@ const (
 	SsdDisk           = "ssd_disk"
 	mountPointMode    = 0777
 	DefaultFsTypeXfs  = "xfs"
+	FsTypeExt4 		  = "ext4"
 	FsTypeExt3        = "ext3"
-	FsTypeExt2        = "ext2"
 	FsTypeXfs         = "xfs"
 	StatusInMounted   = "mounted"
 	StatusInOK        = "ok"
