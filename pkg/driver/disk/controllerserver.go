@@ -420,7 +420,7 @@ func (c *ControllerServer) ControllerExpandVolume(context.Context, *csi.Controll
 func describeNodeStatus(ctx context.Context, c *ControllerServer, nodeId string) (v12.ConditionStatus, error) {
 	var nodeStatus v12.ConditionStatus = ""
 
-	res, err := c.Client.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	res, err := c.Client.CoreV1().Nodes().List(metav1.ListOptions{})
 	if err != nil {
 		log.Errorf("describeNodeStatus: get node list failed, err is: %s", err)
 		return "", err
@@ -441,6 +441,7 @@ func describeNodeStatus(ctx context.Context, c *ControllerServer, nodeId string)
 	log.Infof("describeNodeStatus: nodeStatus is: %s", nodeStatus)
 	return nodeStatus, nil
 }
+
 func createDisk(diskName, diskType, diskSiteID, diskZoneID string, diskSize, diskIops int) (*cdsDisk.CreateDiskResponse, error) {
 
 	log.Infof("createDisk: diskName: %s, diskType: %s, diskSiteID: %s, diskZoneID: %s, diskSize: %d, diskIops: %d", diskName, diskType, diskSiteID, diskZoneID, diskSize, diskIops)
