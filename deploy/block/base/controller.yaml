@@ -92,6 +92,7 @@ spec:
         image: registry-bj.capitalonline.net/cck/csi-livenessprobe:v2.0.0
         args:
         - "--csi-address=/csi/csi.sock"
+        - "--health-port=9810"
         volumeMounts:
         - name: socket-dir
           mountPath: /csi
