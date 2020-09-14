@@ -84,7 +84,7 @@ spec:
         image: registry-bj.capitalonline.net/cck/csi-livenessprobe:v2.0.0
         args:
         - "--csi-address=/var/lib/kubelet/plugins/block.csi.cds.net/csi.sock"
-        - "--health-port=9810"
+        - "--health-port=9812"
         volumeMounts:
         - name: kubelet-dir
           mountPath: /var/lib/kubelet/
