@@ -221,11 +221,14 @@ spec:
           name: socket-dir
       - args:
         - --csi-address=/csi/csi.sock
+        - --health-port=9809
         image: registry-bj.capitalonline.net/cck/csi-livenessprobe:v2.0.0
         name: liveness-probe
         volumeMounts:
         - mountPath: /csi
           name: socket-dir
+      hostNetwork: true
+      hostPID: true
       nodeSelector:
         node.cck.net/role.infra: "True"
       priorityClassName: system-cluster-critical
