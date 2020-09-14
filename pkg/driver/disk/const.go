@@ -7,7 +7,6 @@ const (
 	DefaultFsTypeXfs  = "xfs"
 	FsTypeExt4 		  = "ext4"
 	FsTypeExt3        = "ext3"
-	FsTypeXfs         = "xfs"
 	StatusInMounted   = "mounted"
 	StatusInOK        = "ok"
 	StatusInDeleted   = "deleted"
