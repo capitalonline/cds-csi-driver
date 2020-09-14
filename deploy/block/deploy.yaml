@@ -269,7 +269,7 @@ spec:
           name: socket-dir
       - args:
         - --csi-address=/csi/csi.sock
-        - --health-port=9810
+        - --health-port=9811
         image: registry-bj.capitalonline.net/cck/csi-livenessprobe:v2.0.0
         name: liveness-probe
         volumeMounts:
@@ -391,7 +391,7 @@ spec:
           name: registration-dir
       - args:
         - --csi-address=/var/lib/kubelet/plugins/block.csi.cds.net/csi.sock
-        - --health-port=9810
+        - --health-port=9812
         image: registry-bj.capitalonline.net/cck/csi-livenessprobe:v2.0.0
         name: block-liveness-probe
         volumeMounts:
