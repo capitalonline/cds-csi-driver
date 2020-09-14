@@ -534,7 +534,7 @@ func formatDiskDevice(diskId, deviceName, fsType string) error {
 	// Step 1: check deviceName(disk) is scannable
 	scanDeviceCmd := fmt.Sprintf("fdisk -l | grep %s | grep -v grep", deviceName)
 	if _, err := utils.RunCommand(scanDeviceCmd); err != nil {
-		log.Error("formatDiskDevice: scanDeviceCmd: %s failed, err is: %s", scanDeviceCmd, err.Error())
+		log.Errorf("formatDiskDevice: scanDeviceCmd: %s failed, err is: %s", scanDeviceCmd, err.Error())
 		return err
 	}
 

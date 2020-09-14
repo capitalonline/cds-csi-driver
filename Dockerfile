@@ -27,7 +27,6 @@ RUN git clone https://github.com/s3fs-fuse/s3fs-fuse.git && \
 RUN s3fs --version
 
 COPY --from=build-env /cds-csi-driver /cds-csi-driver
-RUN apk add udev
-RUN apk add e2fsprogs
+RUN apk add udev && apk add e2fsprogs && apk add xfsprogs
 
 ENTRYPOINT ["/cds-csi-driver"]
