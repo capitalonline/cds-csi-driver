@@ -547,12 +547,18 @@ func formatDiskDevice(diskId, deviceName, fsType string) error {
 	} else if fsType == FsTypeExt4 {
 		formatDeviceCmd = fmt.Sprintf("mkfs.ext4 %s", deviceName)
 	} else {
-		log.Error("formatDiskDevice: fsType not support, should be [ext4/ext3/ext2/xfs]")
-		return fmt.Errorf("formatDiskDevice: fsType not support, should be [ext4/ext3/ext2/xfs]")
+		log.Errorf("formatDiskDevice: fsType not support, should be [ext4/ext3/xfs]")
+		return fmt.Errorf("formatDiskDevice: fsType not support, should be [ext4/ext3/xfs]")
 	}
 
 	if _, err := utils.RunCommand(formatDeviceCmd); err != nil {
-		log.Error("formatDiskDevice: formatDeviceCmd: %s failed, err is: %s", formatDeviceCmd, err.Error())
+		if strings.Contains(err.Error(), "existing filesystem"){
+			diskFormattedMap[diskId] = "formatted"
+			log.Warnf("formatDiskDevice: deviceName: %s had been formatted, avoid multi formatting, return directly", deviceName)
+			log.Infof("formatDiskDevice: Successfully!")
+			return nil
+		}
+		log.Errorf("formatDiskDevice: formatDeviceCmd: %s failed, err is: %s", formatDeviceCmd, err.Error())
 		return err
 	}
 
