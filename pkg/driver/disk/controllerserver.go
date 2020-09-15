@@ -300,7 +300,7 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 		log.Warnf("ControllerPublishVolume: diskID: %s had been attached to nodeID: %s is different from current nodeID: %s, check node status", diskID, diskMountedNodeID, nodeID)
 
 		// check node status
-		nodeStatus, err := describeNodeStatus(ctx, c, nodeID)
+		nodeStatus, err := describeNodeStatus(ctx, c, diskMountedNodeID)
 		if err != nil {
 			log.Warnf("ControllerPublishVolume: check nodeStatus error, err is: %s", err)
 			return nil, err
