@@ -127,29 +127,29 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 
 	// check if disk formatted or not, return error if not formatted
 	if _, ok := diskFormattedMap[volumeID]; ok || res.Data.DiskSlice[0].IsFormat == 1 {
-		if value, ok := diskStagingMap[stagingTargetPath]; ok {
-			// staging record exist and record staging path is equal to new staging path
-			if value == stagingTargetPath {
-				log.Warnf("NodePublishVolume: diskID: %s has been staged to stagingTargetPath: %s, direct to bind mount", volumeID, value)
-
-				// bind mount to pod path
-				diskPublishingMap[podPath] = "publishing"
-				err = bindMountGlobalPathToPodPath(volumeID, stagingTargetPath, podPath)
-				if err != nil {
-					diskPublishingMap[podPath] = "error"
-					log.Errorf("NodePublishVolume:: bindMountGlobalPathToPodPath failed, err is: %s", err.Error())
-					return nil, fmt.Errorf("NodePublishVolume:: bindMountGlobalPathToPodPath failed, err is: %s", err.Error())
-				}
-
-				diskPublishingMap[podPath] = stagingTargetPath
-				log.Infof("NodePublishVolume:: Successfully!")
-				return &csi.NodePublishVolumeResponse{}, nil
-			}
-		}
+		//if value, ok := diskStagingMap[stagingTargetPath]; ok {
+		//	// staging record exist and record staging path is equal to new staging path
+		//	if value == stagingTargetPath {
+		//		log.Warnf("NodePublishVolume: diskID: %s has been staged to stagingTargetPath: %s, direct to bind mount", volumeID, value)
+		//
+		//		// bind mount to pod path
+		//		diskPublishingMap[podPath] = "publishing"
+		//		err = bindMountGlobalPathToPodPath(volumeID, stagingTargetPath, podPath)
+		//		if err != nil {
+		//			diskPublishingMap[podPath] = "error"
+		//			log.Errorf("NodePublishVolume:: bindMountGlobalPathToPodPath failed, err is: %s", err.Error())
+		//			return nil, fmt.Errorf("NodePublishVolume:: bindMountGlobalPathToPodPath failed, err is: %s", err.Error())
+		//		}
+		//
+		//		diskPublishingMap[podPath] = stagingTargetPath
+		//		log.Infof("NodePublishVolume:: Successfully!")
+		//		return &csi.NodePublishVolumeResponse{}, nil
+		//	}
+		//}
 
 		// staging record not exist or record staging path is different from new staging path
 		// need staging and bind mount two steps
-		log.Warnf("NodePublishVolume: diskID: %s staging record not exist or record staging path is different from new staging path, need staging and bind mount two steps", volumeID)
+		log.Warnf("NodePublishVolume: diskID: %s formatted, need staging and bind mount two steps", volumeID)
 		deviceName, err := findDeviceNameByUuid(res.Data.DiskSlice[0].Uuid)
 		if err != nil {
 			log.Errorf("NodePublishVolume: findDeviceNameByUuid error, err is: %s", err.Error())

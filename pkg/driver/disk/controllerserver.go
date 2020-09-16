@@ -376,6 +376,22 @@ func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *c
 		}
 	}
 
+	res, err := findDiskByVolumeID(diskID)
+	if err != nil {
+		log.Errorf("ControllerUnpublishVolume: findDiskByVolumeID error, err is: %s", err)
+		return nil, fmt.Errorf("ControllerUnpublishVolume: findDiskByVolumeID error, err is: %s", err)
+	}
+
+	if res == nil {
+		log.Errorf("ControllerUnpublishVolume: findDiskByVolumeID res is nil")
+		return nil, fmt.Errorf("ControllerUnpublishVolume: findDiskByVolumeID res is nil")
+	}
+
+	if res.Data.DiskSlice[0].NodeID != nodeID {
+		log.Warnf("ControllerUnpublishVolume: diskID: %s had been detached from nodeID: %s", diskID, nodeID)
+		return &csi.ControllerUnpublishVolumeResponse{}, nil
+	}
+
 	// Step 4: detach disk
 	taskID, err := detachDisk(diskID)
 	if err != nil {
