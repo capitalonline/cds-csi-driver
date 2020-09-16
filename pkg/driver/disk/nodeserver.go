@@ -23,6 +23,9 @@ var diskUnstagingMap = map[string]string{}
 // storing publishing disk
 var diskPublishingMap = map[string]string{}
 
+// storing published disk
+var diskPublishedMap = map[string]string{}
+
 // storing unpublishing disk
 var diskUnpublishingMap = map[string]string{}
 
@@ -95,32 +98,35 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 	if value, ok := diskPublishingMap[podPath]; ok {
 		if value == "publishing" {
 			log.Warnf("NodePublishVolume: volumeID: %s is in publishing, please wait", volumeID)
+			if _, ok := diskPublishedMap[podPath]; ok {
+				log.Infof("NodePublishVolume: volumeID: %s publishing process succeed, return context", volumeID)
+				return &csi.NodePublishVolumeResponse{}, nil
+			}
 			return nil, fmt.Errorf("NodePublishVolume: volumeID: %s is in publishing, please wait", volumeID)
 		} else if value == "error" {
 			log.Errorf("NodePublishVolume: volumeID: %s publishing process error", volumeID)
 			return nil, fmt.Errorf("NodePublishVolume: volumeID: %s publishing process error", volumeID)
-		} else if value == stagingTargetPath {
-			log.Errorf("NodePublishVolume: volumeID: %s has been published to stagingTargetPath: %s", volumeID, stagingTargetPath)
-			return nil, fmt.Errorf("NodePublishVolume: volumeID: %s has been published to stagingTargetPath: %s", volumeID, stagingTargetPath)
 		}
-
-		log.Warnf("NodePublishVolume: volumeID: %s has been published to stagingTargetPath: %s, and still publish to another stagingTargetPath: %s", volumeID, value, stagingTargetPath)
 	}
 
 	// check if device mounted to node global, if not mount it
+	diskPublishingMap[podPath] = "publishing"
 	res, err := cdsDisk.FindDiskByVolumeID(&cdsDisk.FindDiskByVolumeIDArgs{
 		VolumeID: volumeID,
 	})
 	if err != nil {
+		delete(diskPublishingMap, podPath)
 		log.Errorf("NodePublishVolume: cdsDisk.FindDiskByVolumeID error, err is: %s", err)
 		return nil, fmt.Errorf("NodePublishVolume: cdsDisk.FindDiskByVolumeID error, err is: %s", err)
 	}
 	if res.Data.DiskSlice == nil {
+		delete(diskPublishingMap, podPath)
 		log.Errorf("NodePublishVolume: findDiskByVolumeID res is nil")
 		return nil, fmt.Errorf("NodeStageVolume: findDiskByVolumeID res is nil")
 	}
 
 	if res.Data.DiskSlice[0].Uuid == "" {
+		delete(diskPublishingMap, podPath)
 		log.Errorf("NodePublishVolume: findDeviceNameByVolumeID res uuid is null")
 		return nil, fmt.Errorf("NodePublishVolume: findDeviceNameByVolumeID res uuid is null")
 	}
@@ -157,7 +163,6 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 		}
 
 		// first staging
-		diskPublishingMap[podPath] = "publishing"
 		err = mountDiskDeviceToNodeGlobalPath(strings.TrimSuffix(deviceName, "\n"), strings.TrimSuffix(stagingTargetPath, "\n"), diskVol["fsType"])
 		if err != nil {
 			diskPublishingMap[podPath] = "error"
@@ -173,7 +178,9 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 			return nil, fmt.Errorf("NodePublishVolume:: bindMountGlobalPathToPodPath failed, err is: %s", err.Error())
 		}
 
-		diskPublishingMap[podPath] = stagingTargetPath
+		// diskPublishingMap[podPath] = stagingTargetPath
+		delete(diskPublishingMap, podPath)
+		diskPublishedMap[podPath] = podPath
 		log.Infof("NodePublishVolume:: Successfully!")
 		return &csi.NodePublishVolumeResponse{}, nil
 	}
