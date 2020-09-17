@@ -5,7 +5,7 @@ metadata:
   namespace: kube-system
 spec:
   replicas: 1
-  serviceName: csi-provisioner
+  serviceName: nas-csi-provisioner
   selector:
     matchLabels:
       app: nas-csi-cds-controller
@@ -16,11 +16,14 @@ spec:
         type: csi-provisioner
     spec:
       nodeSelector:
-        node.cck.net/role.infra: "True" 
-      serviceAccount: cds-csi-sa
+        node.cck.net/role.infra: "True"
+      serviceAccount: nas-cds-csi-sa
+      hostNetwork: true
+      hostPID: true
       priorityClassName: system-cluster-critical
       tolerations:
-      - operator: Exists
+        - key:
+          operator: Exists
       containers:
         - name: csi-controller-server
           image: registry-bj.capitalonline.net/cck/cds-csi-driver:latest
@@ -47,11 +50,6 @@ spec:
                 configMapKeyRef:
                   name: cds-properties
                   key: oversea
-            - name: CDS_CLUSTER_ID
-              valueFrom:
-                configMapKeyRef:
-                  name: cds-properties
-                  key: k8s_cluster_id
           securityContext:
             privileged: true
           volumeMounts:
@@ -94,6 +92,7 @@ spec:
           image: registry-bj.capitalonline.net/cck/csi-livenessprobe:v2.0.0
           args:
             - "--csi-address=/csi/csi.sock"
+            - "--health-port=9809"
           volumeMounts:
             - name: socket-dir
               mountPath: /csi

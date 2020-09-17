@@ -9,13 +9,19 @@ The support for the Block Storage will be added soon.
 
 To deploy the CSI NAS driver to your k8s, simply run:
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/capitalonline/cds-csi-driver/master/deploy/nas/deploy.yaml
+kubectl create -f https://raw.githubusercontent.com/capitalonline/cds-csi-driver/master/deploy/nas/deploy.yaml
 ```
 
 To deploy the CSI OSS driver to your k8s, simply run:
 
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/capitalonline/cds-csi-driver/master/deploy/oss/deploy.yaml
+kubectl create -f https://raw.githubusercontent.com/capitalonline/cds-csi-driver/master/deploy/oss/deploy.yaml
+```
+
+To deploy the CSI Block driver to your k8s, simply run:
+
+```bash
+kubectl create -f https://raw.githubusercontent.com/capitalonline/cds-csi-driver/master/deploy/block/deploy.yaml
 ```
 
 ## To run tests
@@ -33,6 +39,12 @@ kubectl apply -f https://raw.githubusercontent.com/capitalonline/cds-csi-driver/
 2. Register a Storage Service in CDS 
 3. Run `make test-prerequisite` to build the image and deploy the driver to your k8s cluster
 4. Run `make oss-test`
+
+**Block：**
+
+1. Make sure that you have a Kubernetes cluster accessible with `kubectl`
+2. Run `make test-prerequisite` to build the image and deploy the driver to your k8s cluster
+3. Run `make block-test`
 
 ## To use the NAS driver
 Examples can be found [here](!https://github.com/capitalonline/cds-csi-driver/tree/master/example/nas)
@@ -170,3 +182,88 @@ Description:
 | akId         | <access_key>                   | yes      | Get it from your own bucket's in CDS web |
 | akSecret     | <acckedd_key_secret>           | yes      | Get it from your own bucket's in CDS web |
 | path         | <bucket_path>                  | yes      | Bucket path, default is `/`              |
+
+
+
+## To use the Block driver 
+
+### Dynamic PV
+
+sc.yaml
+
+```yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: block-csi-cds-sc
+parameters:
+  fstype: "xfs"
+  storageType: "high_disk"
+  iops: "3000"
+  siteId: "beijing001"
+  zoneId: "WuxiA-POD10-CLU02"
+provisioner: block.csi.cds.net
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer    
+```
+
+Description:
+
+|        Key        | Value                                | Required | Description                                                  |
+| :---------------: | :----------------------------------- | :------: | :----------------------------------------------------------- |
+|    provisioner    | block.csi.cds.net                    |   yes    | CDS csi driver's name                                        |
+|   reclaimPolicy   | Delete \| Retain                     |   yes    | `Delete` means that PV will be deleted with PVC delete<br />`Retain` means that PV will be retained when PVC delete |
+| volumeBindingMode | WaitForFirstConsumer                 |   yes    | Only support`WaitForFirstConsumer` mode now.<br />`WaitForFirstConsumer` means that PV will be delayed until PVC is consumed by pod. <br /> |
+|      fstype       | xfs \| ext4                          |   yes    | Support linux filesystem type "xfs" and "ext4"               |
+|    storageType    | high_disk \| ssd_disk                |   yes    | `high_disk` means that normal disk and `iops` only support 3000.<br />`ssd_disk` means that high-performance disk and `iops` support 5000、7500 and 10000. |
+|       iops        | 3000 \| 5000 \| 7500 \| 10000        |   yes    | `3000` only used for `high_disk`.<br />`5000` `7500` and `10000` are used for `ssd_disk`. |
+|      siteId       | ca0bd848-9b59-40a2-9f57-d64fbc72a9df |   yes    | Cluster's site id.                                           |
+|      zoneId       | POD26-CLU03                          |   yes    | Declare node's zone id which nodes you are going to use with block disk. |
+
+Kindly Remind: 
+
+​	For block storage, recommending using `volumeBindingMode:` `WaitForFirstConsumer ` in SC.yaml. 
+
+​	If not, please apply your `block.csi.cds.net` csi driver's `csi-provisioner` in k8s with following:
+
+```yaml
+- args: 
+    - "--csi-address=$(ADDRESS)"
+    - "--v=5"
+    - "--feature-gates=Topology=true"			# 添加这个参数，开启 Topology 
+  env: 
+    - 
+      name: ADDRESS
+      value: /socketDir/csi.sock
+  image: "registry-bj.capitalonline.net/cck/csi-provisioner:v1.5.0"
+  name: csi-provisioner
+  volumeMounts: 
+    - 
+      mountPath: /socketDir
+      name: socket-dir
+```
+
+and then refer the following SC.yaml
+
+```yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: block-sc
+parameters:
+  fstype: "ext4" 
+  storageType: "high_disk"
+  iops: "3000"
+  siteId: "ca0bd848-9b59-40a2-9f57-d64fbc72a9df"
+provisioner: block.csi.cds.net
+reclaimPolicy: Delete
+volumeBindingMode: Immediate    # Immediate policy in SC 
+allowedTopologies:				# using allowedTopologies in sc 
+- matchLabelExpressions:
+  - key: topology.kubernetes.io/zone	
+    values:
+    - WuxiA-POD10-CLU02
+```
+
+
+

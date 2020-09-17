@@ -22,10 +22,10 @@ RUN git clone https://github.com/s3fs-fuse/s3fs-fuse.git && \
     ./autogen.sh && \
     ./configure --prefix=/usr && \
     make && \
-    make install
-
-RUN s3fs --version
+    make install && \
+    s3fs --version
 
 COPY --from=build-env /cds-csi-driver /cds-csi-driver
+RUN apk add udev && apk add e2fsprogs && apk add xfsprogs
 
 ENTRYPOINT ["/cds-csi-driver"]

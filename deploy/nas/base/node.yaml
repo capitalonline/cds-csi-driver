@@ -15,7 +15,7 @@ spec:
       tolerations:
         - operator: Exists
       priorityClassName: system-node-critical
-      serviceAccount: cds-csi-sa
+      serviceAccount: nas-cds-csi-sa
       hostNetwork: true
       hostPID: true
       containers:
@@ -67,7 +67,7 @@ spec:
           image: registry-bj.capitalonline.net/cck/csi-livenessprobe:v2.0.0
           args:
             - "--csi-address=/var/lib/kubelet/plugins/nas.csi.cds.net/csi.sock"
-            - "--health-port=9809"
+            - "--health-port=9810"
           volumeMounts:
             - name: kubelet-dir
               mountPath: /var/lib/kubelet/
