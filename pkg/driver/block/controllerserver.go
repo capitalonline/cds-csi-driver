@@ -306,8 +306,8 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 		}
 
 		if nodeStatus != "True" {
-			// node is not exist or NotReady status, detach force
-			log.Warnf("ControllerPublishVolume: diskMountedNodeID: %s is in [NotRead|Not Exist], detach forcely", diskMountedNodeID)
+			// node is not exist or in NotReady status, detach force
+			log.Warnf("ControllerPublishVolume: diskMountedNodeID: %s is in [NotRead|NotExist], detach forcedly", diskMountedNodeID)
 			taskID, err := detachDisk(diskID)
 			if err != nil {
 				log.Errorf("ControllerPublishVolume: detach diskID: %s from nodeID: %s error,  err is: %s", diskID, diskMountedNodeID, err.Error())
