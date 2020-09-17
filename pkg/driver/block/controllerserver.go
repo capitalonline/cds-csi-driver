@@ -3,6 +3,7 @@ package block
 import (
 	"context"
 	"fmt"
+	"github.com/capitalonline/cluster-autoscaler/clusterstate/utils"
 	v12 "k8s.io/api/core/v1"
 	"strconv"
 	"time"
@@ -18,6 +19,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	blockUtils "github.com/capitalonline/cds-csi-driver/pkg/driver/utils"
 )
 
 // the map of req.Name and csi.Volume.
@@ -268,10 +270,8 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 		if value == "attaching" {
 			log.Warnf("ControllerPublishVolume: diskID: %s is in attaching, please wait", diskID)
 			return nil, fmt.Errorf("ControllerPublishVolume: diskID: %s is in attaching, please wait", diskID)
-		} else if value == "error" {
-			log.Errorf("ControllerPublishVolume: diskID: %s attaching process was error", diskID)
-			return nil, fmt.Errorf("ControllerPublishVolume: diskID: %s attaching process was error", diskID)
 		}
+
 		log.Warnf("ControllerPublishVolume: diskID: %s attaching process finished, return context", diskID)
 		return &csi.ControllerPublishVolumeResponse{}, nil
 	}
@@ -290,6 +290,10 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 
 	diskStatus := res.Data.DiskSlice[0].Status
 	diskMountedNodeID := res.Data.DiskSlice[0].NodeID
+
+	blockAttachingMap[diskID] = "attaching"
+	defer delete(blockAttachingMap, diskID)
+
 	if diskStatus == StatusInMounted {
 		if diskMountedNodeID == nodeID {
 			log.Warnf("ControllerPublishVolume: diskID: %s had been attached to nodeID: %s", diskID, nodeID)
@@ -308,18 +312,24 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 		if nodeStatus != "True" {
 			// node is not exist or in NotReady status, detach force
 			log.Warnf("ControllerPublishVolume: diskMountedNodeID: %s is in [NotRead|NotExist], detach forcedly", diskMountedNodeID)
-			taskID, err := detachDisk(diskID)
+
+			// use surplusDetachDisk temp
+			err = surplusDetachDisk(diskID)
 			if err != nil {
-				log.Errorf("ControllerPublishVolume: detach diskID: %s from nodeID: %s error,  err is: %s", diskID, diskMountedNodeID, err.Error())
-				return nil, fmt.Errorf("ControllerPublishVolume: detach diskID: %s from nodeID: %s error,  err is: %s", diskID, diskMountedNodeID, err.Error())
+				log.Errorf("ControllerPublishVolume: surplusDetachDisk error, err is: %s", err)
+				return nil, fmt.Errorf("ControllerPublishVolume: surplusDetachDisk error, err is: %s", err)
 			}
 
-			blockAttachingMap[diskID] = "attaching"
-			if err := describeTaskStatus(taskID); err != nil {
-				blockAttachingMap[diskID] = "error"
-				log.Errorf("ControllerPublishVolume: cdsDisk.detachDisk task result failed, err is: %s", err)
-				return nil, err
-			}
+			//taskID, err := detachDisk(diskID)
+			//if err != nil {
+			//	log.Errorf("ControllerPublishVolume: detach diskID: %s from nodeID: %s error,  err is: %s", diskID, diskMountedNodeID, err.Error())
+			//	return nil, fmt.Errorf("ControllerPublishVolume: detach diskID: %s from nodeID: %s error,  err is: %s", diskID, diskMountedNodeID, err.Error())
+			//}
+			//
+			//if err := describeTaskStatus(taskID); err != nil {
+			//	log.Errorf("ControllerPublishVolume: cdsDisk.detachDisk task result failed, err is: %s", err)
+			//	return nil, err
+			//}
 
 			log.Warnf("ControllerPublishVolume: detach diskID: %s from nodeID: %s successfully", diskID, diskMountedNodeID)
 		} else {
@@ -332,20 +342,25 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 	}
 
 	// Step 4: attach disk to node
-	taskID, err := attachDisk(diskID, nodeID)
+	// use surplusAttachDisk temp
+	err = surplusAttachDisk(diskID, nodeID)
 	if err != nil {
-		log.Errorf("ControllerPublishVolume: create attach task failed, err is:%s", err.Error())
-		return nil, err
-	}
-
-	blockAttachingMap[diskID] = "attaching"
-	if err = describeTaskStatus(taskID); err != nil {
-		blockAttachingMap[diskID] = "error"
 		log.Errorf("ControllerPublishVolume: attach disk:%s processing to node: %s with error, err is: %s", diskID, nodeID, err.Error())
-		return nil, err
+		return nil, fmt.Errorf("ControllerPublishVolume: attach disk:%s processing to node: %s with error, err is: %s", diskID, nodeID, err.Error())
 	}
 
-	delete(blockAttachingMap, diskID)
+	//taskID, err := attachDisk(diskID, nodeID)
+	//if err != nil {
+	//	log.Errorf("ControllerPublishVolume: create attach task failed, err is:%s", err.Error())
+	//	return nil, err
+	//}
+	//
+	//if err = describeTaskStatus(taskID); err != nil {
+	//	blockAttachingMap[diskID] = "error"
+	//	log.Errorf("ControllerPublishVolume: attach disk:%s processing to node: %s with error, err is: %s", diskID, nodeID, err.Error())
+	//	return nil, err
+	//}
+	//
 	log.Infof("ControllerPublishVolume: Successfully attach disk: %s to node: %s", diskID, nodeID)
 
 	return &csi.ControllerPublishVolumeResponse{}, nil
@@ -365,15 +380,13 @@ func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *c
 	}
 
 	// Step 3: check disk status
-	if value, ok := blockDetachingMap[diskID]; ok {
-		if value == "detaching" {
-			log.Warnf("ControllerUnpublishVolume: diskID: %s is in detaching, please wait", diskID)
-			return nil, fmt.Errorf("ControllerUnpublishVolume: diskID: %s is in detaching, please wait", diskID)
-		} else if value == "error" {
-			log.Errorf("ControllerUnpublishVolume: diskID: %s detaching process is error", diskID)
-			return nil, fmt.Errorf("ControllerUnpublishVolume: diskID: %s detaching process is error", diskID)
-		}
+	if value, ok := blockDetachingMap[diskID]; ok && value == "detaching" {
+		log.Warnf("ControllerUnpublishVolume: diskID: %s is in detaching, please wait", diskID)
+		return nil, fmt.Errorf("ControllerUnpublishVolume: diskID: %s is in detaching, please wait", diskID)
 	}
+
+	blockDetachingMap[diskID] = "detaching"
+	defer delete(blockDetachingMap, diskID)
 
 	res, err := findDiskByVolumeID(diskID)
 	if err != nil {
@@ -392,21 +405,25 @@ func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *c
 	}
 
 	// Step 4: detach disk
-	taskID, err := detachDisk(diskID)
+	// use surplusDetachDisk temp
+	err = surplusDetachDisk(diskID)
 	if err != nil {
 		log.Errorf("ControllerUnpublishVolume: create detach task failed, err is: %s", err.Error())
 		return nil, err
 	}
 
-	blockDetachingMap[diskID] = "detaching"
-	if err := describeTaskStatus(taskID); err != nil {
-		blockDetachingMap[diskID] = "error"
-		log.Errorf("ControllerUnpublishVolume: cdsDisk.detachDisk task result failed, err is: %s", err)
-		return nil, err
-	}
+	//taskID, err := detachDisk(diskID)
+	//if err != nil {
+	//	log.Errorf("ControllerUnpublishVolume: create detach task failed, err is: %s", err.Error())
+	//	return nil, err
+	//}
+	//
+	//if err := describeTaskStatus(taskID); err != nil {
+	//	log.Errorf("ControllerUnpublishVolume: cdsDisk.detachDisk task result failed, err is: %s", err)
+	//	return nil, err
+	//}
+	//
 
-	delete(blockDetachingMap, diskID)
-	//delete(blockAttachingMap, diskID)
 	log.Infof("ControllerUnpublishVolume: Successfully detach disk: %s from node: %s", diskID, nodeID)
 
 	return &csi.ControllerUnpublishVolumeResponse{}, nil
@@ -576,4 +593,62 @@ func describeTaskStatus(taskID string) error {
 	}
 
 	return fmt.Errorf("task time out, running more than 20 minutes")
+}
+
+func surplusAttachDisk(diskID, nodeID string) error {
+	log.Infof("surplusAttachDisk: diskID is: %s, nodeID is: %s", diskID, nodeID)
+
+	// Step 1: attach
+	taskID, err := attachDisk(diskID, nodeID)
+	if err != nil {
+		log.Errorf("surplusAttachDisk: create attach task failed, err is:%s", err.Error())
+		return err
+	}
+
+	if err = describeTaskStatus(taskID); err != nil {
+		log.Errorf("surplusAttachDisk: attach disk:%s processing to node: %s with error, err is: %s", diskID, nodeID, err.Error())
+		return err
+	}
+
+	// Step 2: connect
+	discoveryCmd := fmt.Sprintf("nvme  discover -t rdma -a 10.177.178.201 -s 10060")
+	if _, err := blockUtils.RunCommand(discoveryCmd); err != nil {
+		log.Errorf("surplusAttachDisk: blockUtils.RunCommand error, err is: %s", err.Error())
+		return err
+	}
+
+	connectCmd := fmt.Sprintf("nvme connect -n nqn.2019-06.suzaku.org:ssd_pool.gvol1 -t rdma -a 10.177.178.201 -s 10062")
+	if _, err := blockUtils.RunCommand(connectCmd); err != nil {
+		log.Errorf("surplusAttachDisk: blockUtils.RunCommand error, err is: %s", err.Error())
+		return err
+	}
+
+	log.Infof("surplusAttachDisk: successfully!")
+	return nil
+}
+
+func surplusDetachDisk(diskID string) error {
+	log.Infof("surplusDetachDisk: diskID is: %s", diskID)
+
+	// Step 1: disconnect
+	disconnectCmd := fmt.Sprintf("nvme disconnect -n %s -t rdma -a 10.177.178.201 -s 10062", diskID)
+	if _, err := blockUtils.RunCommand(disconnectCmd); err != nil {
+		log.Errorf("surplusDetachDisk: blockUtils.RunCommand error, err is: %s", err.Error())
+		return err
+	}
+
+	// Step 2: detach
+	taskID, err := detachDisk(diskID)
+	if err != nil {
+		log.Errorf("surplusDetachDisk: detach diskID: %s,  err is: %s", diskID, err.Error())
+		return err
+	}
+
+	if err := describeTaskStatus(taskID); err != nil {
+		log.Errorf("surplusDetachDisk: cdsDisk.detachDisk task result failed, err is: %s", err)
+		return err
+	}
+
+	log.Infof("surplusDetachDisk: successfully!")
+	return nil
 }
