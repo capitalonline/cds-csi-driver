@@ -235,13 +235,13 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 		return nil, fmt.Errorf("deleteDisk: cdsDisk.DeleteDisk task result failed, err is: %s", err)
 	}
 
-	// Step 5: delete pvcCreatedMap and diskIdPvMap
-	delete(diskIdPvMap, diskID)
+	// Step 5: delete pvcCreatedMap 
 	if pvName, ok := diskIdPvMap[diskID]; ok {
 		delete(pvcCreatedMap, pvName)
 	}
 
-	// Step 6: clear diskDeletingMap
+	// Step 6: clear diskDeletingMap and diskIdPvMap
+	delete(diskIdPvMap, diskID)
 	delete(diskDeletingMap, diskID)
 
 	log.Infof("DeleteVolume: clean [diskIdPvMap] and [pvcMap] and [diskDeletingMap] succeed!")
