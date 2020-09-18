@@ -3,7 +3,7 @@ package block
 import (
 	"context"
 	"fmt"
-	"github.com/capitalonline/cluster-autoscaler/clusterstate/utils"
+	// "github.com/capitalonline/cluster-autoscaler/clusterstate/utils"
 	v12 "k8s.io/api/core/v1"
 	"strconv"
 	"time"
@@ -17,9 +17,9 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
+	blockUtils "github.com/capitalonline/cds-csi-driver/pkg/driver/utils"
 	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	blockUtils "github.com/capitalonline/cds-csi-driver/pkg/driver/utils"
 )
 
 // the map of req.Name and csi.Volume.
