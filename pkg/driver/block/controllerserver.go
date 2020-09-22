@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	cdsDisk "github.com/capitalonline/cck-sdk-go/pkg/cck/disk"
+	cdsBlock "github.com/capitalonline/cck-sdk-go/pkg/cck/block"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/kubernetes-csi/drivers/pkg/csi-common"
@@ -117,7 +117,8 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 	// do creation
 	// diskName, diskType, diskSiteID, diskZoneID string, diskSize, diskIops int
 	iopsInt, _ := strconv.Atoi(diskVol.Iops)
-	createRes, err := createDisk(pvName, diskVol.StorageType, diskVol.SiteID, diskVol.ZoneID, int(diskRequestGB), iopsInt)
+	bandwidthInt, _ := strconv.Atoi(diskVol.Bandwidth)
+	createRes, err := createDisk(pvName, diskVol.StorageType, diskVol.SiteID, int(diskRequestGB), iopsInt, bandwidthInt)
 	if err != nil {
 		log.Errorf("CreateVolume: createDisk error, err is: %s", err.Error())
 		return nil, fmt.Errorf("CreateVolume: createDisk error, err is: %s", err.Error())
@@ -144,7 +145,6 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 
 	volumeContext["fsType"] = diskVol.FsType
 	volumeContext["storageType"] = diskVol.StorageType
-	volumeContext["zoneId"] = diskVol.ZoneID
 	volumeContext["siteID"] = diskVol.SiteID
 	volumeContext["iops"] = diskVol.Iops
 
@@ -155,7 +155,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 		AccessibleTopology: []*csi.Topology{
 			{
 				Segments: map[string]string{
-					TopologyZoneKey: diskVol.ZoneID,
+					TopologySiteKey: diskVol.SiteID,
 				},
 			},
 		},
@@ -201,13 +201,13 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 		log.Errorf("DeleteVolume: findDiskByVolumeID error, err is: %s", err.Error())
 		return nil, err
 	}
-	if disk.Data.DiskSlice == nil {
-		log.Error("DeleteVolume: findDiskByVolumeID(cdsDisk.FindDiskByVolumeID) response is nil")
-		return nil, fmt.Errorf("DeleteVolume: findDiskByVolumeID(cdsDisk.FindDiskByVolumeID) response is nil")
+	if disk.Data.BlockSlice == nil {
+		log.Error("DeleteVolume: findDiskByVolumeID(cdsBlock.FindDiskByVolumeID) response is nil")
+		return nil, fmt.Errorf("DeleteVolume: findDiskByVolumeID(cdsBlock.FindDiskByVolumeID) response is nil")
 	}
 
 	// Step 3: check disk detached from node or not, detach it firstly if not
-	diskStatus := disk.Data.DiskSlice[0].Status
+	diskStatus := disk.Data.BlockSlice[0].Status
 	// log.Infof("DeleteVolume: findDiskByVolumeID succeed, diskID is: %s, diskStatus is: %s", diskID, diskStatus)
 	if diskStatus == StatusInMounted {
 		log.Errorf("DeleteVolume: disk [mounted], cant delete volumeID: %s ", diskID)
@@ -231,9 +231,9 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 
 	taskID := deleteRes.TaskID
 	if err := describeTaskStatus(taskID); err != nil {
-		log.Errorf("deleteDisk: cdsDisk.DeleteDisk task result failed, err is: %s", err)
+		log.Errorf("deleteDisk: cdsBlock.DeleteDisk task result failed, err is: %s", err)
 		blockDeletingMap[diskID] = "error"
-		return nil, fmt.Errorf("deleteDisk: cdsDisk.DeleteDisk task result failed, err is: %s", err)
+		return nil, fmt.Errorf("deleteDisk: cdsBlock.DeleteDisk task result failed, err is: %s", err)
 	}
 
 	// Step 5: delete pvcCreatedMap
@@ -283,13 +283,13 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 		return nil, fmt.Errorf("ControllerPublishVolume: findDiskByVolumeID api error, err is: %s", err)
 	}
 
-	if res.Data.DiskSlice == nil {
+	if res.Data.BlockSlice == nil {
 		log.Errorf("ControllerPublishVolume: findDiskByVolumeID res is nil")
 		return nil, fmt.Errorf("ControllerPublishVolume: findDiskByVolumeID res is nil")
 	}
 
-	diskStatus := res.Data.DiskSlice[0].Status
-	diskMountedNodeID := res.Data.DiskSlice[0].NodeID
+	diskStatus := res.Data.BlockSlice[0].Status
+	diskMountedNodeID := res.Data.BlockSlice[0].NodeID
 
 	blockAttachingMap[diskID] = "attaching"
 	defer delete(blockAttachingMap, diskID)
@@ -327,7 +327,7 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 			//}
 			//
 			//if err := describeTaskStatus(taskID); err != nil {
-			//	log.Errorf("ControllerPublishVolume: cdsDisk.detachDisk task result failed, err is: %s", err)
+			//	log.Errorf("ControllerPublishVolume: cdsBlock.detachDisk task result failed, err is: %s", err)
 			//	return nil, err
 			//}
 
@@ -399,7 +399,7 @@ func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *c
 		return nil, fmt.Errorf("ControllerUnpublishVolume: findDiskByVolumeID res is nil")
 	}
 
-	if res.Data.DiskSlice[0].NodeID != nodeID {
+	if res.Data.BlockSlice[0].NodeID != nodeID {
 		log.Warnf("ControllerUnpublishVolume: diskID: %s had been detached from nodeID: %s", diskID, nodeID)
 		return &csi.ControllerUnpublishVolumeResponse{}, nil
 	}
@@ -419,7 +419,7 @@ func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *c
 	//}
 	//
 	//if err := describeTaskStatus(taskID); err != nil {
-	//	log.Errorf("ControllerUnpublishVolume: cdsDisk.detachDisk task result failed, err is: %s", err)
+	//	log.Errorf("ControllerUnpublishVolume: cdsBlock.detachDisk task result failed, err is: %s", err)
 	//	return nil, err
 	//}
 	//
@@ -474,22 +474,22 @@ OuterLoop:
 	return nodeStatus, nil
 }
 
-func createDisk(diskName, diskType, diskSiteID, diskZoneID string, diskSize, diskIops int) (*cdsDisk.CreateDiskResponse, error) {
+func createDisk(diskName, diskType, diskSiteID string, diskSize, diskIops, diskBandwidth int) (*cdsBlock.CreateBlockResponse, error) {
 
-	log.Infof("createDisk: diskName: %s, diskType: %s, diskSiteID: %s, diskZoneID: %s, diskSize: %d, diskIops: %d", diskName, diskType, diskSiteID, diskZoneID, diskSize, diskIops)
+	log.Infof("createDisk: diskName: %s, diskType: %s, diskSiteID: %s, diskSize: %d, diskIops: %d, diskBandwidth: %d", diskName, diskType, diskSiteID, diskSize, diskIops, diskBandwidth)
 
 	// create disk
-	res, err := cdsDisk.CreateDisk(&cdsDisk.CreateDiskArgs{
-		Name:     diskName,
-		RegionID: diskSiteID,
-		DiskType: diskType,
-		Size:     diskSize,
-		Iops:     diskIops,
-		ZoneID:   diskZoneID,
+	res, err := cdsBlock.CreateBlock(&cdsBlock.CreateBlockArgs{
+		Name:      diskName,
+		RegionID:  diskSiteID,
+		DiskType:  diskType,
+		Size:      diskSize,
+		Iops:      diskIops,
+		Bandwidth: diskBandwidth,
 	})
 
 	if err != nil {
-		log.Errorf("createDisk: cdsDisk.CreateDisk api error, err is: %s", err.Error())
+		log.Errorf("createDisk: cdsBlock.CreateDisk api error, err is: %s", err.Error())
 		return nil, err
 	}
 
@@ -498,70 +498,70 @@ func createDisk(diskName, diskType, diskSiteID, diskZoneID string, diskSize, dis
 	return res, nil
 }
 
-func deleteDisk(diskID string) (*cdsDisk.DeleteDiskResponse, error) {
+func deleteDisk(diskID string) (*cdsBlock.DeleteBlockResponse, error) {
 	log.Infof("deleteDisk: diskID is:%s", diskID)
 
-	res, err := cdsDisk.DeleteDisk(&cdsDisk.DeleteDiskArgs{
+	res, err := cdsBlock.DeleteBlock(&cdsBlock.DeleteBlockArgs{
 		VolumeID: diskID,
 	})
 
 	if err != nil {
-		log.Errorf("deleteDisk: cdsDisk.DeleteDisk api error, err is: %s", err)
+		log.Errorf("deleteDisk: cdsBlock.DeleteDisk api error, err is: %s", err)
 		return nil, err
 	}
 
-	log.Infof("deleteDisk: cdsDisk.DeleteDisk task creation succeed, taskID is: %s", res.TaskID)
+	log.Infof("deleteDisk: cdsBlock.DeleteDisk task creation succeed, taskID is: %s", res.TaskID)
 
 	return res, nil
 }
 
-func attachDisk(diskID, nodeID string) (string, error) {
+func attachDisk(diskID, nodeID string) (*cdsBlock.AttachBlockResponse, error) {
 	// attach disk to node
 	log.Infof("attachDisk: diskID: %s, nodeID: %s", diskID, nodeID)
 
-	res, err := cdsDisk.AttachDisk(&cdsDisk.AttachDiskArgs{
+	res, err := cdsBlock.AttachBlock(&cdsBlock.AttachBlockArgs{
 		VolumeID: diskID,
 		NodeID:   nodeID,
 	})
 
 	if err != nil {
-		log.Errorf("attachDisk: cdsDisk.attachDisk api error, err is: %s", err)
-		return "", err
+		log.Errorf("attachDisk: cdsBlock.attachDisk api error, err is: %s", err)
+		return nil, err
 	}
 
-	log.Infof("attachDisk: cdsDisk.attachDisk task creation succeed, taskID is: %s", res.TaskID)
+	log.Infof("attachDisk: cdsBlock.attachDisk task creation succeed, taskID is: %s", res.TaskID)
 
-	return res.TaskID, nil
+	return res, nil
 }
 
 func detachDisk(diskID string) (string, error) {
 	// to detach disk from node
 	log.Infof("detachDisk: diskID: %s", diskID)
 
-	res, err := cdsDisk.DetachDisk(&cdsDisk.DetachDiskArgs{
+	res, err := cdsBlock.DetachBlock(&cdsBlock.DetachBlockArgs{
 		VolumeID: diskID,
 	})
 
 	if err != nil {
-		log.Errorf("detachDisk: cdsDisk.detachDisk api error, err is: %s", err)
+		log.Errorf("detachDisk: cdsBlock.detachDisk api error, err is: %s", err)
 		return "", err
 	}
 
-	log.Infof("detachDisk: cdsDisk.detachDisk task creation succeed, taskID is: %s", res.TaskID)
+	log.Infof("detachDisk: cdsBlock.detachDisk task creation succeed, taskID is: %s", res.TaskID)
 
 	return res.TaskID, nil
 }
 
-func findDiskByVolumeID(volumeID string) (*cdsDisk.FindDiskByVolumeIDResponse, error) {
+func findDiskByVolumeID(volumeID string) (*cdsBlock.FindBlockByVolumeIDResponse, error) {
 
 	log.Infof("findDiskByVolumeID: volumeID is: %s", volumeID)
 
-	res, err := cdsDisk.FindDiskByVolumeID(&cdsDisk.FindDiskByVolumeIDArgs{
+	res, err := cdsBlock.FindBlockByVolumeID(&cdsBlock.FindBlockByVolumeIDArgs{
 		VolumeID: volumeID,
 	})
 
 	if err != nil {
-		log.Errorf("findDiskByVolumeID: cdsDisk.FindDiskByVolumeID [api error], err is: %s", err)
+		log.Errorf("findDiskByVolumeID: cdsBlock.FindDiskByVolumeID [api error], err is: %s", err)
 		return nil, err
 	}
 
@@ -574,7 +574,7 @@ func describeTaskStatus(taskID string) error {
 	log.Infof("describeTaskStatus: taskID is: %s", taskID)
 
 	for i := 1; i < 120; i++ {
-		res, err := cdsDisk.DescribeTaskStatus(taskID)
+		res, err := cdsBlock.DescribeTaskStatus(taskID)
 		if err != nil {
 			log.Errorf("task api error, err is: %s", err)
 			return fmt.Errorf("apiError")
@@ -599,25 +599,40 @@ func surplusAttachDisk(diskID, nodeID string) error {
 	log.Infof("surplusAttachDisk: diskID is: %s, nodeID is: %s", diskID, nodeID)
 
 	// Step 1: attach
-	taskID, err := attachDisk(diskID, nodeID)
+	res, err := attachDisk(diskID, nodeID)
 	if err != nil {
 		log.Errorf("surplusAttachDisk: create attach task failed, err is:%s", err.Error())
 		return err
 	}
 
-	if err = describeTaskStatus(taskID); err != nil {
+	npn := res.Data.Npn
+	vip := res.Data.Vip
+	port := res.Data.Port
+	log.Infof("surplusAttachDisk: npn: %s, vip: %s, port: %s", npn, vip, port)
+
+	if err = describeTaskStatus(res.TaskID); err != nil {
 		log.Errorf("surplusAttachDisk: attach disk:%s processing to node: %s with error, err is: %s", diskID, nodeID, err.Error())
 		return err
 	}
 
 	// Step 2: connect
+	// temp
 	discoveryCmd := fmt.Sprintf("nvme  discover -t rdma -a 10.177.178.201 -s 10060")
 	if _, err := blockUtils.RunCommand(discoveryCmd); err != nil {
 		log.Errorf("surplusAttachDisk: blockUtils.RunCommand error, err is: %s", err.Error())
 		return err
 	}
 
-	connectCmd := fmt.Sprintf("nvme connect -n nqn.2019-06.suzaku.org:ssd_pool.gvol1 -t rdma -a 10.177.178.201 -s 10062")
+	// temp
+	res1, err1 := findDiskByVolumeID(diskID)
+	if err1 != nil {
+		log.Errorf("surplusAttachDisk: findDiskByVolumeID api error, err is: %s", err1)
+		return fmt.Errorf("surplusAttachDisk: findDiskByVolumeID api error, err is: %s", err1)
+	}
+	diskUUid := res1.Data.BlockSlice[0].Uuid
+	log.Infof("surplusAttachDisk: diskUUid: %s", diskUUid)
+
+	connectCmd := fmt.Sprintf("nvme connect -n nqn.2019-06.suzaku.org:ssd_pool.g%s -t rdma -a 10.177.178.201 -s 10062", diskUUid)
 	if _, err := blockUtils.RunCommand(connectCmd); err != nil {
 		log.Errorf("surplusAttachDisk: blockUtils.RunCommand error, err is: %s", err.Error())
 		return err
@@ -631,7 +646,16 @@ func surplusDetachDisk(diskID string) error {
 	log.Infof("surplusDetachDisk: diskID is: %s", diskID)
 
 	// Step 1: disconnect
-	disconnectCmd := fmt.Sprintf("nvme disconnect -n %s -t rdma -a 10.177.178.201 -s 10062", diskID)
+	// temp
+	res1, err1 := findDiskByVolumeID(diskID)
+	if err1 != nil {
+		log.Errorf("surplusAttachDisk: findDiskByVolumeID api error, err is: %s", err1)
+		return fmt.Errorf("surplusAttachDisk: findDiskByVolumeID api error, err is: %s", err1)
+	}
+	diskUUid := res1.Data.BlockSlice[0].Uuid
+	log.Infof("surplusAttachDisk: diskUUid: %s", diskUUid)
+
+	disconnectCmd := fmt.Sprintf("nvme disconnect -n nqn.2019-06.suzaku.org:ssd_pool.g%s", diskUUid)
 	if _, err := blockUtils.RunCommand(disconnectCmd); err != nil {
 		log.Errorf("surplusDetachDisk: blockUtils.RunCommand error, err is: %s", err.Error())
 		return err
@@ -645,7 +669,7 @@ func surplusDetachDisk(diskID string) error {
 	}
 
 	if err := describeTaskStatus(taskID); err != nil {
-		log.Errorf("surplusDetachDisk: cdsDisk.detachDisk task result failed, err is: %s", err)
+		log.Errorf("surplusDetachDisk: cdsBlock.detachDisk task result failed, err is: %s", err)
 		return err
 	}
 

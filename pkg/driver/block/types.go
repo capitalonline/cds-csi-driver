@@ -27,6 +27,6 @@ type BlockVolumeArgs struct {
 	StorageType string `json:"storageType"`
 	FsType      string `json:"fsType"`
 	SiteID      string `json:"siteId"`
-	ZoneID      string `json:"zoneId"`
 	Iops        string `json:"iops"`
+	Bandwidth   string `json:"bandwidth"`
 }

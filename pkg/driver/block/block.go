@@ -10,7 +10,7 @@ import (
 const (
 	driverName      = "block.bare.mental.csi.cds.net"
 	csiVersion      = "1.0.0"
-	TopologyZoneKey = "topology.kubernetes.io/zone"
+	TopologySiteKey = "topology.kubernetes.io/site"
 )
 
 func NewDriver(driverName, nodeId, endpoint string) *BlockDriver {

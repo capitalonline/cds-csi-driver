@@ -20,14 +20,14 @@ func parseBlockVolumeOptions(req *csi.CreateVolumeRequest) (*BlockVolumeArgs, er
 	}
 
 	// zoneID
-	blockVolArgs.ZoneID, ok = volOptions["zoneId"]
-	if !ok {
-		// topology aware feature to get zoneid
-		blockVolArgs.ZoneID = pickZone(req.GetAccessibilityRequirements())
-		if blockVolArgs.ZoneID == "" {
-			return nil, fmt.Errorf("zoneId cannot be empty, please input [zoneId] in parameters or add [allowedTopologies.matchLabelExpressions.key and values] in SC")
-		}
-	}
+	//blockVolArgs.ZoneID, ok = volOptions["zoneId"]
+	//if !ok {
+	//	// topology aware feature to get zoneid
+	//	blockVolArgs.ZoneID = pickZone(req.GetAccessibilityRequirements())
+	//	if blockVolArgs.ZoneID == "" {
+	//		return nil, fmt.Errorf("zoneId cannot be empty, please input [zoneId] in parameters or add [allowedTopologies.matchLabelExpressions.key and values] in SC")
+	//	}
+	//}
 
 	// fstype
 	blockVolArgs.FsType, ok = volOptions["fsType"]
@@ -59,6 +59,12 @@ func parseBlockVolumeOptions(req *csi.CreateVolumeRequest) (*BlockVolumeArgs, er
 		return nil, fmt.Errorf("[iops] should be in one of [3000|5000|7500|10000], but input is: %s", blockVolArgs.Iops)
 	}
 
+	blockVolArgs.Bandwidth, ok = volOptions["bandwidth"]
+	if !ok {
+		return nil, fmt.Errorf("[bandwidth] cant be empty")
+	}
+
+	// bandwidthInt64, _ := strconv.ParseInt(blockVolArgs.Bandwidth, 10, 64)
 	return blockVolArgs, nil
 }
 
