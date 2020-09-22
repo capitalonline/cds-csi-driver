@@ -1,0 +1,13 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: bare-block-csi-provisioner
+  namespace: kube-system
+  labels:
+    name: bare-block-csi-provisioner
+spec:
+  selector:
+    type: bare-block-csi-provisioner
+  ports:
+  - name: healthz
+    port: 9811
