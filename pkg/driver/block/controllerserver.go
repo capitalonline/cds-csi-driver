@@ -521,7 +521,7 @@ func attachDisk(diskID, nodeID string) (*cdsBlock.AttachBlockResponse, error) {
 
 	res, err := cdsBlock.AttachBlock(&cdsBlock.AttachBlockArgs{
 		VolumeID: diskID,
-		// NodeID:   nodeID,
+		NodeID:   nodeID,
 		BmInstanceId: nodeID,
 	})
 
