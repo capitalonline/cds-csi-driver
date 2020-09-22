@@ -11,7 +11,7 @@ import (
 	"google.golang.org/grpc/status"
 	"strings"
 
-	cdsDisk "github.com/capitalonline/cck-sdk-go/pkg/cck/disk"
+	cdsBlock "github.com/capitalonline/cck-sdk-go/pkg/cck/block"
 )
 
 // storing staging disk
@@ -110,26 +110,26 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 	diskPublishingMap[podPath] = "publishing"
 	defer delete(diskPublishingMap, podPath)
 
-	res, err := cdsDisk.FindDiskByVolumeID(&cdsDisk.FindDiskByVolumeIDArgs{
+	res, err := cdsBlock.FindBlockByVolumeID(&cdsBlock.FindBlockByVolumeIDArgs{
 		VolumeID: volumeID,
 	})
 	if err != nil {
-		log.Errorf("NodePublishVolume: cdsDisk.FindDiskByVolumeID error, err is: %s", err)
-		return nil, fmt.Errorf("NodePublishVolume: cdsDisk.FindDiskByVolumeID error, err is: %s", err)
+		log.Errorf("NodePublishVolume: cdsBlock.FindDiskByVolumeID error, err is: %s", err)
+		return nil, fmt.Errorf("NodePublishVolume: cdsBlock.FindDiskByVolumeID error, err is: %s", err)
 	}
-	if res.Data.DiskSlice == nil {
+	if res.Data.BlockSlice == nil {
 		log.Errorf("NodePublishVolume: findDiskByVolumeID res is nil")
 		return nil, fmt.Errorf("NodeStageVolume: findDiskByVolumeID res is nil")
 	}
 
-	if res.Data.DiskSlice[0].Uuid == "" {
+	if res.Data.BlockSlice[0].Uuid == "" {
 		log.Errorf("NodePublishVolume: findDeviceNameByVolumeID res uuid is null")
 		return nil, fmt.Errorf("NodePublishVolume: findDeviceNameByVolumeID res uuid is null")
 	}
 
 	// check if disk formatted or not, return error if not formatted
-	if _, ok := diskFormattedMap[volumeID]; ok || res.Data.DiskSlice[0].IsFormat == 1 {
-		deviceName, err := findDeviceNameByUuid(res.Data.DiskSlice[0].Uuid)
+	if _, ok := diskFormattedMap[volumeID]; ok || res.Data.BlockSlice[0].IsFormat == 1 {
+		deviceName, err := findDeviceNameByUuid(res.Data.BlockSlice[0].Uuid)
 		if err != nil {
 			log.Errorf("NodePublishVolume: findDeviceNameByUuid error, err is: %s", err.Error())
 			return nil, err
@@ -242,17 +242,17 @@ func (n *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 		return nil, err
 	}
 
-	if res.Data.DiskSlice == nil {
+	if res.Data.BlockSlice == nil {
 		log.Errorf("NodeStageVolume: findDiskByVolumeID res is nil")
 		return nil, fmt.Errorf("NodeStageVolume: findDiskByVolumeID res is nil")
 	}
 
-	if res.Data.DiskSlice[0].Uuid == "" {
+	if res.Data.BlockSlice[0].Uuid == "" {
 		log.Errorf("NodeStageVolume: findDeviceNameByVolumeID res uuid is null")
 		return nil, fmt.Errorf("NodeStageVolume: findDeviceNameByVolumeID res uuid is null")
 	}
 
-	deviceName, err := findDeviceNameByUuid(res.Data.DiskSlice[0].Uuid)
+	deviceName, err := findDeviceNameByUuid("nqn.2019-06.suzaku.org:ssd_pool.g" + res.Data.BlockSlice[0].Uuid)
 	if err != nil {
 		log.Errorf("NodeStageVolume: findDeviceNameByUuid error, err is: %s", err.Error())
 		return nil, err
@@ -264,7 +264,7 @@ func (n *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 	diskVol := req.GetVolumeContext()
 	fsType := diskVol["fsType"]
 
-	if _, ok := diskFormattedMap[diskID]; ok || res.Data.DiskSlice[0].IsFormat == 1 {
+	if _, ok := diskFormattedMap[diskID]; ok || res.Data.BlockSlice[0].IsFormat == 1 {
 		log.Warnf("NodeStageVolume: diskID: %s had been formatted, ignore multi format", diskID)
 	} else {
 		if err = formatDiskDevice(diskID, deviceName, fsType); err != nil {
@@ -539,7 +539,7 @@ func formatDiskDevice(diskId, deviceName, fsType string) error {
 
 	// storing formatted disk
 	diskFormattedMap[diskId] = "formatted"
-	res, err := cdsDisk.UpdateBlockFormatFlag(&cdsDisk.UpdateBlockFormatFlagArgs{
+	res, err := cdsBlock.UpdateBlockFormatFlag(&cdsBlock.UpdateBlockFormatFlagArgs{
 		BlockID:  diskId,
 		IsFormat: 1,
 	})
