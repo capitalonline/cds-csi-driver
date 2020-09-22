@@ -77,7 +77,7 @@ func pickZone(requirement *csi.TopologyRequirement) string {
 	}
 	logrus.Infof("pickZone: requirement.GetPreferred() is: %+v", requirement.GetPreferred())
 	for _, topology := range requirement.GetPreferred() {
-		zone, exists := topology.GetSegments()[TopologyZoneKey]
+		zone, exists := topology.GetSegments()[TopologySiteKey]
 		// logrus.Infof("pickZone: exists is: %t", exists)
 		// logrus.Infof("pickZone: zone is: %+v", zone)
 		if exists {
@@ -86,7 +86,7 @@ func pickZone(requirement *csi.TopologyRequirement) string {
 	}
 	logrus.Infof("pickZone: requirement.GetRequisite() is: %+v", requirement.GetRequisite())
 	for _, topology := range requirement.GetRequisite() {
-		zone, exists := topology.GetSegments()[TopologyZoneKey]
+		zone, exists := topology.GetSegments()[TopologySiteKey]
 		// logrus.Infof("pickZone: exists is: %t", exists)
 		// logrus.Infof("pickZone: zone is: %+v", zone)
 		if exists {
