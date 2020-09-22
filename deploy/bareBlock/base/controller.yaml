@@ -31,7 +31,7 @@ spec:
         args:
         - "--endpoint=$(CSI_ENDPOINT)"
         - "--v=5"
-        - "--driver=block.csi.cds.net"
+        - "--driver=block.bare.mental.csi.cds.net"
         env:
         - name: CSI_ENDPOINT
           value: unix://socketDir/csi.sock
