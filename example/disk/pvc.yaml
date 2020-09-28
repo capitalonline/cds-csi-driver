@@ -1,11 +1,11 @@
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
-  name: block-csi-cds-pvc
+  name: disk-csi-cds-pvc
 spec:
   accessModes:
   - ReadWriteMany
-  storageClassName: block-csi-csd-sc
+  storageClassName: disk-csi-csd-sc
   resources:
     requests:
       storage: 500Gi

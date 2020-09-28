@@ -1,23 +1,23 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: block-csi-cds-controller
+  name: disk-csi-cds-controller
   namespace: kube-system
 spec:
   replicas: 1
-  serviceName: block-csi-provisioner
+  serviceName: disk-csi-provisioner
   selector:
     matchLabels:
-      app: block-csi-cds-controller
+      app: disk-csi-cds-controller
   template:
     metadata:
       labels:
-        app: block-csi-cds-controller
+        app: disk-csi-cds-controller
         type: csi-provisioner
     spec:
       nodeSelector:
         node.cck.net/role.infra: "True"
-      serviceAccount: block-cds-csi-sa
+      serviceAccount: disk-cds-csi-sa
       hostNetwork: true
       hostPID: true
       priorityClassName: system-cluster-critical
@@ -31,7 +31,7 @@ spec:
         args:
         - "--endpoint=$(CSI_ENDPOINT)"
         - "--v=5"
-        - "--driver=block.csi.cds.net"
+        - "--driver=disk.csi.cds.net"
         env:
         - name: CSI_ENDPOINT
           value: unix://socketDir/csi.sock
@@ -71,7 +71,7 @@ spec:
             command:
             - sh
             - -c
-            - ps -ef | grep cds-csi-driver | grep block.csi.cds.net | grep -v grep
+            - ps -ef | grep cds-csi-driver | grep disk.csi.cds.net | grep -v grep
           failureThreshold: 8
           initialDelaySeconds: 15
           periodSeconds: 10

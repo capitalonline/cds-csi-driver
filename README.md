@@ -195,14 +195,14 @@ sc.yaml
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: block-csi-cds-sc
+  name: disk
 parameters:
   fstype: "xfs"
   storageType: "high_disk"
   iops: "3000"
   siteId: "beijing001"
   zoneId: "WuxiA-POD10-CLU02"
-provisioner: block.csi.cds.net
+provisioner: disk
 reclaimPolicy: Delete
 volumeBindingMode: WaitForFirstConsumer    
 ```

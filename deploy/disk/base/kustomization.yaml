@@ -1,5 +1,5 @@
 bases:
-- ../../rbac/block
+- ../../rbac/disk
 
 resources:
 - controller.yaml

@@ -1,13 +1,13 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: block-cds-csi-sa
+  name: disk-cds-csi-sa
   namespace: kube-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: block-cds-csi-cluster-role
+  name: disk-cds-csi-cluster-role
 rules:
 - apiGroups:
   - ""
@@ -162,52 +162,52 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: block-cds-csi-cluster-role-bind
+  name: disk-cds-csi-cluster-role-bind
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: block-cds-csi-cluster-role
+  name: disk-cds-csi-cluster-role
 subjects:
 - kind: ServiceAccount
-  name: block-cds-csi-sa
+  name: disk-cds-csi-sa
   namespace: kube-system
 ---
 apiVersion: v1
 kind: Service
 metadata:
   labels:
-    name: block-csi-provisioner
-  name: block-csi-provisioner
+    name: disk-csi-provisioner
+  name: disk-csi-provisioner
   namespace: kube-system
 spec:
   ports:
   - name: healthz
     port: 9810
   selector:
-    type: block-csi-provisioner
+    type: disk-csi-provisioner
 ---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: block-csi-cds-controller
+  name: disk-csi-cds-controller
   namespace: kube-system
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: block-csi-cds-controller
-  serviceName: block-csi-provisioner
+      app: disk-csi-cds-controller
+  serviceName: disk-csi-provisioner
   template:
     metadata:
       labels:
-        app: block-csi-cds-controller
+        app: disk-csi-cds-controller
         type: csi-provisioner
     spec:
       containers:
       - args:
         - --endpoint=$(CSI_ENDPOINT)
         - --v=5
-        - --driver=block.csi.cds.net
+        - --driver=disk.csi.cds.net
         env:
         - name: CSI_ENDPOINT
           value: unix://socketDir/csi.sock
@@ -233,7 +233,7 @@ spec:
             command:
             - sh
             - -c
-            - ps -ef | grep cds-csi-driver | grep block.csi.cds.net | grep -v grep
+            - ps -ef | grep cds-csi-driver | grep disk.csi.cds.net | grep -v grep
           failureThreshold: 8
           initialDelaySeconds: 15
           periodSeconds: 10
@@ -293,7 +293,7 @@ spec:
       nodeSelector:
         node.cck.net/role.infra: "True"
       priorityClassName: system-cluster-critical
-      serviceAccount: block-cds-csi-sa
+      serviceAccount: disk-cds-csi-sa
       tolerations:
       - key: null
         operator: Exists
@@ -312,25 +312,25 @@ spec:
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: block-csi-cds-node
+  name: disk-csi-cds-node
   namespace: kube-system
 spec:
   selector:
     matchLabels:
-      app: block-csi-cds-node
+      app: disk-csi-cds-node
   template:
     metadata:
       labels:
-        app: block-csi-cds-node
+        app: disk-csi-cds-node
     spec:
       containers:
       - args:
         - --endpoint=$(CSI_ENDPOINT)
         - --v=5
-        - --driver=block.csi.cds.net
+        - --driver=disk.csi.cds.net
         env:
         - name: CSI_ENDPOINT
-          value: unix://var/lib/kubelet/plugins/block.csi.cds.net/csi.sock
+          value: unix://var/lib/kubelet/plugins/disk.csi.cds.net/csi.sock
         - name: ACCESS_KEY_ID
           valueFrom:
             secretKeyRef:
@@ -348,7 +348,7 @@ spec:
               name: cds-properties
         image: registry-bj.capitalonline.net/cck/cds-csi-driver:v2.0.0
         imagePullPolicy: Always
-        name: block-csi-node-server
+        name: disk-csi-node-server
         securityContext:
           allowPrivilegeEscalation: true
           capabilities:
@@ -371,9 +371,9 @@ spec:
         - --kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)
         env:
         - name: ADDRESS
-          value: /var/lib/kubelet/plugins/block.csi.cds.net/csi.sock
+          value: /var/lib/kubelet/plugins/disk.csi.cds.net/csi.sock
         - name: DRIVER_REG_SOCK_PATH
-          value: /var/lib/kubelet/plugins/block.csi.cds.net/csi.sock
+          value: /var/lib/kubelet/plugins/disk.csi.cds.net/csi.sock
         image: registry-bj.capitalonline.net/cck/csi-node-driver-registrar:v1.2.0
         imagePullPolicy: Always
         lifecycle:
@@ -382,25 +382,25 @@ spec:
               command:
               - /bin/sh
               - -c
-              - rm -rf /registration/block.csi.cds.net /registration/block.csi.cds.net-reg.sock
-        name: block-driver-registrar
+              - rm -rf /registration/disk.csi.cds.net /registration/disk.csi.cds.net-reg.sock
+        name: disk-driver-registrar
         volumeMounts:
         - mountPath: /var/lib/kubelet/
           name: kubelet-dir
         - mountPath: /registration/
           name: registration-dir
       - args:
-        - --csi-address=/var/lib/kubelet/plugins/block.csi.cds.net/csi.sock
+        - --csi-address=/var/lib/kubelet/plugins/disk.csi.cds.net/csi.sock
         - --health-port=9812
         image: registry-bj.capitalonline.net/cck/csi-livenessprobe:v2.0.0
-        name: block-liveness-probe
+        name: disk-liveness-probe
         volumeMounts:
         - mountPath: /var/lib/kubelet/
           name: kubelet-dir
       hostNetwork: true
       hostPID: true
       priorityClassName: system-node-critical
-      serviceAccount: block-cds-csi-sa
+      serviceAccount: disk-cds-csi-sa
       tolerations:
       - operator: Exists
       volumes:
@@ -427,6 +427,6 @@ spec:
 apiVersion: storage.k8s.io/v1beta1
 kind: CSIDriver
 metadata:
-  name: block.csi.cds.net
+  name: disk.csi.cds.net
 spec:
   attachRequired: true
