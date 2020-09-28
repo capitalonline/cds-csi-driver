@@ -2,9 +2,9 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"github.com/capitalonline/cds-csi-driver/pkg/driver/block"
 	"github.com/capitalonline/cds-csi-driver/pkg/driver/disk"
-	"fmt"
 	"github.com/capitalonline/cds-csi-driver/pkg/driver/oss"
 	"os"
 	"path"
@@ -16,9 +16,9 @@ import (
 )
 
 const (
-	DriverNasTypeName = "nas.csi.cds.net"
-	DriverOssTypeName = "oss.csi.cds.net"
-	DriverDiskTypeName = "disk.csi.cds.net"
+	DriverNasTypeName   = "nas.csi.cds.net"
+	DriverOssTypeName   = "oss.csi.cds.net"
+	DriverDiskTypeName  = "disk.csi.cds.net"
 	DriverBlockTypeName = "block.csi.cds.net"
 )
 
