@@ -314,22 +314,22 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 			log.Warnf("ControllerPublishVolume: diskMountedNodeID: %s is in [NotRead|NotExist], detach forcedly", diskMountedNodeID)
 
 			// use surplusDetachDisk temp
-			err = surplusDetachDisk(blockID)
+			//err = surplusDetachDisk(blockID)
+			//if err != nil {
+			//	log.Errorf("ControllerPublishVolume: surplusDetachDisk error, err is: %s", err)
+			//	return nil, fmt.Errorf("ControllerPublishVolume: surplusDetachDisk error, err is: %s", err)
+			//}
+
+			taskID, err := detachBlock(blockID)
 			if err != nil {
-				log.Errorf("ControllerPublishVolume: surplusDetachDisk error, err is: %s", err)
-				return nil, fmt.Errorf("ControllerPublishVolume: surplusDetachDisk error, err is: %s", err)
+				log.Errorf("ControllerPublishVolume: detach blockID: %s from nodeID: %s error,  err is: %s", blockID, diskMountedNodeID, err.Error())
+				return nil, fmt.Errorf("ControllerPublishVolume: detach blockID: %s from nodeID: %s error,  err is: %s", blockID, diskMountedNodeID, err.Error())
 			}
 
-			//taskID, err := detachBlock(blockID)
-			//if err != nil {
-			//	log.Errorf("ControllerPublishVolume: detach blockID: %s from nodeID: %s error,  err is: %s", blockID, diskMountedNodeID, err.Error())
-			//	return nil, fmt.Errorf("ControllerPublishVolume: detach blockID: %s from nodeID: %s error,  err is: %s", blockID, diskMountedNodeID, err.Error())
-			//}
-			//
-			//if err := describeTaskStatus(taskID); err != nil {
-			//	log.Errorf("ControllerPublishVolume: cdsBlock.detachBlock task result failed, err is: %s", err)
-			//	return nil, err
-			//}
+			if err := describeTaskStatus(taskID); err != nil {
+				log.Errorf("ControllerPublishVolume: cdsBlock.detachBlock task result failed, err is: %s", err)
+				return nil, err
+			}
 
 			log.Warnf("ControllerPublishVolume: detach blockID: %s from nodeID: %s successfully", blockID, diskMountedNodeID)
 		} else {
@@ -342,25 +342,25 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 	}
 
 	// Step 4: attach block to node
-	// use surplusAttachDisk temp
-	err = surplusAttachDisk(blockID, nodeID)
+	//// use surplusAttachDisk temp
+	//err = surplusAttachDisk(blockID, nodeID)
+	//if err != nil {
+	//	log.Errorf("ControllerPublishVolume: attach block:%s processing to node: %s with error, err is: %s", blockID, nodeID, err.Error())
+	//	return nil, fmt.Errorf("ControllerPublishVolume: attach block:%s processing to node: %s with error, err is: %s", blockID, nodeID, err.Error())
+	//}
+
+	resAttach, err := attachBlock(blockID, nodeID)
 	if err != nil {
-		log.Errorf("ControllerPublishVolume: attach block:%s processing to node: %s with error, err is: %s", blockID, nodeID, err.Error())
-		return nil, fmt.Errorf("ControllerPublishVolume: attach block:%s processing to node: %s with error, err is: %s", blockID, nodeID, err.Error())
+		log.Errorf("ControllerPublishVolume: create attach task failed, err is:%s", err.Error())
+		return nil, err
 	}
 
-	//taskID, err := attachDisk(blockID, nodeID)
-	//if err != nil {
-	//	log.Errorf("ControllerPublishVolume: create attach task failed, err is:%s", err.Error())
-	//	return nil, err
-	//}
-	//
-	//if err = describeTaskStatus(taskID); err != nil {
-	//	blockAttachingMap[blockID] = "error"
-	//	log.Errorf("ControllerPublishVolume: attach block:%s processing to node: %s with error, err is: %s", blockID, nodeID, err.Error())
-	//	return nil, err
-	//}
-	//
+	if err = describeTaskStatus(resAttach.TaskID); err != nil {
+		blockAttachingMap[blockID] = "error"
+		log.Errorf("ControllerPublishVolume: attach block:%s processing to node: %s with error, err is: %s", blockID, nodeID, err.Error())
+		return nil, err
+	}
+
 	log.Infof("ControllerPublishVolume: Successfully attach block: %s to node: %s", blockID, nodeID)
 
 	return &csi.ControllerPublishVolumeResponse{}, nil
@@ -406,23 +406,23 @@ func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *c
 
 	// Step 4: detach block
 	// use surplusDetachDisk temp
-	err = surplusDetachDisk(blockID)
+	//err = surplusDetachDisk(blockID)
+	//if err != nil {
+	//	log.Errorf("ControllerUnpublishVolume: create detach task failed, err is: %s", err.Error())
+	//	return nil, err
+	//}
+
+	taskID, err := detachBlock(blockID)
 	if err != nil {
 		log.Errorf("ControllerUnpublishVolume: create detach task failed, err is: %s", err.Error())
 		return nil, err
 	}
 
-	//taskID, err := detachBlock(blockID)
-	//if err != nil {
-	//	log.Errorf("ControllerUnpublishVolume: create detach task failed, err is: %s", err.Error())
-	//	return nil, err
-	//}
-	//
-	//if err := describeTaskStatus(taskID); err != nil {
-	//	log.Errorf("ControllerUnpublishVolume: cdsBlock.detachBlock task result failed, err is: %s", err)
-	//	return nil, err
-	//}
-	//
+	if err := describeTaskStatus(taskID); err != nil {
+		log.Errorf("ControllerUnpublishVolume: cdsBlock.detachBlock task result failed, err is: %s", err)
+		return nil, err
+	}
+
 
 	log.Infof("ControllerUnpublishVolume: Successfully detach block: %s from node: %s", blockID, nodeID)
 
@@ -596,84 +596,84 @@ func describeTaskStatus(taskID string) error {
 	return fmt.Errorf("task time out, running more than 20 minutes")
 }
 
-func surplusAttachDisk(blockID, nodeID string) error {
-	log.Infof("surplusAttachDisk: blockID is: %s, nodeID is: %s", blockID, nodeID)
-
-	// Step 1: attach
-	res, err := attachBlock(blockID, nodeID)
-	if err != nil {
-		log.Errorf("surplusAttachDisk: create attach task failed, err is:%s", err.Error())
-		return err
-	}
-
-	npn := res.Data.Npn
-	vip := res.Data.Vip
-	port := res.Data.Port
-	log.Infof("surplusAttachDisk: npn: %s, vip: %s, port: %s", npn, vip, port)
-
-	if err = describeTaskStatus(res.TaskID); err != nil {
-		log.Errorf("surplusAttachDisk: attach block:%s processing to node: %s with error, err is: %s", blockID, nodeID, err.Error())
-		return err
-	}
-
-	// Step 2: connect
-	// temp
-	discoveryCmd := fmt.Sprintf("nvme  discover -t rdma -a 10.177.178.201 -s 10060")
-	if _, err := blockUtils.RunCommand(discoveryCmd); err != nil {
-		log.Errorf("surplusAttachDisk: blockUtils.RunCommand error, err is: %s", err.Error())
-		return err
-	}
-
-	// temp
-	res1, err1 := findBlockByVolumeID(blockID)
-	if err1 != nil {
-		log.Errorf("surplusAttachDisk: findBlockByVolumeID api error, err is: %s", err1)
-		return fmt.Errorf("surplusAttachDisk: findBlockByVolumeID api error, err is: %s", err1)
-	}
-	diskUUid := res1.Data.BlockSlice[0].Uuid
-	log.Infof("surplusAttachDisk: diskUUid: %s", diskUUid)
-
-	connectCmd := fmt.Sprintf("nvme connect -n nqn.2019-06.suzaku.org:ssd_pool.g%s -t rdma -a 10.177.178.201 -s 10062", diskUUid)
-	if _, err := blockUtils.RunCommand(connectCmd); err != nil {
-		log.Errorf("surplusAttachDisk: blockUtils.RunCommand error, err is: %s", err.Error())
-		return err
-	}
-
-	log.Infof("surplusAttachDisk: successfully!")
-	return nil
-}
-
-func surplusDetachDisk(blockID string) error {
-	log.Infof("surplusDetachDisk: blockID is: %s", blockID)
-
-	// Step 1: disconnect
-	// temp
-	res1, err1 := findBlockByVolumeID(blockID)
-	if err1 != nil {
-		log.Errorf("surplusAttachDisk: findBlockByVolumeID api error, err is: %s", err1)
-		return fmt.Errorf("surplusAttachDisk: findBlockByVolumeID api error, err is: %s", err1)
-	}
-	diskUUid := res1.Data.BlockSlice[0].Uuid
-	log.Infof("surplusAttachDisk: diskUUid: %s", diskUUid)
-
-	disconnectCmd := fmt.Sprintf("nvme disconnect -n nqn.2019-06.suzaku.org:ssd_pool.g%s", diskUUid)
-	if _, err := blockUtils.RunCommand(disconnectCmd); err != nil {
-		log.Errorf("surplusDetachDisk: blockUtils.RunCommand error, err is: %s", err.Error())
-		return err
-	}
-
-	// Step 2: detach
-	taskID, err := detachBlock(blockID)
-	if err != nil {
-		log.Errorf("surplusDetachDisk: detach blockID: %s,  err is: %s", blockID, err.Error())
-		return err
-	}
-
-	if err := describeTaskStatus(taskID); err != nil {
-		log.Errorf("surplusDetachDisk: cdsBlock.detachBlock task result failed, err is: %s", err)
-		return err
-	}
-
-	log.Infof("surplusDetachDisk: successfully!")
-	return nil
-}
+//func surplusAttachDisk(blockID, nodeID string) error {
+//	log.Infof("surplusAttachDisk: blockID is: %s, nodeID is: %s", blockID, nodeID)
+//
+//	// Step 1: attach
+//	res, err := attachBlock(blockID, nodeID)
+//	if err != nil {
+//		log.Errorf("surplusAttachDisk: create attach task failed, err is:%s", err.Error())
+//		return err
+//	}
+//
+//	npn := res.Data.Npn
+//	vip := res.Data.Vip
+//	port := res.Data.Port
+//	log.Infof("surplusAttachDisk: npn: %s, vip: %s, port: %s", npn, vip, port)
+//
+//	if err = describeTaskStatus(res.TaskID); err != nil {
+//		log.Errorf("surplusAttachDisk: attach block:%s processing to node: %s with error, err is: %s", blockID, nodeID, err.Error())
+//		return err
+//	}
+//
+//	// Step 2: connect
+//	// temp
+//	discoveryCmd := fmt.Sprintf("nvme  discover -t rdma -a 10.177.178.201 -s 10060")
+//	if _, err := blockUtils.RunCommand(discoveryCmd); err != nil {
+//		log.Errorf("surplusAttachDisk: blockUtils.RunCommand error, err is: %s", err.Error())
+//		return err
+//	}
+//
+//	// temp
+//	res1, err1 := findBlockByVolumeID(blockID)
+//	if err1 != nil {
+//		log.Errorf("surplusAttachDisk: findBlockByVolumeID api error, err is: %s", err1)
+//		return fmt.Errorf("surplusAttachDisk: findBlockByVolumeID api error, err is: %s", err1)
+//	}
+//	diskUUid := res1.Data.BlockSlice[0].Uuid
+//	log.Infof("surplusAttachDisk: diskUUid: %s", diskUUid)
+//
+//	connectCmd := fmt.Sprintf("nvme connect -n nqn.2019-06.suzaku.org:ssd_pool.g%s -t rdma -a 10.177.178.201 -s 10062", diskUUid)
+//	if _, err := blockUtils.RunCommand(connectCmd); err != nil {
+//		log.Errorf("surplusAttachDisk: blockUtils.RunCommand error, err is: %s", err.Error())
+//		return err
+//	}
+//
+//	log.Infof("surplusAttachDisk: successfully!")
+//	return nil
+//}
+//
+//func surplusDetachDisk(blockID string) error {
+//	log.Infof("surplusDetachDisk: blockID is: %s", blockID)
+//
+//	// Step 1: disconnect
+//	// temp
+//	res1, err1 := findBlockByVolumeID(blockID)
+//	if err1 != nil {
+//		log.Errorf("surplusAttachDisk: findBlockByVolumeID api error, err is: %s", err1)
+//		return fmt.Errorf("surplusAttachDisk: findBlockByVolumeID api error, err is: %s", err1)
+//	}
+//	diskUUid := res1.Data.BlockSlice[0].Uuid
+//	log.Infof("surplusAttachDisk: diskUUid: %s", diskUUid)
+//
+//	disconnectCmd := fmt.Sprintf("nvme disconnect -n nqn.2019-06.suzaku.org:ssd_pool.g%s", diskUUid)
+//	if _, err := blockUtils.RunCommand(disconnectCmd); err != nil {
+//		log.Errorf("surplusDetachDisk: blockUtils.RunCommand error, err is: %s", err.Error())
+//		return err
+//	}
+//
+//	// Step 2: detach
+//	taskID, err := detachBlock(blockID)
+//	if err != nil {
+//		log.Errorf("surplusDetachDisk: detach blockID: %s,  err is: %s", blockID, err.Error())
+//		return err
+//	}
+//
+//	if err := describeTaskStatus(taskID); err != nil {
+//		log.Errorf("surplusDetachDisk: cdsBlock.detachBlock task result failed, err is: %s", err)
+//		return err
+//	}
+//
+//	log.Infof("surplusDetachDisk: successfully!")
+//	return nil
+//}
