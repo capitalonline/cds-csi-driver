@@ -1,8 +1,0 @@
-bases:
-- ../../rbac/bareBlock
-
-resources:
-- controller.yaml
-- csidriver.yaml
-- node.yaml
-- service.yaml
