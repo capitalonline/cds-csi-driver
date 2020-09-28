@@ -195,14 +195,14 @@ sc.yaml
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: block-csi-cds-sc
+  name: disk
 parameters:
   fstype: "xfs"
   storageType: "high_disk"
   iops: "3000"
   siteId: "beijing001"
   zoneId: "WuxiA-POD10-CLU02"
-provisioner: block.csi.cds.net
+provisioner: disk
 reclaimPolicy: Delete
 volumeBindingMode: WaitForFirstConsumer    
 ```
@@ -249,13 +249,13 @@ and then refer the following SC.yaml
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: block-sc
+  name: disk
 parameters:
   fstype: "ext4" 
   storageType: "high_disk"
   iops: "3000"
   siteId: "ca0bd848-9b59-40a2-9f57-d64fbc72a9df"
-provisioner: block.csi.cds.net
+provisioner: disk
 reclaimPolicy: Delete
 volumeBindingMode: Immediate    # Immediate policy in SC 
 allowedTopologies:				# using allowedTopologies in sc 

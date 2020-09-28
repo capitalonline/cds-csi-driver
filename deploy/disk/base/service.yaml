@@ -1,0 +1,13 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: disk-csi-provisioner
+  namespace: kube-system
+  labels:
+    name: disk-csi-provisioner
+spec:
+  selector:
+    type: disk-csi-provisioner
+  ports:
+  - name: healthz
+    port: 9810

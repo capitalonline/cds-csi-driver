@@ -40,7 +40,6 @@ var diskAttachingMap = map[string]string{}
 // storing detaching disk
 var diskDetachingMap = map[string]string{}
 
-
 func NewControllerServer(d *DiskDriver) *ControllerServer {
 	config, err := rest.InClusterConfig()
 	if err != nil {
@@ -166,7 +165,8 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 	// store req.Name and csi.Volume
 	pvcCreatedMap[pvName] = tmpVol
 
-	log.Infof("CreateVolume: store [diskIdPvMap] and [pvcMap] succeed")
+	// log.Infof("CreateVolume: store [diskIdPvMap] and [pvcMap] succeed")
+
 	log.Infof("CreateVolume: successfully create disk, pvName is: %s, diskID is: %s", pvName, diskID)
 
 	return &csi.CreateVolumeResponse{Volume: tmpVol}, nil
@@ -235,16 +235,16 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 		return nil, fmt.Errorf("deleteDisk: cdsDisk.DeleteDisk task result failed, err is: %s", err)
 	}
 
-	// Step 5: delete pvcCreatedMap and diskIdPvMap
-	delete(diskIdPvMap, diskID)
+	// Step 5: delete pvcCreatedMap 
 	if pvName, ok := diskIdPvMap[diskID]; ok {
 		delete(pvcCreatedMap, pvName)
 	}
 
-	// Step 6: clear diskDeletingMap
+	// Step 6: clear diskDeletingMap and diskIdPvMap
+	delete(diskIdPvMap, diskID)
 	delete(diskDeletingMap, diskID)
 
-	log.Infof("DeleteVolume: clean [diskIdPvMap] and [pvcMap] and [diskDeletingMap] succeed!")
+	// log.Infof("DeleteVolume: clean [diskIdPvMap] and [pvcMap] and [diskDeletingMap] succeed!")
 	log.Infof("DeleteVolume: Successfully delete diskID: %s !", diskID)
 
 	return &csi.DeleteVolumeResponse{}, nil
@@ -414,7 +414,7 @@ func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *c
 }
 
 func (c *ControllerServer) ValidateVolumeCapabilities(ctx context.Context, req *csi.ValidateVolumeCapabilitiesRequest) (*csi.ValidateVolumeCapabilitiesResponse, error) {
-	log.Infof("ValidateVolumeCapabilities: req is: %v", req)
+	log.Infof("ValidateVolumeCapabilities: req is: %+v", req)
 
 	for _, capability := range req.VolumeCapabilities {
 		if capability.GetAccessMode().GetMode() != csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER {
@@ -442,7 +442,7 @@ func describeNodeStatus(ctx context.Context, c *ControllerServer, nodeId string)
 		return "", err
 	}
 
- 	OuterLoop:
+OuterLoop:
 	for _, node := range res.Items {
 		if node.Spec.ProviderID == nodeId {
 			for _, value := range node.Status.Conditions {
@@ -578,3 +578,4 @@ func describeTaskStatus(taskID string) error {
 
 	return fmt.Errorf("task time out, running more than 20 minutes")
 }
+
