@@ -166,6 +166,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 	pvcCreatedMap[pvName] = tmpVol
 
 	// log.Infof("CreateVolume: store [diskIdPvMap] and [pvcMap] succeed")
+
 	log.Infof("CreateVolume: successfully create disk, pvName is: %s, diskID is: %s", pvName, diskID)
 
 	return &csi.CreateVolumeResponse{Volume: tmpVol}, nil
@@ -577,3 +578,4 @@ func describeTaskStatus(taskID string) error {
 
 	return fmt.Errorf("task time out, running more than 20 minutes")
 }
+
