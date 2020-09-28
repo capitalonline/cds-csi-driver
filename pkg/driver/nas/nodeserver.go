@@ -17,6 +17,23 @@ func NewNodeServer(d *NasDriver) *NodeServer {
 	}
 }
 
+func (n *NodeServer) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
+	nodeCap := &csi.NodeServiceCapability{
+		Type: &csi.NodeServiceCapability_Rpc{
+			Rpc: &csi.NodeServiceCapability_RPC{
+				Type: csi.NodeServiceCapability_RPC_GET_VOLUME_STATS,
+			},
+		},
+	}
+
+	// Disk Metric enable config
+	nodeSvcCap := []*csi.NodeServiceCapability{nodeCap}
+
+	return &csi.NodeGetCapabilitiesResponse{
+		Capabilities: nodeSvcCap,
+	}, nil
+}
+
 func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
 	log.Infof("NodePublishVolume:: starting mount nas volume with req: %+v", req)
 	var opts, err = parsePublishOptions(req)
@@ -89,4 +106,16 @@ func (n *NodeServer) NodeUnstageVolume(context.Context, *csi.NodeUnstageVolumeRe
 
 func (n *NodeServer) NodeExpandVolume(context.Context, *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "")
+}
+
+// NodeGetVolumeStats used for csi metrics
+func (ns *NodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
+	var err error
+	targetPath := req.GetVolumePath()
+	if targetPath == "" {
+		err = fmt.Errorf("NodeGetVolumeStats targetpath %v is empty", targetPath)
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	return utils.GetMetrics(targetPath)
 }

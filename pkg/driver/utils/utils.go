@@ -3,8 +3,12 @@ package utils
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/getsentry/sentry-go"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"io/ioutil"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"net"
 	"os"
 	"os/exec"
@@ -13,11 +17,49 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/sys/unix"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
 	NodeMetaDataFile = "/host/etc/cds/node-meta"
 )
+
+// Metrics represents the used and available bytes of the Volume.
+type Metrics struct {
+	// The time at which these stats were updated.
+	Time metav1.Time
+
+	// Used represents the total bytes used by the Volume.
+	// Note: For block devices this maybe more than the total size of the files.
+	Used *resource.Quantity
+
+	// Capacity represents the total capacity (bytes) of the volume's
+	// underlying storage. For Volumes that share a filesystem with the host
+	// (e.g. emptydir, hostpath) this is the size of the underlying storage,
+	// and will not equal Used + Available as the fs is shared.
+	Capacity *resource.Quantity
+
+	// Available represents the storage space available (bytes) for the
+	// Volume. For Volumes that share a filesystem with the host (e.g.
+	// emptydir, hostpath), this is the available space on the underlying
+	// storage, and is shared with host processes and other Volumes.
+	Available *resource.Quantity
+
+	// InodesUsed represents the total inodes used by the Volume.
+	InodesUsed *resource.Quantity
+
+	// Inodes represents the total number of inodes available in the volume.
+	// For volumes that share a filesystem with the host (e.g. emptydir, hostpath),
+	// this is the inodes available in the underlying storage,
+	// and will not equal InodesUsed + InodesFree as the fs is shared.
+	Inodes *resource.Quantity
+
+	// InodesFree represent the inodes available for the volume.  For Volumes that share
+	// a filesystem with the host (e.g. emptydir, hostpath), this is the free inodes
+	// on the underlying storage, and is shared with host processes and other volumes
+	InodesFree *resource.Quantity
+}
 
 type NodeMeta struct {
 	NodeID string `json:"node_id"`
@@ -153,4 +195,96 @@ func SentrySendError(errorInfo error) {
 
 	// 发送错误 sentry.CaptureException(exception error)
 	sentry.CaptureException(errorInfo)
+}
+
+// GetMetrics get path metric
+func GetMetrics(path string) (*csi.NodeGetVolumeStatsResponse, error) {
+	if path == "" {
+		return nil, fmt.Errorf("getMetrics No path given")
+	}
+	available, capacity, usage, inodes, inodesFree, inodesUsed, err := FsInfo(path)
+	if err != nil {
+		return nil, err
+	}
+
+	metrics := &Metrics{Time: metav1.Now()}
+	metrics.Available = resource.NewQuantity(available, resource.BinarySI)
+	metrics.Capacity = resource.NewQuantity(capacity, resource.BinarySI)
+	metrics.Used = resource.NewQuantity(usage, resource.BinarySI)
+	metrics.Inodes = resource.NewQuantity(inodes, resource.BinarySI)
+	metrics.InodesFree = resource.NewQuantity(inodesFree, resource.BinarySI)
+	metrics.InodesUsed = resource.NewQuantity(inodesUsed, resource.BinarySI)
+
+	metricAvailable, ok := (*(metrics.Available)).AsInt64()
+	if !ok {
+		log.Errorf("failed to fetch available bytes for target: %s", path)
+		return nil, status.Error(codes.Unknown, "failed to fetch available bytes")
+	}
+	metricCapacity, ok := (*(metrics.Capacity)).AsInt64()
+	if !ok {
+		log.Errorf("failed to fetch capacity bytes for target: %s", path)
+		return nil, status.Error(codes.Unknown, "failed to fetch capacity bytes")
+	}
+	metricUsed, ok := (*(metrics.Used)).AsInt64()
+	if !ok {
+		log.Errorf("failed to fetch used bytes for target %s", path)
+		return nil, status.Error(codes.Unknown, "failed to fetch used bytes")
+	}
+	metricInodes, ok := (*(metrics.Inodes)).AsInt64()
+	if !ok {
+		log.Errorf("failed to fetch available inodes for target %s", path)
+		return nil, status.Error(codes.Unknown, "failed to fetch available inodes")
+	}
+	metricInodesFree, ok := (*(metrics.InodesFree)).AsInt64()
+	if !ok {
+		log.Errorf("failed to fetch free inodes for target: %s", path)
+		return nil, status.Error(codes.Unknown, "failed to fetch free inodes")
+	}
+	metricInodesUsed, ok := (*(metrics.InodesUsed)).AsInt64()
+	if !ok {
+		log.Errorf("failed to fetch used inodes for target: %s", path)
+		return nil, status.Error(codes.Unknown, "failed to fetch used inodes")
+	}
+
+	return &csi.NodeGetVolumeStatsResponse{
+		Usage: []*csi.VolumeUsage{
+			{
+				Available: metricAvailable,
+				Total:     metricCapacity,
+				Used:      metricUsed,
+				Unit:      csi.VolumeUsage_BYTES,
+			},
+			{
+				Available: metricInodesFree,
+				Total:     metricInodes,
+				Used:      metricInodesUsed,
+				Unit:      csi.VolumeUsage_INODES,
+			},
+		},
+	}, nil
+}
+
+// FSInfo linux returns (available bytes, byte capacity, byte usage, total inodes, inodes free, inode usage, error)
+// for the filesystem that path resides upon.
+func FsInfo(path string) (int64, int64, int64, int64, int64, int64, error) {
+	statfs := &unix.Statfs_t{}
+	err := unix.Statfs(path, statfs)
+	if err != nil {
+		return 0, 0, 0, 0, 0, 0, err
+	}
+
+	// Available is blocks available * fragment size
+	available := int64(statfs.Bavail) * int64(statfs.Bsize)
+
+	// Capacity is total block count * fragment size
+	capacity := int64(statfs.Blocks) * int64(statfs.Bsize)
+
+	// Usage is block being used * fragment size (aka block size).
+	usage := (int64(statfs.Blocks) - int64(statfs.Bfree)) * int64(statfs.Bsize)
+
+	inodes := int64(statfs.Files)
+	inodesFree := int64(statfs.Ffree)
+	inodesUsed := inodes - inodesFree
+
+	return available, capacity, usage, inodes, inodesFree, inodesUsed, nil
 }
