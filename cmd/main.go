@@ -18,8 +18,8 @@ import (
 const (
 	DriverNasTypeName = "nas.csi.cds.net"
 	DriverOssTypeName = "oss.csi.cds.net"
+	DriverDiskTypeName = "disk.csi.cds.net"
 	DriverBlockTypeName = "block.csi.cds.net"
-	DriverBareBlockName = "block.bare.mental.csi.cds.net"
 )
 
 var (
@@ -79,11 +79,11 @@ func main() {
 	case DriverOssTypeName:
 		ossDriver := oss.NewDriver(DriverOssTypeName, nodeID, endpoint)
 		ossDriver.Run()
+	case DriverDiskTypeName:
+		diskDriver := disk.NewDriver(DriverDiskTypeName, nodeID, endpoint)
+		diskDriver.Run()
 	case DriverBlockTypeName:
-		blockDriver := disk.NewDriver(DriverBlockTypeName, nodeID, endpoint)
-		blockDriver.Run()
-	case DriverBareBlockName:
-		bareBlockDriver := block.NewDriver(DriverBareBlockName, nodeID, endpoint)
+		bareBlockDriver := block.NewDriver(DriverBlockTypeName, nodeID, endpoint)
 		bareBlockDriver.Run()
 	default:
 		log.Fatalf("unsupported driver type: %s", driverName)

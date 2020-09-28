@@ -1,0 +1,8 @@
+bases:
+- ../../rbac/disk
+
+resources:
+- controller.yaml
+- csidriver.yaml
+- node.yaml
+- service.yaml

@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: disk-csi-cds-pod
+spec:
+  containers:
+  - name: "hello-world"
+    image: "tutum/hello-world"
+    volumeMounts:
+    - name: pvc-disk-sc
+      mountPath: "/data"
+  volumes:
+  - name: pvc-disk-sc
+    persistentVolumeClaim:
+      claimName: disk-csi-cds-pvc

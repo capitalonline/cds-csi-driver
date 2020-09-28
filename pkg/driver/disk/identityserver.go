@@ -23,7 +23,6 @@ type IdentityServer struct {
 	*csicommon.DefaultIdentityServer
 }
 
-
 func NewIdentityServer(d *DiskDriver) *IdentityServer {
 	d.csiDriver.AddVolumeCapabilityAccessModes(volumeCap)
 	d.csiDriver.AddControllerServiceCapabilities(controllerCap)

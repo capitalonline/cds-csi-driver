@@ -1,0 +1,11 @@
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: disk-csi-cds-pvc
+spec:
+  accessModes:
+  - ReadWriteMany
+  storageClassName: disk-csi-csd-sc
+  resources:
+    requests:
+      storage: 500Gi

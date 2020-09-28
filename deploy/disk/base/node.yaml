@@ -1,0 +1,110 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: disk-csi-cds-node
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      app: disk-csi-cds-node
+  template:
+    metadata:
+      labels:
+        app: disk-csi-cds-node
+    spec:
+      tolerations:
+      - operator: Exists
+      priorityClassName: system-node-critical
+      serviceAccount: disk-cds-csi-sa
+      hostNetwork: true
+      hostPID: true
+      containers:
+      - name: disk-csi-node-server
+        securityContext:
+          privileged: true
+          capabilities:
+            add: ["SYS_ADMIN"]
+          allowPrivilegeEscalation: true
+        image: registry-bj.capitalonline.net/cck/cds-csi-driver:latest
+        imagePullPolicy: "Always"
+        args:
+        - "--endpoint=$(CSI_ENDPOINT)"
+        - "--v=5"
+        - "--driver=disk.csi.cds.net"
+        env:
+        - name: CSI_ENDPOINT
+          value: unix://var/lib/kubelet/plugins/disk.csi.cds.net/csi.sock
+        - name: ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              key: access_key_id
+              name: cck-secrets
+        - name: ACCESS_KEY_SECRET
+          valueFrom:
+            secretKeyRef:
+              key: access_key_secret
+              name: cck-secrets
+        - name: CDS_OVERSEA
+          valueFrom:
+            configMapKeyRef:
+              name: cds-properties
+              key: oversea
+        volumeMounts:
+        - name: kubelet-dir
+          mountPath: /var/lib/kubelet/
+          mountPropagation: "Bidirectional"
+        - name: host-log
+          mountPath: /var/log/
+        - name: etc
+          mountPath: /host/etc
+        - name: host-dev
+          mountPath: /dev
+      - name: disk-driver-registrar
+        image: registry-bj.capitalonline.net/cck/csi-node-driver-registrar:v1.2.0
+        imagePullPolicy: Always
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "rm -rf /registration/disk.csi.cds.net /registration/disk.csi.cds.net-reg.sock"]
+        args:
+        - "--v=5"
+        - "--csi-address=$(ADDRESS)"
+        - "--kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)"
+        env:
+        - name: ADDRESS
+          value: /var/lib/kubelet/plugins/disk.csi.cds.net/csi.sock
+        - name: DRIVER_REG_SOCK_PATH
+          value: /var/lib/kubelet/plugins/disk.csi.cds.net/csi.sock
+        volumeMounts:
+        - name: kubelet-dir
+          mountPath: /var/lib/kubelet/
+        - name: registration-dir
+          mountPath: /registration/
+      - name: disk-liveness-probe
+        image: registry-bj.capitalonline.net/cck/csi-livenessprobe:v2.0.0
+        args:
+        - "--csi-address=/var/lib/kubelet/plugins/disk.csi.cds.net/csi.sock"
+        - "--health-port=9812"
+        volumeMounts:
+        - name: kubelet-dir
+          mountPath: /var/lib/kubelet/
+      volumes:
+      - name: kubelet-dir
+        hostPath:
+          path: /var/lib/kubelet
+          type: Directory
+      - name: registration-dir
+        hostPath:
+          path: /var/lib/kubelet/plugins_registry
+          type: DirectoryOrCreate
+      - name: host-log
+        hostPath:
+          path: /var/log/
+      - name: etc
+        hostPath:
+          path: /etc
+      - name: host-dev
+        hostPath:
+          path: /dev
+  updateStrategy:
+    type: "RollingUpdate"

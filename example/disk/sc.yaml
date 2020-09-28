@@ -1,0 +1,13 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: disk-csi-csd-sc
+parameters:
+  fsType: "ext4"
+  storageType: "high_disk"
+  iops: "3000"
+  siteId: "beijing001"
+  zoneId: "WuxiA-POD10-CLU02"
+provisioner: disk.csi.cds.net
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer    # Immediate

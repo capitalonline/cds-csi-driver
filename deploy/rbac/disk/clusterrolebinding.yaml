@@ -1,0 +1,12 @@
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: disk-cds-csi-cluster-role-bind
+subjects:
+  - kind: ServiceAccount
+    name: disk-cds-csi-sa
+    namespace: kube-system
+roleRef:
+  kind: ClusterRole
+  name: disk-cds-csi-cluster-role
+  apiGroup: rbac.authorization.k8s.io
