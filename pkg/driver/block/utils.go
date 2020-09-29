@@ -46,8 +46,8 @@ func parseBlockVolumeOptions(req *csi.CreateVolumeRequest) (*BlockVolumeArgs, er
 		return nil, fmt.Errorf("[storageType] cant be empty")
 	}
 
-	if blockVolArgs.StorageType != HighDisk && blockVolArgs.StorageType != SsdDisk {
-		return nil, fmt.Errorf("Illegal required parameter type, only support [high_disk], [ssd_disk], input is: %s", blockVolArgs.StorageType)
+	if blockVolArgs.StorageType != Ssd {
+		return nil, fmt.Errorf("Illegal required parameter type, only support [ssd], input is: %s", blockVolArgs.StorageType)
 	}
 
 	// disk iops
