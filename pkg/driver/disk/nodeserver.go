@@ -102,7 +102,7 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 				log.Infof("NodePublishVolume: volumeID: %s publishing process succeed, return context", volumeID)
 				return &csi.NodePublishVolumeResponse{}, nil
 			}
-			return nil, fmt.Errorf("NodePublishVolume: volumeID: %s is in publishing, please wait", volumeID)
+			return nil, fmt.Errorf("NodePublishVolume: volumeID: %s publishing process error", volumeID)
 		} else if value == "error" {
 			log.Errorf("NodePublishVolume: volumeID: %s publishing process error", volumeID)
 			return nil, fmt.Errorf("NodePublishVolume: volumeID: %s publishing process error", volumeID)
