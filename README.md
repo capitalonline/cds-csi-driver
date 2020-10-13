@@ -185,7 +185,7 @@ Description:
 
 
 
-## To use the Block driver 
+## To use the Disk driver 
 
 ### Dynamic PV
 
@@ -195,36 +195,36 @@ sc.yaml
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: disk
+  name: disk-csi-cds-sc
 parameters:
-  fstype: "xfs"
+  fsType: "ext4"			
   storageType: "high_disk"
   iops: "3000"
   siteId: "beijing001"
   zoneId: "WuxiA-POD10-CLU02"
-provisioner: disk
-reclaimPolicy: Delete
+provisioner: disk.csi.cds.net
+reclaimPolicy: Retain
 volumeBindingMode: WaitForFirstConsumer    
 ```
 
 Description:
 
-|        Key        | Value                                | Required | Description                                                  |
-| :---------------: | :----------------------------------- | :------: | :----------------------------------------------------------- |
-|    provisioner    | block.csi.cds.net                    |   yes    | CDS csi driver's name                                        |
-|   reclaimPolicy   | Delete \| Retain                     |   yes    | `Delete` means that PV will be deleted with PVC delete<br />`Retain` means that PV will be retained when PVC delete |
-| volumeBindingMode | WaitForFirstConsumer                 |   yes    | Only support`WaitForFirstConsumer` mode now.<br />`WaitForFirstConsumer` means that PV will be delayed until PVC is consumed by pod. <br /> |
-|      fstype       | xfs \| ext4                          |   yes    | Support linux filesystem type "xfs" and "ext4"               |
-|    storageType    | high_disk \| ssd_disk                |   yes    | `high_disk` means that normal disk and `iops` only support 3000.<br />`ssd_disk` means that high-performance disk and `iops` support 5000、7500 and 10000. |
-|       iops        | 3000 \| 5000 \| 7500 \| 10000        |   yes    | `3000` only used for `high_disk`.<br />`5000` `7500` and `10000` are used for `ssd_disk`. |
-|      siteId       | ca0bd848-9b59-40a2-9f57-d64fbc72a9df |   yes    | Cluster's site id.                                           |
-|      zoneId       | POD26-CLU03                          |   yes    | Declare node's zone id which nodes you are going to use with block disk. |
+| Key               | Value                     | Required | Description                                                  |
+| ----------------- | ------------------------- | -------- | ------------------------------------------------------------ |
+| fsType            | [ xfs\|ext4\|ext3 ]       | yes      | Linux filesystem type                                        |
+| storageType       | [ high_disk\|ssd_disk ]   | yes      | Only support `high_disk` and `ssd_disk`.<br />`high_disk` shoud be with iops `3000`.<br />`ssd_disk` should be with iops `[5000|7500|10000]`. |
+| iops              | [3000\|5000\|7500\|10000] | yes      | Only support `3000` `5000` `7500` and `1000`.<br />Should combined with `storageType`. |
+| siteId            | Eg. "Beijing001"          | yes      | Cluster's site_id.                                           |
+| zoneId            | Eg. "Beijing-POD10-CLU02" | yes      | Cluster's id.                                                |
+| provisioner       | disk.csi.cds.net          | yes      | Disk driver which installed default.                         |
+| reclaimPolicy     | [ Delete\|Retain ]        | yes      | `Delete` means that PV will be deleted with PVC delete<br/>`Retain` means that PV will be retained when PVC delete |
+| volumeBindingMode | WaitForFirstConsumer      | yes      | Only suport `WaitForFirstConsumer` pollicy for disk.csi.cds.net driver. |
 
 Kindly Remind: 
 
-​	For block storage, recommending using `volumeBindingMode:` `WaitForFirstConsumer ` in SC.yaml. 
+​	For disk storage, recommending using `volumeBindingMode:` `WaitForFirstConsumer ` in SC.yaml. 
 
-​	If not, please apply your `block.csi.cds.net` csi driver's `csi-provisioner` in k8s with following:
+​	If not, please apply your `disk.csi.cds.net` csi driver's `csi-provisioner` in k8s with following:
 
 ```yaml
 - args: 
@@ -255,7 +255,7 @@ parameters:
   storageType: "high_disk"
   iops: "3000"
   siteId: "ca0bd848-9b59-40a2-9f57-d64fbc72a9df"
-provisioner: disk
+provisioner: disk.csi.cds.net
 reclaimPolicy: Delete
 volumeBindingMode: Immediate    # Immediate policy in SC 
 allowedTopologies:				# using allowedTopologies in sc 
