@@ -284,7 +284,7 @@ func parseVolumeCreateSubpathOptions(req *csi.CreateVolumeRequest) (*VolumeCreat
 		return nil, fmt.Errorf("nas, fatel error, threshold should be within [0-1], but input is: %s", opts.Threshold)
 	}
 
-	log.Infof("serverSlice is: %s", serverSlice)
+	log.Debugf("serverSlice is: %s", serverSlice)
 
 	servers, err := ParseServerList(serverSlice, thresholdFloat64)
 	if err != nil {
@@ -392,7 +392,7 @@ func mountNasVolume(opts *PublishOptions, volumeId string) error {
 	}
 
 	mntCmd := fmt.Sprintf("mount -t nfs -o vers=%s %s:%s %s", versStr, opts.Server, serverMountPoint, opts.NodePublishPath)
-	log.Infof("mountNasVolume:: mntCmd is: %s", mntCmd)
+	log.Debugf("mountNasVolume:: mntCmd is: %s", mntCmd)
 
 	_, err := utils.RunCommand(mntCmd)
 	if err != nil && opts.Path != "/" {
@@ -416,18 +416,18 @@ func mountNasVolume(opts *PublishOptions, volumeId string) error {
 		return err
 	}
 
-	log.Infof("nas, mount nfs successful with command: %s", mntCmd)
+	log.Debugf("nas, mount nfs successful with command: %s", mntCmd)
 	return nil
 }
 
 func (opts *NfsOpts) createNasSubDir(mountRoot, subDir string) error {
-	log.Infof("nas, running creatNasSubDir: root: %s, path: %s, subDir:%s", mountRoot, opts.Path, subDir)
+	log.Debugf("nas, running creatNasSubDir: root: %s, path: %s, subDir:%s", mountRoot, opts.Path, subDir)
 
 	localMountPath := filepath.Join(mountRoot, subDir)
 	fullPath := filepath.Join(localMountPath, strings.TrimPrefix(opts.Path, defaultNFSRoot), subDir)
 
 	// unmount the volume if it has been mounted
-	log.Infof("nas, unmount localMountPath if is mounted: %s", localMountPath)
+	log.Debugf("nas, unmount localMountPath if is mounted: %s", localMountPath)
 
 	if utils.Mounted(localMountPath) {
 		if err := utils.Unmount(localMountPath); err != nil {
@@ -435,7 +435,7 @@ func (opts *NfsOpts) createNasSubDir(mountRoot, subDir string) error {
 		}
 	}
 
-	log.Infof("nas, creating localMountPath dir: %s", localMountPath)
+	log.Debugf("nas, creating localMountPath dir: %s", localMountPath)
 
 	if err := utils.CreateDir(localMountPath, mountPointMode); err != nil {
 		return fmt.Errorf("nas, create localMountPath %s err: %s", localMountPath, err.Error())
@@ -444,47 +444,47 @@ func (opts *NfsOpts) createNasSubDir(mountRoot, subDir string) error {
 	// mount localMountPath to remote nfs server
 	mntCmd := fmt.Sprintf("mount -t nfs -o vers=%s %s:%s %s", opts.Vers, opts.Server, defaultNFSRoot, localMountPath)
 
-	log.Infof("nas, mount for sub dir: %s", mntCmd)
+	log.Debugf("nas, mount for sub dir: %s", mntCmd)
 
 	if _, err := utils.RunCommand(mntCmd); err != nil {
 		return fmt.Errorf("nas, failed to localMountPath %s: %s", mntCmd, err.Error())
 	}
 
 	// create sub directory, which makes the folder on the remote nfs server at the same time
-	log.Infof("nas, creating fullPath: %s", fullPath)
+	log.Debugf("nas, creating fullPath: %s", fullPath)
 
 	if err := utils.CreateDir(fullPath, mountPointMode); err != nil {
 		return fmt.Errorf("nas, create sub directory err: " + err.Error())
 	}
 	defer os.RemoveAll(localMountPath)
 
-	log.Infof("nas, changing mode for %s", fullPath)
+	log.Debugf("nas, changing mode for %s", fullPath)
 
 	if err := os.Chmod(fullPath, mountPointMode); err != nil {
 		log.Errorf("nas, failed to change the mode of %s to %d", fullPath, mountPointMode)
 	}
 
 	// unmount the local path after the remote folder is created
-	log.Infof("nas, unmount dir after the dir creation: %s", fullPath)
+	log.Debugf("nas, unmount dir after the dir creation: %s", fullPath)
 
 	if err := utils.Unmount(localMountPath); err != nil {
 		log.Errorf("nas, failed to unmount path %s: %s", fullPath, err)
 	}
 
-	log.Infof("nas, create sub directory successful: %s", opts.Path)
+	log.Debugf("nas, create sub directory successful: %s", opts.Path)
 
 	return nil
 }
 
 func createNasFilesystemSubDir(localMountPath, subDir, fileSystemNasIP string) error {
-	log.Infof("nas, running createNasFilesystemSubDir")
+	log.Debugf("nas, running createNasFilesystemSubDir")
 
 	createFullPath := filepath.Join(localMountPath, subDir)
 
-	log.Infof("localMountPath is: %s, createFullPath is: %s, pvPath is:%s", localMountPath, createFullPath, subDir)
+	log.Debugf("localMountPath is: %s, createFullPath is: %s, pvPath is:%s", localMountPath, createFullPath, subDir)
 
 	// unmount the localMountPath if mounted
-	log.Infof("nas, unmount localMountPath if mounted: %s", localMountPath)
+	log.Debugf("nas, unmount localMountPath if mounted: %s", localMountPath)
 
 	if utils.Mounted(localMountPath) {
 		if err := utils.Unmount(localMountPath); err != nil {
@@ -492,7 +492,7 @@ func createNasFilesystemSubDir(localMountPath, subDir, fileSystemNasIP string) e
 		}
 	}
 
-	log.Infof("nas, creating localMountPath dir: %s", localMountPath)
+	log.Debugf("nas, creating localMountPath dir: %s", localMountPath)
 
 	if err := utils.CreateDir(localMountPath, mountPointMode); err != nil {
 		return fmt.Errorf("nas, create localMountPath %s err: %s", localMountPath, err.Error())
@@ -501,14 +501,14 @@ func createNasFilesystemSubDir(localMountPath, subDir, fileSystemNasIP string) e
 	// mount remote nfs server /nfsshare to localMountPath
 	mntCmd := fmt.Sprintf("mount -t nfs -o vers=%s %s:%s %s", defaultNfsVersion, fileSystemNasIP, defaultNFSRoot, localMountPath)
 
-	log.Infof("nas, mntCmd is: %s", mntCmd)
+	log.Debugf("nas, mntCmd is: %s", mntCmd)
 
 	if _, err := utils.RunCommand(mntCmd); err != nil {
 		return fmt.Errorf("nas, failed to run mntCmd: %s, err is:  %s", mntCmd, err.Error())
 	}
 
 	// create sub directory, which makes the folder on the remote nfs server at the same time
-	log.Infof("nas, creating createFullPath: %s", createFullPath)
+	log.Debugf("nas, creating createFullPath: %s", createFullPath)
 
 	if err := utils.CreateDir(createFullPath, mountPointMode); err != nil {
 		return fmt.Errorf("nas, create sub directory err: " + err.Error())
@@ -517,20 +517,20 @@ func createNasFilesystemSubDir(localMountPath, subDir, fileSystemNasIP string) e
 	// finally delete localMountPath
 	defer os.RemoveAll(localMountPath)
 
-	log.Infof("nas, changing mode for %s", createFullPath)
+	log.Debugf("nas, changing mode for %s", createFullPath)
 
 	if err := os.Chmod(createFullPath, mountPointMode); err != nil {
 		log.Errorf("nas, failed to change the mode of %s to %d", createFullPath, mountPointMode)
 	}
 
 	// unmount the localMountPath after the remote folder is created
-	log.Infof("nas, unmount localMountPath: %s", localMountPath)
+	log.Debugf("nas, unmount localMountPath: %s", localMountPath)
 
 	if err := utils.Unmount(localMountPath); err != nil {
 		log.Errorf("nas, failed to unmount localMountPath, error is: %s", err)
 	}
 
-	log.Infof("nas, create pv path: %s, in remote server's /nfsshare successfully", subDir)
+	log.Debugf("nas, create pv path: %s, in remote server's /nfsshare successfully", subDir)
 
 	return nil
 }
@@ -554,7 +554,7 @@ func deleteNasFilesystemSubDir(mountRoot, subDir, fileSystemNasIP string) error 
 
 	// mount mountRoot to remote nfs server
 	mntCmd := fmt.Sprintf("mount -t nfs -o vers=%s %s:%s %s", defaultNfsVersion, fileSystemNasIP, defaultNFSRoot, mountRoot)
-	log.Infof("nas, mntCmd is: %s", mntCmd)
+	log.Debugf("nas, mntCmd is: %s", mntCmd)
 
 	if _, err := utils.RunCommand(mntCmd); err != nil {
 		return fmt.Errorf("nas, failed to mountRoot %s: %s", mntCmd, err.Error())
@@ -562,7 +562,7 @@ func deleteNasFilesystemSubDir(mountRoot, subDir, fileSystemNasIP string) error 
 
 	// delete pv's path
 	deleteDir := mountRoot + strings.TrimPrefix(subDir, "/nfsshare")
-	log.Infof("nas, delete pv path is: %s", deleteDir)
+	log.Debugf("nas, delete pv path is: %s", deleteDir)
 
 	if err := os.RemoveAll(deleteDir); err != nil {
 		log.Errorf("nas, delete pv path error, err is: %s", err)
@@ -593,14 +593,14 @@ func changeNasMode(opts *PublishOptions) {
 			if _, err := utils.RunCommand(cmd); err != nil {
 				log.Errorf("nas, chmod cmd fail: %s %s", cmd, err)
 			} else {
-				log.Infof("nas, chmod cmd success: %s", cmd)
+				log.Debugf("nas, chmod cmd success: %s", cmd)
 			}
 			wg1.Done()
 		}(&wg1)
 
 		timeout := 1 // 1s
 		if utils.WaitTimeout(&wg1, timeout) {
-			log.Infof("nas, chmod runs more than %ds, continues to run in background: %s", timeout, opts.NodePublishPath)
+			log.Debugf("nas, chmod runs more than %ds, continues to run in background: %s", timeout, opts.NodePublishPath)
 		}
 	}
 }
@@ -642,7 +642,7 @@ func ParseServerList(serverList []string, thresholdFloat64 float64) ([]*NfsServe
 	if err != nil {
 		return nil, err
 	}
-	log.Infof("idleServerSlice is: %s", idleServerList)
+	log.Debugf("idleServerSlice is: %s", idleServerList)
 	if len(idleServerList) == 0 {
 		return nil, nil
 	}
@@ -713,7 +713,7 @@ func DeleteUsageFullServers(serverList []string, thresholdFloat64 float64) ([]st
 
 		if res != nil {
 			usageFloat64, _ := strconv.ParseFloat(strings.TrimSuffix(res.Data.NasInfo[0].UsageRate, "%"), 32)
-			log.Infof("DeleteUsageFullServers: addr is: %s, usageFloat64 is: %f, thresholdFloat64 is: %f", addr, usageFloat64, thresholdFloat64)
+			log.Debugf("DeleteUsageFullServers: addr is: %s, usageFloat64 is: %f, thresholdFloat64 is: %f", addr, usageFloat64, thresholdFloat64)
 			if usageFloat64 < thresholdFloat64 {
 				tmpServers = append(tmpServers, serverList[k])
 			}

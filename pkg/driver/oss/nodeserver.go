@@ -48,11 +48,11 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 	if err := opts.parsOssOpts(); err != nil {
 		return nil, err
 	}
-	log.Infof("NodePublishVolume:: parsed PublishOptions options: %+v", opts)
+	log.Debugf("NodePublishVolume:: parsed PublishOptions options: %+v", opts)
 
 	// directly return if the target mountPath has been mounted
 	if utils.Mounted(opts.NodePublishPath) {
-		log.Infof("NodePublishVolume:: oss, mountPath: %s is mounted", opts.NodePublishPath)
+		log.Debugf("NodePublishVolume:: oss, mountPath: %s is mounted", opts.NodePublishPath)
 		return &csi.NodePublishVolumeResponse{}, nil
 	}
 
@@ -62,7 +62,7 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 	if opts.AuthType == "saveAkFile" {
 		// save ak file: bucket:ak_id:ak_secret to /etc/s3pass
 		if err := opts.saveOssCredential(CredentialFile); err != nil {
-			log.Infof("save ak file: bucket:ak_id:ak_secret failed")
+			log.Debugf("save ak file: bucket:ak_id:ak_secret failed")
 			return nil, err
 		}
 	} else {
@@ -72,9 +72,9 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 	}
 
 	var mntCmd string
-	log.Infof("NodePublishVolume:: Start mount source [%s:%s] to [%s]", opts.Bucket, opts.Path, opts.NodePublishPath)
+	log.Debugf("NodePublishVolume:: Start mount source [%s:%s] to [%s]", opts.Bucket, opts.Path, opts.NodePublishPath)
 	mntCmd = fmt.Sprintf("s3fs %s:%s %s -o passwd_file=%s -o url=%s %s", opts.Bucket, opts.Path, opts.NodePublishPath, CredentialFile, opts.URL, defaultOtherOpts)
-	log.Infof("mntCmd is: %s", mntCmd)
+	log.Debugf("mntCmd is: %s", mntCmd)
 	if _, err := utils.RunCommand(mntCmd); err != nil {
 		log.Errorf("Mount oss bucket to mountPath failed, error is: %s", err)
 		utils.SentrySendError(fmt.Errorf("Mount oss bucket to mountPath failed, error is: %s", err))

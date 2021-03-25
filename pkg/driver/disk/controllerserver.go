@@ -84,7 +84,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 	volSizeBytes := int64(req.GetCapacityRange().GetRequiredBytes())
 	diskRequestGB := req.CapacityRange.RequiredBytes / (1024 * 1024 * 1024)
 
-	log.Infof("CreateVolume: diskRequestGB is: %d", diskRequestGB)
+	log.Debugf("CreateVolume: diskRequestGB is: %d", diskRequestGB)
 
 	// Step 3: parse DiskVolume params
 	diskVol, err := parseDiskVolumeOptions(req)
@@ -100,7 +100,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 			log.Warnf("CreateVolume: Disk Volume(%s)'s is in creating, please wait", pvName)
 
 			if tmpVol, ok := pvcCreatedMap[pvName]; ok {
-				log.Infof("CreateVolume: Disk Volume(%s)'s diskID: %s creating process finished, return context", pvName, value)
+				log.Warnf("CreateVolume: Disk Volume(%s)'s diskID: %s creating process finished, return context", pvName, value)
 				return &csi.CreateVolumeResponse{Volume: tmpVol}, nil
 			}
 
@@ -212,7 +212,7 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 		log.Errorf("DeleteVolume: disk [mounted], cant delete volumeID: %s ", diskID)
 		return nil, fmt.Errorf("DeleteVolume: disk [mounted], cant delete volumeID: %s", diskID)
 	} else if diskStatus == StatusInOK {
-		log.Infof("DeleteVolume: disk is in [idle], then to delete directly!")
+		log.Debugf("DeleteVolume: disk is in [idle], then to delete directly!")
 	} else if diskStatus == StatusInDeleted {
 		log.Warnf("DeleteVolume: disk had been deleted")
 		return &csi.DeleteVolumeResponse{}, nil
@@ -565,13 +565,13 @@ func describeTaskStatus(taskID string) error {
 		}
 
 		if res.Data.Status == "finish" {
-			log.Infof("task succeed")
+			log.Debugf("task succeed")
 			return nil
 		} else if res.Data.Status == "doing" {
-			log.Infof("task:%s is running, sleep 10s", taskID)
+			log.Debugf("task:%s is running, sleep 10s", taskID)
 			time.Sleep(10 * time.Second)
 		} else if res.Data.Status == "error" {
-			log.Infof("task error")
+			log.Debugf("task error")
 			return fmt.Errorf("taskError")
 		}
 	}

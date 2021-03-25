@@ -33,7 +33,7 @@ func  (opts *OssOpts)saveOssCredential(akFile string) error {
 		log.Errorf("Save Credential File failed, %s, %s", newContentStr, err)
 		return err
 	}
-	log.Infof("saveOssCredential, save AK and AS into %s succeed!", CredentialFile)
+	log.Debugf("saveOssCredential, save AK and AS into %s succeed!", CredentialFile)
 	return nil
 }
 

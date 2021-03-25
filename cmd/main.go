@@ -56,9 +56,9 @@ func main() {
 	if nodeID == "" {
 		nodeID = utils.GetNodeMetadata().GetNodeID()
 	}
-	log.Infof("CSI Driver Name: %s", driverName)
-	log.Infof("CSI endpoint: %s", endpoint)
-	log.Infof("CSI node ID: %s", nodeID)
+	log.Debugf("CSI Driver Name: %s", driverName)
+	log.Debugf("CSI endpoint: %s", endpoint)
+	log.Debugf("CSI node ID: %s", nodeID)
 
 	if err := os.MkdirAll(path.Join(rootDir, "plugins", driverName, "controller"), os.FileMode(0755)); err != nil {
 		log.Errorf("failed to create persistent storage for controller: %v", err)

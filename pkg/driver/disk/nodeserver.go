@@ -86,7 +86,7 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 			return nil, fmt.Errorf("NodePublishVolume:: step 3, req.TargetPath(podPath): %s is not exist, but unable to create it, err is: %s", podPath, err.Error())
 		}
 
-		log.Infof("NodePublishVolume:: req.TargetPath(podPath): %s is not exist, and create it succeed!", podPath)
+		log.Debugf("NodePublishVolume:: req.TargetPath(podPath): %s is not exist, and create it succeed!", podPath)
 	}
 
 	if utils.Mounted(podPath) {
@@ -99,7 +99,7 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 		if value == "publishing" {
 			log.Warnf("NodePublishVolume: volumeID: %s is in publishing, please wait", volumeID)
 			if _, ok := diskPublishedMap[podPath]; ok {
-				log.Infof("NodePublishVolume: volumeID: %s publishing process succeed, return context", volumeID)
+				log.Debugf("NodePublishVolume: volumeID: %s publishing process succeed, return context", volumeID)
 				return &csi.NodePublishVolumeResponse{}, nil
 			}
 			return nil, fmt.Errorf("NodePublishVolume: volumeID: %s publishing process error", volumeID)
@@ -279,7 +279,7 @@ func (n *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 		return nil, err
 	}
 
-	log.Infof("NodeStageVolume: findDeviceNameByVolumeID succeed, deviceName is: %s", deviceName)
+	log.Debugf("NodeStageVolume: findDeviceNameByVolumeID succeed, deviceName is: %s", deviceName)
 
 	// Step 2-2: format disk
 	diskVol := req.GetVolumeContext()
@@ -294,19 +294,19 @@ func (n *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 			log.Errorf("NodeStageVolume: format deviceName: %s failed, err is: %s", deviceName, err.Error())
 			return nil, err
 		}
-		log.Infof("NodeStageVolume: Step 1: formatDiskDevice successfully!")
+		log.Debugf("NodeStageVolume: Step 1: formatDiskDevice successfully!")
 	}
 
 	// Step 3: mount disk to node's global path
 	// Step 3-1: check targetGlobalPath
-	log.Infof("NodeStageVolume: targetGlobalPath exist flag: %t", utils.FileExisted(targetGlobalPath))
+	log.Debugf("NodeStageVolume: targetGlobalPath exist flag: %t", utils.FileExisted(targetGlobalPath))
 	if !utils.FileExisted(targetGlobalPath) {
 		if err = utils.CreateDir(targetGlobalPath, mountPointMode); err != nil {
 			diskStagingMap[targetGlobalPath] = "error"
 			log.Errorf("NodeStageVolume: Step 1, targetGlobalPath is not exist, but unable to create it, err is: %s", err.Error())
 			return nil, fmt.Errorf("NodeStageVolume: Step 1, targetGlobalPath is not exist, but unable to create it, err is: %s", err.Error())
 		}
-		log.Infof("NodeStageVolume: Step 1, targetGlobalPath: %s is not exist, and create succeed", targetGlobalPath)
+		log.Debugf("NodeStageVolume: Step 1, targetGlobalPath: %s is not exist, and create succeed", targetGlobalPath)
 	}
 
 	// Step 3-2: mount deviceName to node's global path
@@ -318,7 +318,7 @@ func (n *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 	}
 
 	diskStagingMap[targetGlobalPath] = targetGlobalPath
-	log.Infof("NodeStageVolume: Step 2, mountDiskDeviceToNodeGlobalPath: %s successfully!", targetGlobalPath)
+	log.Debugf("NodeStageVolume: Step 2, mountDiskDeviceToNodeGlobalPath: %s successfully!", targetGlobalPath)
 
 	log.Infof("NodeStageVolume: Successfully!")
 
@@ -413,7 +413,7 @@ func findDeviceNameByUuid(diskUuid string) (string, error) {
 		deviceNameUuid[strings.TrimSpace(strings.TrimPrefix(uuidStr, "3"))] = deviceName
 	}
 
-	log.Infof("findDeviceNameByUuid: deviceNameUuid is: %+v", deviceNameUuid)
+	log.Debugf("findDeviceNameByUuid: deviceNameUuid is: %+v", deviceNameUuid)
 
 	// compare
 	if _, ok := deviceNameUuid[diskUuidFormat]; !ok {

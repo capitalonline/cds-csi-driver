@@ -146,7 +146,7 @@ spec:
         env:
         - name: CSI_ENDPOINT
           value: unix://var/lib/kubelet/plugins/oss.csi.cds.net/csi.sock
-        image: registry-bj.capitalonline.net/cck/cds-csi-driver:v2.0.0
+        image: registry-bj.capitalonline.net/cck/cds-csi-driver:v2.0.1
         imagePullPolicy: Always
         name: oss-csi-node-server
         securityContext:

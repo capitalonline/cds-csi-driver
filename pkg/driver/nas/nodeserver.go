@@ -38,7 +38,7 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 	log.Infof("NodePublishVolume:: starting mount nas volume with req: %+v", req)
 	var opts, err = parsePublishOptions(req)
 
-	log.Infof("NodePublishVolume:: parsed PublishOptions options: %+v", opts)
+	log.Debugf("NodePublishVolume:: parsed PublishOptions options: %+v", opts)
 
 	if err != nil {
 		return nil, fmt.Errorf("nas, failed to parse mount options %+v: %s", opts, err)
@@ -46,7 +46,7 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 
 	// directly return if the target mountPath has been mounted
 	if utils.Mounted(opts.NodePublishPath) {
-		log.Infof("NodePublishVolume:: nas, mount point %s has existed, ignore", opts.NodePublishPath)
+		log.Warnf("NodePublishVolume:: nas, mount point %s has existed, ignore", opts.NodePublishPath)
 		return &csi.NodePublishVolumeResponse{}, nil
 	}
 

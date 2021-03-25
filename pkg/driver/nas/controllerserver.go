@@ -59,7 +59,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 
 	// step1: check pvc is created or not. return pv directly if created, else do create action
 	if value, ok := processedPvc.Load(pvName); ok && value != nil {
-		log.Infof("CreateVolume:: nas Volume %s had been created before, skip: %v", pvName, value)
+		log.Warnf("CreateVolume:: nas Volume %s had been created before, skip: %v", pvName, value)
 		return &csi.CreateVolumeResponse{Volume: value.(*csi.Volume)}, nil
 	}
 
@@ -78,12 +78,12 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 	volToCreate := &csi.Volume{}
 
 	if volumeAs == subpathLiteral {
-		log.Infof("CreateVolume:: nas, provisioning subpath volume, req: %+v", req)
+		log.Debugf("CreateVolume:: nas, provisioning subpath volume, req: %+v", req)
 
 		// step3-subpath-1: parse subpath params
 		opts, err := parseVolumeCreateSubpathOptions(req)
 
-		log.Infof("CreateVolume:: nas, provisioning subpath volume, nfs opts: %+v", opts)
+		log.Debugf("CreateVolume:: nas, provisioning subpath volume, nfs opts: %+v", opts)
 
 		if err != nil {
 			utils.SentrySendError(fmt.Errorf("CreateVolume:: nas, failed to parse subpath create volume req, error is: %s", err.Error()))
@@ -112,7 +112,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 		// step3-filesystem-1: parse params
 		opts, err := parseVolumeCreateFilesystemOptions(req)
 
-		log.Infof("CreateVolume: nas, provisioning filesystem volume, nfs opts: %+v", opts)
+		log.Debugf("CreateVolume: nas, provisioning filesystem volume, nfs opts: %+v", opts)
 
 		if err != nil {
 			log.Errorf("CreateVolume:: nas, failed to parse filesystem create volume req, error is: %s", err.Error())
@@ -127,7 +127,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 			fileSystemNasID = value.(string)
 
 		} else {
-			log.Infof("CreateVolume: nas, provisioning filesystem volume, req: %+v", req)
+			log.Debugf("CreateVolume: nas, provisioning filesystem volume, req: %+v", req)
 
 			// 1-create filesystem,
 			storageSize := req.CapacityRange.RequiredBytes / (1024 * 1024 * 1024)
@@ -148,7 +148,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 			// storage with nasIP= ""
 			pvcFileSystemIPMap.Store(fileSystemNasID, "")
 
-			log.Infof("CreateVolume: create Nas succeed, fileSystemReqID is: %s, fileSystemNasID is: %s", fileSystemReqID, fileSystemNasID)
+			log.Debugf("CreateVolume: create Nas succeed, fileSystemReqID is: %s, fileSystemNasID is: %s", fileSystemReqID, fileSystemNasID)
 
 			// 2-get Nas creation task status
 			err = describeTaskStatus(fileSystemReqID)
@@ -158,7 +158,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 				utils.SentrySendError(fmt.Errorf("CreateVolume: describeTaskStatus error, err is: %s", err.Error()))
 				return nil, fmt.Errorf("CreateVolume: describeTaskStatus error, err is: %s", err.Error())
 			}
-			log.Infof("CreateVolume: create Nas succeed, then to mount Nas to cluster")
+			log.Debugf("CreateVolume: create Nas succeed, then to mount Nas to cluster")
 
 			// 3-mount nas then get the nasIP
 			mountNasRes, err := cdsNas.MountNas(fileSystemNasID, opts.ClusterID)
@@ -180,12 +180,12 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 				utils.SentrySendError(fmt.Errorf("CreateVolume: describeTaskStatus error, err is: %s", err.Error()))
 				return nil, fmt.Errorf("CreateVolume: describeTaskStatus error, err is: %s", err.Error())
 			}
-			log.Infof("CreateVolume: mount nas: %s to cluster: %s succeed", fileSystemNasID, opts.ClusterID)
+			log.Debugf("CreateVolume: mount nas: %s to cluster: %s succeed", fileSystemNasID, opts.ClusterID)
 
 			// storage with nasIP
 			pvcFileSystemIPMap.Store(fileSystemNasID, fileSystemNasIP)
 
-			log.Infof("CreateVolume: Nfs Volume (%s) Successful Created, fileSystemNasID is: %s, FileSystemNasIP is: %s", pvName, fileSystemNasID, fileSystemNasIP)
+			log.Debugf("CreateVolume: Nfs Volume (%s) Successful Created, fileSystemNasID is: %s, FileSystemNasIP is: %s", pvName, fileSystemNasID, fileSystemNasIP)
 
 			// only do create nas storage and mount to cluster, then to return
 			return nil, fmt.Errorf("CreateVolume: finish create nas storage and mount it to cluster, next GRPC request will create mountTargetPath")
@@ -199,7 +199,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 			return nil, fmt.Errorf("CreateVolume: fileSystemNasID: %s, waiting for mount to cluster and get nasIP", fileSystemNasID)
 		}
 
-		log.Infof("CreateVolume: fileSystemNasID is: %s, fileSystemNasIP is: %s, then to create mountTargetPath", fileSystemNasID, fileSystemNasIP)
+		log.Debugf("CreateVolume: fileSystemNasID is: %s, fileSystemNasIP is: %s, then to create mountTargetPath", fileSystemNasID, fileSystemNasIP)
 
 		// step3-filesystem-4: if mountTarget is already created, skip creating a mountTarget
 		mountTargetPath := ""
@@ -216,7 +216,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 
 			// 2-store
 			pvcMountTargetMap.Store(pvName, mountTargetPath)
-			log.Infof("CreateVolume: Nfs Volume (%s) mountTarget: %s created succeed!", pvName, mountTargetPath)
+			log.Debugf("CreateVolume: Nfs Volume (%s) mountTarget: %s created succeed!", pvName, mountTargetPath)
 		}
 
 		// step3-filesystem-5: assemble the response
@@ -248,7 +248,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 }
 
 func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
-	// log.Infof("DeleteVolume:: nas, delete volumeId(pvName) is: %s", req.GetVolumeId())
+	log.Infof("DeleteVolume:: nas, delete volumeId(pvName) is: %s", req.GetVolumeId())
 
 	pv, err := c.Client.CoreV1().PersistentVolumes().Get(req.VolumeId, metav1.GetOptions{})
 	if err != nil {
@@ -266,7 +266,7 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 	} else {
 		volumeAs = value
 	}
-	log.Infof("DeleteVolume: Nas, volumeAs is: %s", volumeAs)
+	log.Debugf("DeleteVolume: Nas, volumeAs is: %s", volumeAs)
 
 	// subpath
 	if volumeAs == subpathLiteral {
@@ -312,7 +312,7 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 		if utils.IsDir(deletePath) {
 			if opts.ArchiveOnDelete {
 				archivePath := filepath.Join(mountPoint, "archived-"+filepath.Base(pvPath)+time.Now().Format(".2006-01-02-15:04:05"))
-				log.Infof("DeleteVolume:: nas, archiving %s to %s", deletePath, archivePath)
+				log.Debugf("DeleteVolume:: nas, archiving %s to %s", deletePath, archivePath)
 				if err := os.Rename(deletePath, archivePath); err != nil {
 					log.Errorf("DeleteVolume:: nas, failed to archive volume %s from path %s to %s with error: %s",
 						req.VolumeId, deletePath, archivePath, err.Error())
@@ -322,13 +322,13 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 						req.VolumeId, deletePath, archivePath, err.Error())
 				}
 			} else {
-				log.Infof("DeleteVolume:: nas, deleting %s", deletePath)
+				log.Debugf("DeleteVolume:: nas, deleting %s", deletePath)
 				if err := os.RemoveAll(deletePath); err != nil {
 					return nil, fmt.Errorf("DeleteVolume:: nas, failed to remove path %s: %s", deletePath, err)
 				}
 			}
 		} else {
-			log.Infof("DeleteVolume:: nas, path %s doesn't exist, skipping", deletePath)
+			log.Debugf("DeleteVolume:: nas, path %s doesn't exist, skipping", deletePath)
 		}
 		processedPvc.Delete(req.VolumeId)
 		log.Infof("DeleteVolume:: volume %s has been deleted successfully", req.VolumeId)
@@ -352,16 +352,16 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 				return nil, fmt.Errorf("DeleteVolume: nas, volumeID is: %s, fileSystemId is empty", req.VolumeId)
 			} else {
 				fileSystemNasID = value
-				log.Infof("DeleteVolume: nas, volumeID is: %s, fileSystemId is: %s", req.VolumeId, fileSystemNasID)
+				log.Debugf("DeleteVolume: nas, volumeID is: %s, fileSystemId is: %s", req.VolumeId, fileSystemNasID)
 			}
 
 			// check if pv is deleted or not
 			if value, ok := pvcFileSystemDeleteMap.Load(fileSystemNasID); ok {
 				if value == "deleting" {
-					log.Infof("DeleteVolume: the pv has been deleting, ignore this request to avoid repeating delete")
+					log.Debugf("DeleteVolume: the pv has been deleting, ignore this request to avoid repeating delete")
 					return nil, fmt.Errorf("DeleteVolume: the pv have been deleting, ignore this request to avoid repeating delete")
 				} else if value == "ok" {
-					log.Infof("DeleteVolume: pv deleting process finished")
+					log.Debugf("DeleteVolume: pv deleting process finished")
 					pvcFileSystemDeleteMap.Delete(fileSystemNasID)
 					return &csi.DeleteVolumeResponse{}, nil
 				}
@@ -374,7 +374,7 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 			// check pv nasIP
 			if value, ok := pv.Spec.CSI.VolumeAttributes["server"]; ok {
 				fileSystemNasIP = value
-				log.Infof("DeleteVolume: nas, server is: %s", fileSystemNasIP)
+				log.Debugf("DeleteVolume: nas, server is: %s", fileSystemNasIP)
 			} else {
 				log.Errorf("DeleteVolume: nas server is empty, CSI is: %v", pv.Spec.CSI)
 				utils.SentrySendError(fmt.Errorf("DeleteVolume: nas server is empty, CSI is: %v", pv.Spec.CSI))
@@ -384,7 +384,7 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 			// check pv path
 			if value, ok := pv.Spec.CSI.VolumeAttributes["path"]; ok {
 				mountTargetPath = value
-				log.Infof("DeleteVolume: nas, path is: %s", mountTargetPath)
+				log.Debugf("DeleteVolume: nas, path is: %s", mountTargetPath)
 			} else {
 				log.Errorf("DeleteVolume: path is empty, CSI is: %v", pv.Spec.CSI)
 				utils.SentrySendError(fmt.Errorf("DeleteVolume: path is empty, CSI is: %v", pv.Spec.CSI))
@@ -395,7 +395,7 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 			if err := deleteNasFilesystemSubDir(deleteVolumeRoot, mountTargetPath, fileSystemNasIP); err != nil {
 				return nil, fmt.Errorf("DeleteVolume: nas, failed to delete mountTargetPath on the nas server, error is: %s", err.Error())
 			}
-			log.Infof("DeleteVolume: nas, delete pv path succeed in NAS storage")
+			log.Debugf("DeleteVolume: nas, delete pv path succeed in NAS storage")
 
 			// step4: Unmount NAS storage from cluster
 			unMountNasRes, err := cdsNas.UnMountNas(fileSystemNasID)
@@ -406,7 +406,7 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 
 			// get unmount task status
 			unMountNasTaskID := unMountNasRes.TaskID
-			log.Infof("DeleteVolume: cdsNas.UnMountNas, taskID is:%s", unMountNasTaskID)
+			log.Debugf("DeleteVolume: cdsNas.UnMountNas, taskID is:%s", unMountNasTaskID)
 
 			err = describeTaskStatus(unMountNasTaskID)
 
@@ -434,13 +434,13 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 			pvcFileSystemIPMap.Delete(fileSystemNasID)
 			pvcFileSystemIDMap.Delete(req.VolumeId)
 			pvcFileSystemDeleteMap.Store(fileSystemNasID, "ok")
-			log.Infof("clean processedPvc, pvcMountTargetMap, pvcFileSystemIDMap, pvcFileSystemIPMap, pvcFileSystemDeleteMap record")
+			log.Debugf("clean processedPvc, pvcMountTargetMap, pvcFileSystemIDMap, pvcFileSystemIPMap, pvcFileSystemDeleteMap record")
 
 			// step7: response
 			log.Infof("DeleteVolume:: Nas volume(%s)'s NAS storage and mountTargetPath have been deleted successfully", req.VolumeId)
 		} else {
 			// retain pv's filesystem NAS storage
-			log.Infof("DeleteVolume: Nas volume(%s) Filesystem's deleteVolume is [false], remain nas storage and pv data", req.VolumeId)
+			log.Warnf("DeleteVolume: Nas volume(%s) Filesystem's deleteVolume is [false], remain nas storage and pv data", req.VolumeId)
 		}
 	}
 
@@ -466,7 +466,7 @@ func (c ControllerServer) ControllerExpandVolume(context.Context, *csi.Controlle
 
 func describeTaskStatus(taskID string) error {
 
-	log.Infof("describeTaskStatus: taskID is: %s", taskID)
+	log.Debugf("describeTaskStatus: taskID is: %s", taskID)
 
 	for i := 1; i < 120; i++ {
 
@@ -479,13 +479,13 @@ func describeTaskStatus(taskID string) error {
 		}
 
 		if res.Data.Status == "finish" {
-			log.Infof("describeTaskStatus: task succeed")
+			log.Debugf("describeTaskStatus: task succeed")
 			return nil
 		} else if res.Data.Status == "doing" {
-			log.Infof("describeTaskStatus: task:%s is running, sleep 10s", taskID)
+			log.Debugf("describeTaskStatus: task:%s is running, sleep 10s", taskID)
 			time.Sleep(10 * time.Second)
 		} else if res.Data.Status == "error" {
-			log.Infof("describeTaskStatus: task is error")
+			log.Debugf("describeTaskStatus: task is error")
 			return fmt.Errorf("taskError")
 		}
 	}
