@@ -86,7 +86,8 @@ func (n *NodeMeta) GetNodeID() string {
 
 // Mounted checks whether a volume is mounted
 func Mounted(mountPath string) bool {
-	cmd := fmt.Sprintf("mount | grep %s | grep -v grep | wc -l", mountPath)
+	//cmd := fmt.Sprintf("mount | grep %s | grep -v grep | wc -l", mountPath)
+	cmd := fmt.Sprintf("df -h | grep %s | grep -v grep | wc -l", mountPath)
 	out, err := RunCommand(cmd)
 	if err != nil {
 		log.Infof("check whether mounted exec error: %s, %s", cmd, err.Error())
