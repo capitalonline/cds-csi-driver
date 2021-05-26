@@ -92,6 +92,7 @@ func Mounted(mountPath string) bool {
 		log.Infof("check whether mounted exec error: %s, %s", cmd, err.Error())
 		return false
 	}
+	log.Infof("%s", out)
 	if strings.TrimSpace(out) == "0" {
 		return false
 	}
@@ -183,8 +184,7 @@ func ServerReachable(host, port string, timeout time.Duration) bool {
 
 func SentrySendError(errorInfo error) {
 	// will init by ENVIRONMENT named "SENTRY_DSN"
-	err := sentry.Init(sentry.ClientOptions{
-	})
+	err := sentry.Init(sentry.ClientOptions{})
 
 	if err != nil {
 		log.Fatalf("sentry.Init: %s", err)
