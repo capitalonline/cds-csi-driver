@@ -92,7 +92,7 @@ func Mounted(mountPath string) bool {
 		log.Infof("check whether mounted exec error: %s, %s", cmd, err.Error())
 		return false
 	}
-	log.Infof("%s", out)
+	log.Infof("cmd: %s, cmd_res: %s", cmd, out)
 	if strings.TrimSpace(out) == "0" {
 		return false
 	}
