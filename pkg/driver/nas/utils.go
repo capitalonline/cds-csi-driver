@@ -515,7 +515,7 @@ func createNasFilesystemSubDir(localMountPath, subDir, fileSystemNasIP string) e
 	}
 
 	// finally delete localMountPath
-	defer os.RemoveAll(localMountPath)
+	//defer os.RemoveAll(localMountPath)
 
 	log.Debugf("nas, changing mode for %s", createFullPath)
 
@@ -569,7 +569,7 @@ func deleteNasFilesystemSubDir(mountRoot, subDir, fileSystemNasIP string) error 
 	}
 
 	// log.Infof("nas, delete pv path succeed in NAS storage")
-	defer os.RemoveAll(mountRoot)
+	//defer os.RemoveAll(mountRoot)
 
 	// unmount the local path after the remote folder is created
 	// log.Infof("nas, unmount dir after the dir creation: %s", mountRoot)
