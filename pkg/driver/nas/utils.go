@@ -126,7 +126,7 @@ func newPublishOptions(req *csi.NodePublishVolumeRequest) *PublishOptions {
 			opts.ModeType = value
 		} else if key == "volumeAs" {
 			opts.VolumeAs = value
-		}else if key == "allowShared" {
+		} else if key == "allowShared" {
 			allowed, err := strconv.ParseBool(value)
 			if err != nil {
 				opts.AllowSharePath = false
@@ -225,7 +225,7 @@ func newVolumeCreateFilesystemOptions(param map[string]string) *VolumeCreateFile
 	value, ok := param["deleteNas"]
 	if !ok {
 		opts.DeleteNas = false
-	}else {
+	} else {
 		value = strings.ToLower(value)
 		if value == "true" {
 			opts.DeleteNas = true
@@ -456,7 +456,7 @@ func (opts *NfsOpts) createNasSubDir(mountRoot, subDir string) error {
 	if err := utils.CreateDir(fullPath, mountPointMode); err != nil {
 		return fmt.Errorf("nas, create sub directory err: " + err.Error())
 	}
-	defer os.RemoveAll(localMountPath)
+	//defer os.RemoveAll(localMountPath)
 
 	log.Debugf("nas, changing mode for %s", fullPath)
 
@@ -665,7 +665,7 @@ func ParseServerList(serverList []string, thresholdFloat64 float64) ([]*NfsServe
 		}
 		servers = append(servers, &NfsServer{Address: addr, Path: filepath.Join("/", path)})
 	}
-	return servers, nil 
+	return servers, nil
 }
 
 func SelectServer(servers []*NfsServer, uniqueSelectString string, strategy string) *NfsServer {
@@ -700,7 +700,7 @@ func SelectServerRandom(servers []*NfsServer) *NfsServer {
 	return servers[rand.Intn(length)]
 }
 
-func DeleteUsageFullServers(serverList []string, thresholdFloat64 float64) ([]string, error){
+func DeleteUsageFullServers(serverList []string, thresholdFloat64 float64) ([]string, error) {
 	var tmpServers []string
 
 	for k, v := range serverList {
