@@ -456,7 +456,10 @@ func (opts *NfsOpts) createNasSubDir(mountRoot, subDir string) error {
 	if err := utils.CreateDir(fullPath, mountPointMode); err != nil {
 		return fmt.Errorf("nas, create sub directory err: " + err.Error())
 	}
-	//defer os.RemoveAll(localMountPath)
+	defer func(directory string) {
+		log.Infof("Try to delete the temporary local momunt point %s", directory)
+		safeRemoveDir(directory)
+	}(localMountPath)
 
 	log.Debugf("nas, changing mode for %s", fullPath)
 
@@ -515,7 +518,10 @@ func createNasFilesystemSubDir(localMountPath, subDir, fileSystemNasIP string) e
 	}
 
 	// finally delete localMountPath
-	//defer os.RemoveAll(localMountPath)
+	defer func(directory string) {
+		log.Infof("Try to delete the temporary local momunt point %s", directory)
+		safeRemoveDir(directory)
+	}(localMountPath)
 
 	log.Debugf("nas, changing mode for %s", createFullPath)
 
@@ -568,8 +574,10 @@ func deleteNasFilesystemSubDir(mountRoot, subDir, fileSystemNasIP string) error 
 		log.Errorf("nas, delete pv path error, err is: %s", err)
 	}
 
-	// log.Infof("nas, delete pv path succeed in NAS storage")
-	//defer os.RemoveAll(mountRoot)
+	defer func(directory string) {
+		log.Infof("Try to delete the temporary local momunt point %s", directory)
+		safeRemoveDir(directory)
+	}(mountRoot)
 
 	// unmount the local path after the remote folder is created
 	// log.Infof("nas, unmount dir after the dir creation: %s", mountRoot)
@@ -723,4 +731,15 @@ func DeleteUsageFullServers(serverList []string, thresholdFloat64 float64) ([]st
 		}
 	}
 	return tmpServers, nil
+}
+
+func safeRemoveDir(directory string) {
+	if utils.Mounted(directory) {
+		log.Errorf("Directory %s is still mounted, for the sake of data protection, skip the delete operation", directory)
+	} else {
+		err := os.Remove(directory)
+		if err != nil {
+			log.Errorf("Cannot delete the directory %s: %s", directory, err.Error())
+		}
+	}
 }
