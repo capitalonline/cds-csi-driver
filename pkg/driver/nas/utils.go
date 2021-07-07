@@ -519,7 +519,7 @@ func createNasFilesystemSubDir(localMountPath, subDir, fileSystemNasIP string) e
 
 	// finally delete localMountPath
 	defer func(directory string) {
-		log.Infof("Try to delete the temporary local momunt point %s", directory)
+		log.Infof("=============Try to delete the temporary local momunt point %s", directory)
 		safeRemoveDir(directory)
 	}(localMountPath)
 
@@ -530,11 +530,12 @@ func createNasFilesystemSubDir(localMountPath, subDir, fileSystemNasIP string) e
 	}
 
 	// unmount the localMountPath after the remote folder is created
-	log.Debugf("nas, unmount localMountPath: %s", localMountPath)
-
-	if err := utils.Unmount(localMountPath); err != nil {
-		log.Errorf("nas, failed to unmount localMountPath, error is: %s", err)
-	}
+	//log.Debugf("nas, unmount localMountPath: %s", localMountPath)
+	//
+	//if err := utils.Unmount(localMountPath); err != nil {
+	//	log.Errorf("nas, failed to unmount localMountPath, error is: %s", err)
+	//}
+	log.Errorf("=============nas, failed to unmount localMountPath")
 
 	log.Debugf("nas, create pv path: %s, in remote server's /nfsshare successfully", subDir)
 
