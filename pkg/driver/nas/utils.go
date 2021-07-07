@@ -457,7 +457,7 @@ func (opts *NfsOpts) createNasSubDir(mountRoot, subDir string) error {
 		return fmt.Errorf("nas, create sub directory err: " + err.Error())
 	}
 	defer func(directory string) {
-		log.Infof("Try to delete the temporary local momunt point %s", directory)
+		log.Infof("===============Try to delete the temporary local momunt point %s", directory)
 		safeRemoveDir(directory)
 	}(localMountPath)
 
@@ -470,9 +470,10 @@ func (opts *NfsOpts) createNasSubDir(mountRoot, subDir string) error {
 	// unmount the local path after the remote folder is created
 	log.Debugf("nas, unmount dir after the dir creation: %s", fullPath)
 
-	if err := utils.Unmount(localMountPath); err != nil {
-		log.Errorf("nas, failed to unmount path %s: %s", fullPath, err)
-	}
+	//if err := utils.Unmount(localMountPath); err != nil {
+	//	log.Errorf("nas, failed to unmount path %s: %s", fullPath, err)
+	//}
+	log.Errorf("===========nas, failed to unmount")
 
 	log.Debugf("nas, create sub directory successful: %s", opts.Path)
 
