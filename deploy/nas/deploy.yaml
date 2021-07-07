@@ -178,7 +178,7 @@ spec:
             configMapKeyRef:
               key: oversea
               name: cds-properties
-        image: registry-bj.capitalonline.net/cck/cds-csi-driver:v2.0.3
+        image: registry-bj.capitalonline.net/cck/cds-csi-driver:v2.0.4
         imagePullPolicy: Always
         livenessProbe:
           exec:
@@ -270,7 +270,7 @@ spec:
         env:
         - name: CSI_ENDPOINT
           value: unix://var/lib/kubelet/plugins/nas.csi.cds.net/csi.sock
-        image: registry-bj.capitalonline.net/cck/cds-csi-driver:v2.0.3
+        image: registry-bj.capitalonline.net/cck/cds-csi-driver:v2.0.4
         imagePullPolicy: Always
         name: nas-csi-node-server
         securityContext:

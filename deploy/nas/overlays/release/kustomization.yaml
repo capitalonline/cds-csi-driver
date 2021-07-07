@@ -3,4 +3,4 @@ bases:
 
 images:
   - name: registry-bj.capitalonline.net/cck/cds-csi-driver
-    newTag: v2.0.3
+    newTag: v2.0.4
