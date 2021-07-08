@@ -9,8 +9,8 @@ require (
 	github.com/kubernetes-csi/csi-lib-utils v0.7.0 // indirect
 	github.com/kubernetes-csi/drivers v1.0.2
 	github.com/sirupsen/logrus v1.4.2
-	github.com/wxnacy/wgo v1.0.4 // indirect
-	golang.org/x/net v0.0.0-20200114155413-6afb5195e5aa // indirect
+	github.com/wxnacy/wgo v1.0.4
+	golang.org/x/net v0.0.0-20200114155413-6afb5195e5aa
 	golang.org/x/sys v0.0.0-20200926100807-9d91bd62050c
 	google.golang.org/grpc v1.26.0
 	k8s.io/api v0.17.0

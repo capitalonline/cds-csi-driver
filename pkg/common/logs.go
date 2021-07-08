@@ -24,6 +24,7 @@ func SetLogAttribute(logType, driver string) {
 		logType = "both"
 	}
 	if logType == "stdout" {
+		log.SetOutput(os.Stdout)
 		return
 	}
 
