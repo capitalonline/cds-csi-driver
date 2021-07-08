@@ -47,8 +47,11 @@ func main() {
 
 	// set log config
 	logType := os.Getenv("LOG_TYPE")
-	if debug {
+	if logType == "" {
 		logType = "stdout"
+	}
+	if debug {
+		log.SetLevel(log.DebugLevel)
 	}
 	common.SetLogAttribute(logType, driverName)
 
