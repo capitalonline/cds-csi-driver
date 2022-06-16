@@ -70,6 +70,10 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 		utils.SentrySendError(fmt.Errorf("AuthType verify error, AuthType is only support %s", AuthTypeDefault))
 		return nil, errors.New("AuthType verify error, not support, it should to be saveAkFile")
 	}
+	
+	if err := utils.CreateDir(opts.NodePublishPath, 0777); err != nil {
+		return nil, fmt.Errorf("NodePublishVolume:: oss, unable to create directory: %s", opts.NodePublishPath)
+	}
 
 	var mntCmd string
 	log.Debugf("NodePublishVolume:: Start mount source [%s:%s] to [%s]", opts.Bucket, opts.Path, opts.NodePublishPath)
