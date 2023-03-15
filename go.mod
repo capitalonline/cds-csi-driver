@@ -3,7 +3,7 @@ module github.com/capitalonline/cds-csi-driver
 go 1.13
 
 require (
-	github.com/capitalonline/cck-sdk-go v2.2.1+incompatible
+	github.com/capitalonline/cck-sdk-go v2.2.2+incompatible
 	github.com/container-storage-interface/spec v1.2.0
 	github.com/kubernetes-csi/csi-lib-utils v0.7.0 // indirect
 	github.com/kubernetes-csi/drivers v1.0.2
