@@ -1,10 +1,11 @@
 package utils
 
 import (
+	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/getsentry/sentry-go"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"io/ioutil"
@@ -23,6 +24,7 @@ import (
 
 const (
 	NodeMetaDataFile = "/host/etc/cds/node-meta"
+	CloudInitDev     = "/dev/sdb"
 )
 
 // Metrics represents the used and available bytes of the Volume.
@@ -70,7 +72,12 @@ func GetNodeMetadata() *NodeMeta {
 	return func(f string) *NodeMeta {
 		b, err := ioutil.ReadFile(f)
 		if err != nil {
-			log.Fatalf("cannot find metadata file %s: %s", f, err.Error())
+			// 尝试从cloud-init盘读取数据
+			id, err := ReadCloudInitInfo()
+			if err != nil {
+				log.Fatalf("cannot find metadata file %s: %s", f, err.Error())
+			}
+			return &NodeMeta{NodeID: id}
 		}
 		var nodeMeta NodeMeta
 		if err := json.Unmarshal(b, &nodeMeta); err != nil {
@@ -82,6 +89,27 @@ func GetNodeMetadata() *NodeMeta {
 
 func (n *NodeMeta) GetNodeID() string {
 	return n.NodeID
+}
+
+func ReadCloudInitInfo() (string, error) {
+	file, err := os.Open(CloudInitDev)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	// 创建一个 Scanner 对象来读取文件内容
+	scanner := bufio.NewScanner(file)
+
+	// 逐行读取文件内容
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "local-hostname:") {
+			line = strings.Replace(line, "local-hostname:", "", -1)
+			return strings.TrimSpace(line), nil
+		}
+	}
+	return "", errors.New("cat not found instance info")
 }
 
 // Mounted checks whether a volume is mounted
@@ -183,8 +211,7 @@ func ServerReachable(host, port string, timeout time.Duration) bool {
 
 func SentrySendError(errorInfo error) {
 	// will init by ENVIRONMENT named "SENTRY_DSN"
-	err := sentry.Init(sentry.ClientOptions{
-	})
+	err := sentry.Init(sentry.ClientOptions{})
 
 	if err != nil {
 		log.Fatalf("sentry.Init: %s", err)

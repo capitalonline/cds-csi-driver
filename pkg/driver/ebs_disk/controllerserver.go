@@ -50,8 +50,7 @@ func NewControllerServer(d *DiskDriver) *ControllerServer {
 
 // CreateVolume 创建
 func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
-	//resp, err := eks.CreateBlock("", "")
-	//fmt.Println(resp, err)
+
 	return &csi.CreateVolumeResponse{}, nil
 }
 
