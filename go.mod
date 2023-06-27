@@ -1,6 +1,6 @@
 module github.com/capitalonline/cds-csi-driver
 
-go 1.13
+go 1.18
 
 require (
 	github.com/capitalonline/cck-sdk-go v2.2.2+incompatible

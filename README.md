@@ -18,12 +18,6 @@ To deploy the CSI OSS driver to your k8s, simply run:
 kubectl create -f https://raw.githubusercontent.com/capitalonline/cds-csi-driver/master/deploy/oss/deploy.yaml
 ```
 
-To deploy the CSI Block driver to your k8s, simply run:
-
-```bash
-kubectl create -f https://raw.githubusercontent.com/capitalonline/cds-csi-driver/master/deploy/block/deploy.yaml
-```
-
 ## To run tests
 
 **NAS:**
@@ -40,11 +34,6 @@ kubectl create -f https://raw.githubusercontent.com/capitalonline/cds-csi-driver
 3. Run `make test-prerequisite` to build the image and deploy the driver to your k8s cluster
 4. Run `make oss-test`
 
-**Block：**
-
-1. Make sure that you have a Kubernetes cluster accessible with `kubectl`
-2. Run `make test-prerequisite` to build the image and deploy the driver to your k8s cluster
-3. Run `make block-test`
 
 ## To use the NAS driver
 Examples can be found [here](!https://github.com/capitalonline/cds-csi-driver/tree/master/example/nas)
@@ -182,7 +171,6 @@ Description:
 | akId         | <access_key>                   | yes      | Get it from your own bucket's in CDS web |
 | akSecret     | <acckedd_key_secret>           | yes      | Get it from your own bucket's in CDS web |
 | path         | <bucket_path>                  | yes      | Bucket path, default is `/`              |
-
 
 
 ## To use the Disk driver 
