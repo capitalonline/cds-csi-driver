@@ -1,4 +1,4 @@
-package disk
+package ebs_disk
 
 import (
 	"github.com/capitalonline/cds-csi-driver/pkg/common"
@@ -8,7 +8,7 @@ import (
 
 // PluginFolder defines the location of disk plugin
 const (
-	driverName      = "disk.csi.cds.net"
+	driverName      = "ebs.csi.cds.net"
 	csiVersion      = "1.0.0"
 	TopologyZoneKey = "topology.kubernetes.io/zone"
 )

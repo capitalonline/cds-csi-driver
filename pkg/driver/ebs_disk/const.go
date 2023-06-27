@@ -1,4 +1,4 @@
-package disk
+package ebs_disk
 
 const (
 	HighDisk         = "high_disk"

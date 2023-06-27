@@ -1,4 +1,4 @@
-package disk
+package ebs_disk
 
 import (
 	"context"
