@@ -17,10 +17,6 @@ DISK_DEPLOY_PATH=./deploy/disk
 DISK_KUSTOMIZATION_RELEASE_PATH=${DISK_DEPLOY_PATH}/overlays/release
 DISK_KUSTOMIZATION_TEST_PATH=${DISK_DEPLOY_PATH}/overlays/test
 DISK_KUSTOMIZATION_FILE=${DISK_KUSTOMIZATION_RELEASE_PATH}/kustomization.yaml
-BLOCK_DEPLOY_PATH=./deploy/block
-BLOCK_KUSTOMIZATION_RELEASE_PATH=${BLOCK_DEPLOY_PATH}/overlays/release
-BLOCK_KUSTOMIZATION_TEST_PATH=${BLOCK_DEPLOY_PATH}/overlays/test
-BLOCK_KUSTOMIZATION_FILE=${BLOCK_KUSTOMIZATION_RELEASE_PATH}/kustomization.yaml
 .EXPORT_ALL_VARIABLES:
 
 .PHONY: build
@@ -51,14 +47,12 @@ sync-version:
 	sed -i.bak 's/newTag: .*/newTag: '${VERSION}'/g' ${NAS_KUSTOMIZATION_FILE} && rm ${NAS_KUSTOMIZATION_FILE}.bak
 	sed -i.bak 's/newTag: .*/newTag: '${VERSION}'/g' ${OSS_KUSTOMIZATION_FILE} && rm ${OSS_KUSTOMIZATION_FILE}.bak
 	sed -i.bak 's/newTag: .*/newTag: '${VERSION}'/g' ${DISK_KUSTOMIZATION_FILE} && rm ${DISK_KUSTOMIZATION_FILE}.bak
-	sed -i.bak 's/newTag: .*/newTag: '${VERSION}'/g' ${BLOCK_KUSTOMIZATION_FILE} && rm ${BLOCK_KUSTOMIZATION_FILE}.bak
 
 .PHONY: kustomize
 kustomize:sync-version
 	kubectl kustomize ${NAS_KUSTOMIZATION_RELEASE_PATH} > ${NAS_DEPLOY_PATH}/deploy.yaml
 	kubectl kustomize ${OSS_KUSTOMIZATION_RELEASE_PATH} > ${OSS_DEPLOY_PATH}/deploy.yaml
 	kubectl kustomize ${DISK_KUSTOMIZATION_RELEASE_PATH} > ${DISK_DEPLOY_PATH}/deploy.yaml
-	kubectl kustomize ${BLOCK_KUSTOMIZATION_RELEASE_PATH} > ${BLOCK_DEPLOY_PATH}/deploy.yaml
 
 .PHONY: unit-test
 unit-test:
@@ -71,7 +65,6 @@ test-prerequisite:
 	kubectl kustomize ${NAS_KUSTOMIZATION_TEST_PATH} | kubectl apply -f -
 	kubectl kustomize ${OSS_KUSTOMIZATION_TEST_PATH} | kubectl apply -f -
 	kubectl kustomize ${DISK_KUSTOMIZATION_TEST_PATH} | kubectl apply -f -
-	kubectl kustomize ${BLOCK_KUSTOMIZATION_TEST_PATH} | kubectl apply -f -
 
 .PHONY: integration-test
 integration-test:
@@ -88,12 +81,4 @@ oss-test:
 	go test -v -race ./pkg/driver/oss/...
 	@echo "**************************** running oss integration test ****************************"
 	@./test/oss/test.sh
-	@echo "**************************** all tests passed ****************************"
-
-.PHONE: block-test
-block-test:
-	@echo "**************************** running oss unit test ****************************"
-	go test -v -race ./pkg/driver/block/...
-	@echo "**************************** running oss integration test ****************************"
-	@./test/block/test.sh
 	@echo "**************************** all tests passed ****************************"
