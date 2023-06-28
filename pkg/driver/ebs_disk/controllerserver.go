@@ -177,7 +177,45 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 }
 
 func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
-	return &csi.ControllerPublishVolumeResponse{}, nil
+	// Step 1: get necessary params
+	diskID := req.VolumeId
+
+	// todo 什么时候赋值的
+	nodeID := req.NodeId
+	log.Infof("ControllerPublishVolume: pvName: %s, starting attach diskID: %s to node: %s", req.VolumeId, diskID, nodeID)
+
+	// Step 2: check necessary params
+	if diskID == "" || nodeID == "" {
+		log.Errorf("ControllerPublishVolume: missing [VolumeId/NodeId] in request")
+		return nil, status.Error(codes.InvalidArgument, "ControllerPublishVolume missing [VolumeId/NodeId] in request")
+	}
+
+	// check attaching status
+	if value, ok := diskAttachingMap[diskID]; ok {
+		if value == "attaching" {
+			log.Warnf("ControllerPublishVolume: diskID: %s is in attaching, please wait", diskID)
+			return nil, fmt.Errorf("ControllerPublishVolume: diskID: %s is in attaching, please wait", diskID)
+		} else if value == "error" {
+			log.Errorf("ControllerPublishVolume: diskID: %s attaching process was error", diskID)
+			return nil, fmt.Errorf("ControllerPublishVolume: diskID: %s attaching process was error", diskID)
+		}
+		log.Warnf("ControllerPublishVolume: diskID: %s attaching process finished, return context", diskID)
+		return &csi.ControllerPublishVolumeResponse{}, nil
+	}
+
+	// Step 3: check disk status
+	// todo go sdk need edit
+	res, err := findDiskByVolumeID(diskID)
+	if err != nil {
+		log.Errorf("ControllerPublishVolume: findDiskByVolumeID api error, err is: %s", err)
+		return nil, fmt.Errorf("ControllerPublishVolume: findDiskByVolumeID api error, err is: %s", err)
+	}
+
+	if res.Data.DiskSlice == nil {
+		log.Errorf("ControllerPublishVolume: findDiskByVolumeID res is nil")
+		return nil, fmt.Errorf("ControllerPublishVolume: findDiskByVolumeID res is nil")
+	}
+
 }
 
 func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
