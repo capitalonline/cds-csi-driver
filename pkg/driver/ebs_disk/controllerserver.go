@@ -112,7 +112,6 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 		return nil, fmt.Errorf("CreateVolume: Disk Volume(%s)'s creating process error", pvName)
 	}
 
-	// todo go sdk need edit
 	// do request to create ebs disk
 	// diskName, diskType, diskSiteID, diskZoneID string, diskSize, diskIops int
 	createRes, err := createEbsDisk(pvName, diskVol.StorageType, "", "", int(diskRequestGB), 0)
@@ -121,14 +120,16 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 		return nil, fmt.Errorf("CreateVolume: createDisk error, err is: %s", err.Error())
 	}
 
-	diskID := createRes.Data.VolumeID
-	taskID := createRes.TaskID
+	diskIdSet := createRes.Data.DiskIdSet
+	if len(diskIdSet) != 1 {
+		return nil, fmt.Errorf("invalid diskIdSet:%s", diskIdSet)
+	}
+	diskID := diskIdSet[1]
+	taskID := createRes.Data.EventId
 
-	// store creating disk
 	diskProcessingMap[pvName] = "creating"
 
 	// check create ebs disk event
-	// todo go sdk need edit
 	err = describeTaskStatus(taskID)
 	if err != nil {
 		log.Errorf("createDisk: describeTaskStatus task result failed, err is: %s", err.Error())
@@ -159,11 +160,8 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 		},
 	}
 
-	// Step 6: store
-	// store diskId and pvName(pvName is equal to pvcName)
 	diskIdPvMap[diskID] = pvName
 
-	// store req.Name and csi.Volume
 	pvcCreatedMap[pvName] = tmpVol
 
 	log.Infof("CreateVolume: successfully create disk, pvName is: %s, diskID is: %s", pvName, diskID)
@@ -172,6 +170,71 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 }
 
 func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
+	log.Infof("DeleteVolume: Starting deleting volume, req is: %+v", req)
+
+	diskID := req.VolumeId
+	if diskID == "" {
+		log.Error("DeleteVolume: req.VolumeID cannot be empty")
+		return nil, fmt.Errorf("DeleteVolume: req.VolumeID cannot be empty")
+	}
+
+	if value, ok := diskDeletingMap[diskID]; ok {
+		if value == "deleting" || value == "detaching" {
+			log.Warnf("DeleteVolume: diskID: %s is in [deleting|detaching] status, please wait", diskID)
+			return nil, fmt.Errorf("DeleteVolume: diskID: %s is in [deleting|detaching] status, please wait", diskID)
+		}
+
+		log.Errorf("DeleteVolume: diskID: %s has been deleted but failed, please manual deal with it", diskID)
+		return nil, fmt.Errorf("DeleteVolume: diskID: %s has been deleted but failed, please manual deal with it", diskID)
+	}
+
+	// Step 2: find disk by volumeID
+	disk, err := findDiskByVolumeID(req.VolumeId)
+	if err != nil {
+		log.Errorf("DeleteVolume: findDiskByVolumeID error, err is: %s", err.Error())
+		return nil, err
+	}
+	// TODO enumerate all disk status
+	diskStatus := disk.Data.DiskInfo.Status
+	if diskStatus == StatusInMounted {
+		log.Errorf("DeleteVolume: disk [mounted], cant delete volumeID: %s ", diskID)
+		return nil, fmt.Errorf("DeleteVolume: disk [mounted], cant delete volumeID: %s", diskID)
+	} else if diskStatus == StatusInOK {
+		log.Debugf("DeleteVolume: disk is in [idle], then to delete directly!")
+	} else if diskStatus == StatusInDeleted {
+		log.Warnf("DeleteVolume: disk had been deleted")
+		return &csi.DeleteVolumeResponse{}, nil
+	}
+
+	// Step 4: delete disk
+	deleteRes, err := deleteDisk(diskID)
+	if err != nil {
+		log.Errorf("DeleteVolume: delete disk error, err is: %s", err)
+		return nil, fmt.Errorf("DeleteVolume: delete disk error, err is: %s", err)
+	}
+
+	// store deleting disk status
+	diskDeletingMap[diskID] = "deleting"
+
+	taskID := deleteRes.Data.EventId
+	if err := describeTaskStatus(taskID); err != nil {
+		log.Errorf("deleteDisk: cdsDisk.DeleteDisk task result failed, err is: %s", err)
+		diskDeletingMap[diskID] = "error"
+		return nil, fmt.Errorf("deleteDisk: cdsDisk.DeleteDisk task result failed, err is: %s", err)
+	}
+
+	// Step 5: delete pvcCreatedMap
+	if pvName, ok := diskIdPvMap[diskID]; ok {
+		delete(pvcCreatedMap, pvName)
+	}
+
+	// Step 6: clear diskDeletingMap and diskIdPvMap
+	delete(diskIdPvMap, diskID)
+	delete(diskDeletingMap, diskID)
+
+	// log.Infof("DeleteVolume: clean [diskIdPvMap] and [pvcMap] and [diskDeletingMap] succeed!")
+	log.Infof("DeleteVolume: Successfully delete diskID: %s !", diskID)
+
 	return &csi.DeleteVolumeResponse{}, nil
 }
 
@@ -195,20 +258,14 @@ func (c *ControllerServer) ControllerExpandVolume(context.Context, *csi.Controll
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
-func createEbsDisk(diskName, diskType, diskSiteID, diskZoneID string, diskSize, diskIops int) (*cdsDisk.CreateDiskResponse, error) {
-
+func createEbsDisk(diskName, diskType, diskSiteID, diskZoneID string, diskSize, diskIops int) (*cdsDisk.CreateEbsResp, error) {
 	log.Infof("createDisk: diskName: %s, diskType: %s, diskSiteID: %s, diskZoneID: %s, diskSize: %d, diskIops: %d", diskName, diskType, diskSiteID, diskZoneID, diskSize, diskIops)
-
-	// create disk
 	res, err := cdsDisk.CreateEbs(&cdsDisk.CreateEbsReq{
-		ProductSource:     "",
-		ProductServerId:   "",
 		AvailableZoneCode: "",
 		DiskName:          diskName,
-		DiskFeature:       "ssd",
+		DiskFeature:       DiskFeatureSSD,
 		Size:              diskSize,
-		Number:            1,
-		BillingMethod:     "",
+		BillingMethod:     BillingMethodPostPaid,
 	})
 
 	if err != nil {
@@ -230,18 +287,53 @@ func describeTaskStatus(taskID string) error {
 			log.Errorf("task api error, err is: %s", err)
 			return fmt.Errorf("apiError")
 		}
-
-		if res.Data.Status == "finish" {
-			log.Debugf("task succeed")
+		switch res.Data.EventStatus {
+		case "finish", "success":
 			return nil
-		} else if res.Data.Status == "doing" {
+		case "error", "failed", "part_fail":
+			return fmt.Errorf("taskError")
+		case "doing", "init":
 			log.Debugf("task:%s is running, sleep 10s", taskID)
 			time.Sleep(10 * time.Second)
-		} else if res.Data.Status == "error" {
-			log.Debugf("task error")
-			return fmt.Errorf("taskError")
+		default:
+			return fmt.Errorf("unkonw task status:%s ,taskId: %s", res.Data.EventStatus, taskID)
 		}
 	}
 
 	return fmt.Errorf("task time out, running more than 20 minutes")
+}
+
+func findDiskByVolumeID(volumeID string) (*cdsDisk.FindDiskByVolumeIDResponse, error) {
+
+	log.Infof("findDiskByVolumeID: volumeID is: %s", volumeID)
+
+	res, err := cdsDisk.FindDiskByVolumeID(&cdsDisk.FindDiskByVolumeIDArgs{
+		DiskId: volumeID,
+	})
+
+	if err != nil {
+		log.Errorf("findDiskByVolumeID: cdsDisk.FindDiskByVolumeID [api error], err is: %s", err)
+		return nil, err
+	}
+
+	log.Infof("findDiskByVolumeID: Successfully!")
+
+	return res, nil
+}
+
+func deleteDisk(diskID string) (*cdsDisk.DeleteDiskResponse, error) {
+	log.Infof("deleteDisk: diskID is:%s", diskID)
+
+	res, err := cdsDisk.DeleteDisk(&cdsDisk.DeleteDiskArgs{
+		DiskIds: []string{diskID},
+	})
+
+	if err != nil {
+		log.Errorf("deleteDisk: cdsDisk.DeleteDisk api error, err is: %s", err)
+		return nil, err
+	}
+
+	log.Infof("deleteDisk: cdsDisk.DeleteDisk task creation succeed, taskID is: %s", res.Data.EventId)
+
+	return res, nil
 }
