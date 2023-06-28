@@ -3,16 +3,15 @@ package ebs_disk
 import (
 	"context"
 	"fmt"
-	cdsDisk "github.com/capitalonline/cck-sdk-go/pkg/cck/disk"
+	cdsDisk "github.com/capitalonline/cck-sdk-go/pkg/eks/ebs"
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/kubernetes-csi/drivers/pkg/csi-common"
+	csicommon "github.com/kubernetes-csi/drivers/pkg/csi-common"
+	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"time"
-
-	log "github.com/sirupsen/logrus"
 )
 
 // the map of req.Name and csi.Volume.
@@ -201,13 +200,15 @@ func createEbsDisk(diskName, diskType, diskSiteID, diskZoneID string, diskSize, 
 	log.Infof("createDisk: diskName: %s, diskType: %s, diskSiteID: %s, diskZoneID: %s, diskSize: %d, diskIops: %d", diskName, diskType, diskSiteID, diskZoneID, diskSize, diskIops)
 
 	// create disk
-	res, err := cdsDisk.CreateDisk(&cdsDisk.CreateDiskArgs{
-		Name:     diskName,
-		RegionID: diskSiteID,
-		DiskType: diskType,
-		Size:     diskSize,
-		Iops:     diskIops,
-		ZoneID:   diskZoneID,
+	res, err := cdsDisk.CreateEbs(&cdsDisk.CreateEbsReq{
+		ProductSource:     "",
+		ProductServerId:   "",
+		AvailableZoneCode: "",
+		DiskName:          diskName,
+		DiskFeature:       "ssd",
+		Size:              diskSize,
+		Number:            1,
+		BillingMethod:     "",
 	})
 
 	if err != nil {
