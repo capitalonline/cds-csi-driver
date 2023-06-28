@@ -11,8 +11,8 @@ import (
 // storing staging disk
 var diskStagingMap = map[string]string{}
 
-// storing unstaging disk
-var diskUnstagingMap = map[string]string{}
+// storing unStaging disk
+var diskUnStagingMap = map[string]string{}
 
 // storing publishing disk
 var diskPublishingMap = map[string]string{}
@@ -20,8 +20,8 @@ var diskPublishingMap = map[string]string{}
 // storing published disk
 var diskPublishedMap = map[string]string{}
 
-// storing unpublishing disk
-var diskUnpublishingMap = map[string]string{}
+// storing unPublishing disk
+var diskUnPublishingMap = map[string]string{}
 
 // storing formatted disk
 var diskFormattedMap = map[string]string{}
