@@ -2,6 +2,7 @@ package utils
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/getsentry/sentry-go"
@@ -23,6 +24,7 @@ import (
 
 const (
 	NodeMetaDataFile = "/host/etc/cds/node-meta"
+	CloudInitDevSize = 8 * 1024
 )
 
 // Metrics represents the used and available bytes of the Volume.
@@ -70,7 +72,13 @@ func GetNodeMetadata() *NodeMeta {
 	return func(f string) *NodeMeta {
 		b, err := ioutil.ReadFile(f)
 		if err != nil {
-			log.Fatalf("cannot find metadata file %s: %s", f, err.Error())
+			// 尝试从cloud-init盘读取数据
+			id, err := ReadCloudInitInfo()
+			log.Infof("successfully get instance id from cloud init info")
+			if err != nil {
+				log.Fatalf("cannot find metadata file %s: %s", f, err.Error())
+			}
+			return &NodeMeta{NodeID: id}
 		}
 		var nodeMeta NodeMeta
 		if err := json.Unmarshal(b, &nodeMeta); err != nil {
@@ -82,6 +90,113 @@ func GetNodeMetadata() *NodeMeta {
 
 func (n *NodeMeta) GetNodeID() string {
 	return n.NodeID
+}
+
+func ReadCloudInitInfo() (string, error) {
+
+	output, err := exec.Command("sh", "-c", "cat /proc/partitions | grep 8192").CombinedOutput()
+	fmt.Println(output, err)
+	list := strings.Split(strings.TrimSpace(string(output)), " ")
+	var devName = ""
+	for _, item := range list {
+		if !strings.HasPrefix(item, "sd") {
+			continue
+		}
+		devName = item
+	}
+	if devName == "" {
+		return "", errors.New("cannot find cloudinit device")
+	}
+
+	if err = os.Mkdir("/tmp/ins", 0777); err != nil && !os.IsExist(err) {
+		msg := fmt.Sprintf("can not make dir err:%s", err.Error())
+		log.Errorf(msg)
+		return "", errors.New(msg)
+	}
+	cmd := exec.Command("mount", fmt.Sprintf("/dev/%s", devName), "/tmp/ins")
+	_, err = cmd.CombinedOutput()
+	if err != nil {
+		return "", errors.New("cannot mount device")
+	}
+	file, err := os.ReadFile("/tmp/ins/meta-data")
+	if err != nil {
+		return "", errors.New(fmt.Sprintf("cannot open /tmp/ins/meta-data,err:%s", err.Error()))
+	}
+
+	list = strings.Split(string(file), "\n")
+	var instanceId = ""
+	for _, item := range list {
+		if strings.Contains(item, "local-hostname") {
+			item = strings.Trim(item, "local-hostname:")
+			instanceId = strings.Trim(strings.TrimSpace(item), " ")
+		}
+	}
+	_, _ = exec.Command("umount", "/tmp/ins").CombinedOutput()
+	if len(instanceId) == 0 {
+		return "", errors.New(fmt.Sprintf("invalid instance_id"))
+	}
+	return instanceId, nil
+
+	//dir, err := os.Open("/dev")
+	//if err != nil {
+	//	log.Errorf("can not open dev")
+	//	return "", err
+	//}
+	//defer dir.Close()
+	//
+	//// 读取目录中的文件信息
+	//files, err := dir.Readdir(-1)
+	//if err != nil {
+	//
+	//	return "", err
+	//}
+	//
+	//var blocks = make([]os.FileInfo, 0)
+	//
+	//// 遍历文件信息
+	//for _, file := range files {
+	//	// 检查是否为块设备文件
+	//	if (file.Mode()&os.ModeDevice) == 0 || (file.Mode()&os.ModeCharDevice) != 0 {
+	//		continue
+	//	}
+	//	blocks = append(blocks, file)
+	//	// 获取设备号
+	//	//dev := file.Sys().(*syscall.Stat_t).Rdev
+	//	//
+	//	//// 输出设备路径和设备号
+	//	//fmt.Printf("设备路径：%s\n", "/dev/"+file.Name())
+	//	//fmt.Printf("设备号：%d:%d\n", uint32(dev/256), uint32(dev%256))
+	//	//fmt.Println()
+	//}
+	//
+	//for _, dev := range blocks {
+	//	file, err := os.Open(fmt.Sprintf("/dev/%s", dev.Name()))
+	//	defer file.Close()
+	//	if err != nil {
+	//		continue
+	//	}
+	//	fd := int(file.Fd())
+	//	var stat syscall.Stat_t
+	//	if err = syscall.Fstat(fd, &stat); err != nil {
+	//		continue
+	//	}
+	//
+	//	// 输出块设备大小（以字节为单位）
+	//	blockSize := int64(stat.Blksize)
+	//	diskSize := uint64(stat.Blocks) * uint64(blockSize)
+	//	if diskSize == CloudInitDevSize {
+	//		if err = os.Mkdir("/tmp/ins", 0777); err != nil && !os.IsExist(err) {
+	//			msg := fmt.Sprintf("can not make dir err:%s", err.Error())
+	//			log.Errorf(msg)
+	//			panic(msg)
+	//		}
+	//		cmd := exec.Command("mount", fmt.Sprintf("/dev/%s", dev.Name()), "/tmp/ins")
+	//		output, err := cmd.CombinedOutput()
+	//		fmt.Println(string(output), "   ", err)
+	//	}
+	//}
+
+	return "", errors.New("cat not found instance info")
 }
 
 // Mounted checks whether a volume is mounted
@@ -183,8 +298,7 @@ func ServerReachable(host, port string, timeout time.Duration) bool {
 
 func SentrySendError(errorInfo error) {
 	// will init by ENVIRONMENT named "SENTRY_DSN"
-	err := sentry.Init(sentry.ClientOptions{
-	})
+	err := sentry.Init(sentry.ClientOptions{})
 
 	if err != nil {
 		log.Fatalf("sentry.Init: %s", err)
