@@ -8,9 +8,12 @@ import (
 
 // PluginFolder defines the location of disk plugin
 const (
-	driverName      = "ebs.csi.cds.net"
-	csiVersion      = "1.0.0"
-	TopologyZoneKey = "topology.kubernetes.io/zone"
+	driverName            = "ebs.csi.cds.net"
+	csiVersion            = "1.0.0"
+	TopologyZoneKey       = "topology.kubernetes.io/zone"
+	DiskFeatureSSD        = "SSD"
+	BillingMethodPrePaid  = "1"
+	BillingMethodPostPaid = "0"
 )
 
 func NewDriver(driverName, nodeId, endpoint string) *DiskDriver {
