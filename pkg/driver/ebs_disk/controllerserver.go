@@ -333,7 +333,65 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 	return &csi.ControllerPublishVolumeResponse{}, nil
 }
 
+// ControllerUnpublishVolume detach
 func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
+
+	// Step 1: get necessary params
+	diskID := req.VolumeId
+	nodeID := req.NodeId
+	log.Infof("ControllerUnpublishVolume: starting detach disk: %s from node: %s", diskID, nodeID)
+
+	// Step 2: check necessary params
+	if diskID == "" || nodeID == "" {
+		log.Errorf("ControllerUnpublishVolume: missing [VolumeId/NodeId] in request")
+		return nil, status.Error(codes.InvalidArgument, "ControllerUnpublishVolume: missing [VolumeId/NodeId] in request")
+	}
+
+	// Step 3: check disk status
+	if value, ok := diskDetachingMap[diskID]; ok {
+		if value == "detaching" {
+			log.Warnf("ControllerUnpublishVolume: diskID: %s is in detaching, please wait", diskID)
+			return nil, fmt.Errorf("ControllerUnpublishVolume: diskID: %s is in detaching, please wait", diskID)
+		} else if value == "error" {
+			log.Errorf("ControllerUnpublishVolume: diskID: %s detaching process is error", diskID)
+			return nil, fmt.Errorf("ControllerUnpublishVolume: diskID: %s detaching process is error", diskID)
+		}
+	}
+
+	res, err := findDiskByVolumeID(diskID)
+	if err != nil {
+		log.Errorf("ControllerUnpublishVolume: findDiskByVolumeID error, err is: %s", err)
+		return nil, fmt.Errorf("ControllerUnpublishVolume: findDiskByVolumeID error, err is: %s", err)
+	}
+
+	if res == nil {
+		log.Errorf("ControllerUnpublishVolume: findDiskByVolumeID res is nil")
+		return nil, fmt.Errorf("ControllerUnpublishVolume: findDiskByVolumeID res is nil")
+	}
+
+	if res.Data.DiskSlice[0].NodeID != nodeID {
+		log.Warnf("ControllerUnpublishVolume: diskID: %s had been detached from nodeID: %s", diskID, nodeID)
+		return &csi.ControllerUnpublishVolumeResponse{}, nil
+	}
+
+	// Step 4: detach disk
+	taskID, err := detachDisk(diskID)
+	if err != nil {
+		log.Errorf("ControllerUnpublishVolume: create detach task failed, err is: %s", err.Error())
+		return nil, err
+	}
+
+	diskDetachingMap[diskID] = "detaching"
+	if err := describeTaskStatus(taskID); err != nil {
+		diskDetachingMap[diskID] = "error"
+		log.Errorf("ControllerUnpublishVolume: cdsDisk.detachDisk task result failed, err is: %s", err)
+		return nil, err
+	}
+
+	delete(diskDetachingMap, diskID)
+	//delete(diskAttachingMap, diskID)
+	log.Infof("ControllerUnpublishVolume: Successfully detach disk: %s from node: %s", diskID, nodeID)
+
 	return &csi.ControllerUnpublishVolumeResponse{}, nil
 }
 

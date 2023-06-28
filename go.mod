@@ -16,3 +16,7 @@ require (
 	k8s.io/apimachinery v0.17.1-beta.0
 	k8s.io/client-go v0.17.0
 )
+
+replace (
+	github.com/capitalonline/cck-sdk-go v2.2.2+incompatible => ../cck-sdk-go
+)
