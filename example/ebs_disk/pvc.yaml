@@ -8,4 +8,4 @@ spec:
   storageClassName: disk-csi-csd-sc
   resources:
     requests:
-      storage: 16Gi
+      storage: 24Gi

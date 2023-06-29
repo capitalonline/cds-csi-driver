@@ -3,9 +3,9 @@ kind: StorageClass
 metadata:
   name: disk-csi-csd-sc
 parameters:
-  fsType: "ext4"
-  storageType: "SSD"
-  azId: "beijing001"
-provisioner: disk.csi.cds.net
+  fsType: ext4
+  azId: SR_SaoPaulo_A
+  storageType: SSD
+provisioner: ebs-disk.csi.cds.net
 reclaimPolicy: Delete
-volumeBindingMode: WaitForFirstConsumer    # Immediate
+volumeBindingMode: WaitForFirstConsumer
