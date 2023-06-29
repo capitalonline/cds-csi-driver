@@ -19,7 +19,7 @@ import (
 )
 
 // the map of req.Name and csi.Volume.
-var pvcCreatedMap = map[string]*csi.Volume{}
+var pvcCreatedMap = new(sync.Map)
 
 // the map of diskId and pvName
 // diskId and pvName is not same under csi plugin
@@ -69,8 +69,10 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 
 	pvName := req.Name
 	// Step 1: check the pvc(req.Name) is created or not. return pv directly if created, else do creation
-	if value, ok := pvcCreatedMap[pvName]; ok {
+	if v, ok := pvcCreatedMap.Load(pvName); ok {
+		value, _ := v.(*csi.Volume)
 		log.Warnf("CreateVolume: volume has been created, pvName: %s, volumeContext: %v, return directly", pvName, value.VolumeContext)
+		return &csi.CreateVolumeResponse{Volume: value}, nil
 	}
 
 	// Step 2: check critical params
@@ -113,7 +115,8 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 		if value == "creating" {
 			log.Warnf("CreateVolume: Disk Volume(%s)'s is in creating, please wait", pvName)
 
-			if tmpVol, ok := pvcCreatedMap[pvName]; ok {
+			if tmp, ok := pvcCreatedMap.Load(pvName); ok {
+				tmpVol, _ := tmp.(*csi.Volume)
 				log.Warnf("CreateVolume: Disk Volume(%s)'s diskID: %s creating process finished, return context", pvName, value)
 				return &csi.CreateVolumeResponse{Volume: tmpVol}, nil
 			}
@@ -179,7 +182,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 	diskIdPvMap.Store(diskID, pvName)
 	//diskIdPvMap[diskID] = pvName
 
-	pvcCreatedMap[pvName] = tmpVol
+	pvcCreatedMap.Store(pvName, tmpVol)
 
 	log.Infof("CreateVolume: successfully create disk, pvName is: %s, diskID is: %s", pvName, diskID)
 
@@ -245,7 +248,7 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 	//}
 	if pvName, ok := diskIdPvMap.Load(diskID); ok {
 		name, _ := pvName.(string)
-		delete(pvcCreatedMap, name)
+		pvcCreatedMap.Delete(name)
 	}
 
 	// Step 6: clear diskDeletingMap and diskIdPvMap
