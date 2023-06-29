@@ -90,14 +90,11 @@ func (n *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 			log.Warnf("NodeStageVolume: diskID: %s has been staged to targetGlobalPath: %s, and still going to staged to another targetGlobalPath: %s", diskID, value, targetGlobalPath)
 		}
 	}
-	// 1 openapi根据diskID查询详情，主要获取盘的 设备id
 	res, err := findDiskByVolumeID(diskID)
 	if err != nil {
 		log.Errorf("NodeStageVolume: find disk uuid failed, err is: %s", err)
 		return nil, err
 	}
-
-	// 2 根据 设备id 获取 deviceName
 	deviceName, err := findDeviceNameByOrderId(fmt.Sprintf("%s%d", OrderHead, res.Data.DiskInfo.Order))
 	if err != nil {
 		log.Errorf("NodeStageVolume: findDeviceNameByUuid error, err is: %s", err.Error())
@@ -117,7 +114,6 @@ func (n *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 		}
 		log.Debugf("NodeStageVolume: Step 1: formatDiskDevice successfully!")
 	}
-	// 4. 检查挂载全局路径是否存在（无则创建），并挂载磁盘到节点的全局路径，完成
 	log.Debugf("NodeStageVolume: targetGlobalPath exist flag: %t", utils.FileExisted(targetGlobalPath))
 	if !utils.FileExisted(targetGlobalPath) {
 		if err = utils.CreateDir(targetGlobalPath, mountPointMode); err != nil {
@@ -142,11 +138,6 @@ func (n *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 
 // NodePublishVolume 2.将挂载节点的全局路径绑定到pod目录
 func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
-	// 1. 查看pod path是否存在
-	// 2. 将挂载节点的路径绑定到pod的路径：
-	// 2.1 校验 mount | grep [staging_target_path] |grep -v grep|wc -l 是否为>0
-	// 2.2 "mount --bind %s %s", stagingTargetPath, podPath
-	// 2.3 如果=0，先挂载到节点，再挂载到pod
 	log.Infof("NodePublishVolume:: starting to mount bind stagingTargetPath to pod directory with req: %+v", req)
 
 	// Step 1: check necessary params
