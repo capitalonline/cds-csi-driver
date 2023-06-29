@@ -135,67 +135,6 @@ func ReadCloudInitInfo() (string, error) {
 		return "", errors.New(fmt.Sprintf("invalid instance_id"))
 	}
 	return instanceId, nil
-
-	//dir, err := os.Open("/dev")
-	//if err != nil {
-	//	log.Errorf("can not open dev")
-	//	return "", err
-	//}
-	//defer dir.Close()
-	//
-	//// 读取目录中的文件信息
-	//files, err := dir.Readdir(-1)
-	//if err != nil {
-	//
-	//	return "", err
-	//}
-	//
-	//var blocks = make([]os.FileInfo, 0)
-	//
-	//// 遍历文件信息
-	//for _, file := range files {
-	//	// 检查是否为块设备文件
-	//	if (file.Mode()&os.ModeDevice) == 0 || (file.Mode()&os.ModeCharDevice) != 0 {
-	//		continue
-	//	}
-	//	blocks = append(blocks, file)
-	//	// 获取设备号
-	//	//dev := file.Sys().(*syscall.Stat_t).Rdev
-	//	//
-	//	//// 输出设备路径和设备号
-	//	//fmt.Printf("设备路径：%s\n", "/dev/"+file.Name())
-	//	//fmt.Printf("设备号：%d:%d\n", uint32(dev/256), uint32(dev%256))
-	//	//fmt.Println()
-	//}
-	//
-	//for _, dev := range blocks {
-	//	file, err := os.Open(fmt.Sprintf("/dev/%s", dev.Name()))
-	//	defer file.Close()
-	//	if err != nil {
-	//		continue
-	//	}
-	//	fd := int(file.Fd())
-	//	var stat syscall.Stat_t
-	//	if err = syscall.Fstat(fd, &stat); err != nil {
-	//		continue
-	//	}
-	//
-	//	// 输出块设备大小（以字节为单位）
-	//	blockSize := int64(stat.Blksize)
-	//	diskSize := uint64(stat.Blocks) * uint64(blockSize)
-	//	if diskSize == CloudInitDevSize {
-	//		if err = os.Mkdir("/tmp/ins", 0777); err != nil && !os.IsExist(err) {
-	//			msg := fmt.Sprintf("can not make dir err:%s", err.Error())
-	//			log.Errorf(msg)
-	//			panic(msg)
-	//		}
-	//		cmd := exec.Command("mount", fmt.Sprintf("/dev/%s", dev.Name()), "/tmp/ins")
-	//		output, err := cmd.CombinedOutput()
-	//		fmt.Println(string(output), "   ", err)
-	//	}
-	//}
-
-	return "", errors.New("cat not found instance info")
 }
 
 // Mounted checks whether a volume is mounted
