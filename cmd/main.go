@@ -19,7 +19,7 @@ const (
 	DriverNasTypeName     = "nas.csi.cds.net"
 	DriverOssTypeName     = "oss.csi.cds.net"
 	DriverDiskTypeName    = "disk.csi.cds.net"
-	DriverEbsDiskTypeName = "ebs_disk.csi.cds.net"
+	DriverEbsDiskTypeName = "ebs-disk.csi.cds.net"
 )
 
 var (

@@ -13,7 +13,7 @@ const (
 	StatusInError    = "error"
 	ebsSsdDisk       = "ssd"
 
-	DriverEbsDiskTypeName = "ebs_disk.csi.cds.net"
+	DriverEbsDiskTypeName = "ebs-disk.csi.cds.net"
 )
 
 var IopsArrayInt64 = []int64{3000, 5000, 7500, 10000}
