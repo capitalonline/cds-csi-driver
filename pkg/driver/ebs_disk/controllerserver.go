@@ -372,7 +372,7 @@ func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *c
 		return nil, fmt.Errorf("ControllerUnpublishVolume: findDiskByVolumeID res is nil")
 	}
 
-	if res.Data.DiskSlice[0].NodeID != nodeID {
+	if res.Data.DiskInfo.EcsId != nodeID {
 		log.Warnf("ControllerUnpublishVolume: diskID: %s had been detached from nodeID: %s", diskID, nodeID)
 		return &csi.ControllerUnpublishVolumeResponse{}, nil
 	}
@@ -548,5 +548,20 @@ OuterLoop:
 	return nodeStatus, nil
 }
 
-type CsiInfo struct {
+func detachDisk(diskID string) (string, error) {
+	// to detach disk from node
+	log.Infof("detachDisk: diskID: %s", diskID)
+
+	res, err := cdsDisk.DetachDisk(&cdsDisk.DetachDiskArgs{
+		DiskIds: []string{diskID},
+	})
+
+	if err != nil {
+		log.Errorf("detachDisk: cdsDisk.detachDisk api error, err is: %s", err)
+		return "", err
+	}
+
+	log.Infof("detachDisk: cdsDisk.detachDisk task creation succeed, taskID is: %s", res.TaskID)
+
+	return res.TaskID, nil
 }
