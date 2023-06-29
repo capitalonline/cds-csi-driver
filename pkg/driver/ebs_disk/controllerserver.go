@@ -37,6 +37,9 @@ var diskAttachingMap = map[string]string{}
 // storing detaching disk
 var diskDetachingMap = map[string]string{}
 
+// storing expanding disk
+var diskExpandingMap = map[string]string{}
+
 func NewControllerServer(d *DiskDriver) *ControllerServer {
 	config, err := rest.InClusterConfig()
 	if err != nil {
@@ -413,8 +416,79 @@ func (c *ControllerServer) ValidateVolumeCapabilities(ctx context.Context, req *
 	}, nil
 }
 
-func (c *ControllerServer) ControllerExpandVolume(context.Context, *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "")
+func (c *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest,
+) (*csi.ControllerExpandVolumeResponse, error) {
+	log.Infof("ControllerExpandVolume:: Starting expand disk with: %v", req)
+
+	// check resize conditions
+	volSizeBytes := int64(req.GetCapacityRange().GetRequiredBytes())
+	requestGB := int((volSizeBytes + 1024*1024*1024 - 1) / (1024 * 1024 * 1024))
+	diskID := req.VolumeId
+
+	if value, ok := diskExpandingMap[diskID]; ok {
+		if value == "creating" {
+			log.Warnf("CreateVolume: Disk Volume(%s)'s is in creating, please wait", diskID)
+			return nil, fmt.Errorf("ControllerExpandVolume: disk Volume(%s) is in expanding, please wait", diskID)
+		}
+	}
+
+	res, err := findDiskByVolumeID(diskID)
+	if err != nil {
+		log.Errorf("ControllerExpandVolume:: find disk(%s) with error: %s", diskID, err.Error())
+		return nil, fmt.Errorf("ControllerPublishVolume: findDiskByVolumeID api error, err is: %s", err)
+	}
+
+	if res == nil {
+		log.Errorf("ControllerExpandVolume: expand disk find disk not exist: %s", diskID)
+		return nil, status.Error(codes.Internal, "expand disk find disk not exist "+diskID)
+	}
+
+	diskSize := res.Data.DiskInfo.Size
+	if requestGB == diskSize {
+		log.Infof("ControllerExpandVolume:: expect size is same with current: %s, size: %dGi", req.VolumeId, requestGB)
+		return &csi.ControllerExpandVolumeResponse{CapacityBytes: volSizeBytes, NodeExpansionRequired: true}, nil
+	}
+	if requestGB < diskSize {
+		log.Infof("ControllerExpandVolume:: expect size is less than current: %d, expected: %d, disk: %s", diskSize, requestGB, req.VolumeId)
+		return &csi.ControllerExpandVolumeResponse{CapacityBytes: volSizeBytes, NodeExpansionRequired: true}, nil
+	}
+
+	// Check if autoSnapshot is enabled
+
+	// do resize
+	resizeRes, err := expandEbsDisk(diskID, diskSize)
+	if err != nil {
+		log.Errorf("ControllerExpandVolume:: resize got error: %s", err.Error())
+		return nil, status.Errorf(codes.Internal, "resize disk %s get error: %s", diskID, err.Error())
+	}
+
+	taskId := resizeRes.Data.EventId
+	diskExpandingMap[diskID] = "expanding"
+
+	// check create ebs disk event
+	err = describeTaskStatus(taskId)
+	if err != nil {
+		log.Errorf("createDisk: describeTaskStatus task result failed, err is: %s", err.Error())
+		diskProcessingMap[diskID] = "error"
+		return nil, err
+	}
+
+	// clean creating disk
+	delete(diskProcessingMap, diskID)
+
+	checkDisk, err := findDiskByVolumeID(diskID)
+	if err != nil {
+		log.Errorf("ControllerExpandVolume:: find disk failed with error: %+v", err)
+		return nil, status.Errorf(codes.Internal, "resize disk %s get error: %s", diskID, err.Error())
+	}
+
+	if requestGB != checkDisk.Data.DiskInfo.Size {
+		log.Infof("ControllerExpandVolume:: resize disk err with excepted size: %vGB, actual size: %vGB", requestGB, checkDisk.Data.DiskInfo.Size)
+		return nil, status.Errorf(codes.Internal, "resize disk err with excepted size: %vGB, actual size: %vGB", requestGB, checkDisk.Data.DiskInfo.Size)
+	}
+
+	log.Infof("ControllerExpandVolume:: Success to resize volume: %s from %dG to %dG", req.VolumeId, diskSize, requestGB)
+	return &csi.ControllerExpandVolumeResponse{CapacityBytes: volSizeBytes, NodeExpansionRequired: true}, nil
 }
 
 func createEbsDisk(diskName, diskType, diskSiteID, diskZoneID string, diskSize, diskIops int) (*cdsDisk.CreateEbsResp, error) {
@@ -435,6 +509,10 @@ func createEbsDisk(diskName, diskType, diskSiteID, diskZoneID string, diskSize, 
 	log.Infof("createDisk: successfully!")
 
 	return res, nil
+}
+
+func expandEbsDisk(diskId string, diskSize int) (*cdsDisk.CreateEbsResp, error) {
+	return new(cdsDisk.CreateEbsResp), nil
 }
 
 func describeTaskStatus(taskID string) error {
