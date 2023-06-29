@@ -2,6 +2,7 @@ package ebs_disk
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	cdsDisk "github.com/capitalonline/cck-sdk-go/pkg/eks/ebs"
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -9,6 +10,8 @@ import (
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	v12 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"time"
@@ -511,4 +514,46 @@ func attachDisk(diskID, nodeID string) (string, error) {
 	log.Infof("attachDisk: cdsDisk.attachDisk task creation succeed, taskID is: %s", res.TaskID)
 
 	return res.TaskID, nil
+}
+
+func describeNodeStatus(ctx context.Context, c *ControllerServer, nodeId string) (v12.ConditionStatus, error) {
+	var nodeStatus v12.ConditionStatus = ""
+
+	res, err := c.Client.CoreV1().Nodes().List(metav1.ListOptions{})
+	if err != nil {
+		log.Errorf("describeNodeStatus: get node list failed, err is: %s", err)
+		return "", err
+	}
+
+OuterLoop:
+	for _, node := range res.Items {
+		if node.Annotations == nil {
+			continue
+		}
+
+		csiInfo, ok := node.Annotations["csi.volume.kubernetes.io/nodeid"]
+		if !ok {
+			continue
+		}
+		var csiMap = make(map[string]string)
+		if err = json.Unmarshal([]byte(csiInfo), &csiMap); err != nil {
+			continue
+		}
+		instanceId := csiMap[DriverEbsTypeName]
+		if instanceId != nodeId {
+			continue
+		}
+		for _, value := range node.Status.Conditions {
+			if value.Type == "Ready" {
+				nodeStatus = value.Status
+				break OuterLoop
+			}
+		}
+	}
+
+	log.Infof("describeNodeStatus: nodeStatus is: %s", nodeStatus)
+	return nodeStatus, nil
+}
+
+type CsiInfo struct {
 }
