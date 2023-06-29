@@ -326,7 +326,7 @@ spec:
       hostNetwork: true
       hostPID: true
       nodeSelector:
-        node.cck.net/role.infra: "True"
+        node-role.kubernetes.io/control-plane: ""
       priorityClassName: system-cluster-critical
       serviceAccount: ebs-disk-cds-csi-sa
       tolerations:
