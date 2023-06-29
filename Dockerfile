@@ -1,31 +1,28 @@
 FROM golang:1.18-alpine AS build-env
 RUN apk update && apk add git make
-COPY . /go/src/github.com/capitalonline/cds-csi-driver
-RUN cd /go/src/github.com/capitalonline/cds-csi-driver && make container-binary
+COPY cck-sdk-go /go/src/github.com/capitalonline/cck-sdk-go
+COPY cds-csi-driver /go/src/github.com/capitalonline/cds-csi-driver
+#COPY . /go/src/github.com/capitalonline/cds-csi-driver
+RUN cd /go/src/github.com/capitalonline/cds-csi-driver && go mod tidy && make container-binary
 
 FROM alpine:3.6
-RUN apk update --no-cache && apk add ca-certificates
-ARG S3FS_VERSION=v1.82
-
-RUN apk --update add --virtual build-dependencies \
-        build-base alpine-sdk \
-        fuse fuse-dev \
-        automake autoconf git \
-        libressl-dev  \
-        curl-dev libxml2-dev  \
-        ca-certificates
-
-# RUN apk del .build-dependencies
-RUN git clone https://github.com/s3fs-fuse/s3fs-fuse.git && \
-    cd s3fs-fuse \
-    git checkout tags/${S3FS_VERSION} && \
-    ./autogen.sh && \
-    ./configure --prefix=/usr && \
-    make && \
-    make install && \
-    s3fs --version
+RUN apk update --no-cache && apk add -U --no-cache --virtual build-dependencies \
+    build-base \
+    alpine-sdk \
+    fuse \
+    fuse-dev \
+    automake  \
+    autoconf \
+    git \
+    libressl-dev \
+    curl-dev libxml2-dev \
+    ca-certificates \
+    udev \
+    e2fsprogs \
+    xfsprogs \
+    nvme-cli \
+    s3fs-fuse
 
 COPY --from=build-env /cds-csi-driver /cds-csi-driver
-RUN apk add udev && apk add e2fsprogs && apk add xfsprogs && apk add nvme-cli
 
 ENTRYPOINT ["/cds-csi-driver"]
