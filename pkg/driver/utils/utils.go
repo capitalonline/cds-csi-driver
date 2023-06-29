@@ -126,8 +126,8 @@ func ReadCloudInitInfo() (string, error) {
 	var instanceId = ""
 	for _, item := range list {
 		if strings.Contains(item, "local-hostname") {
-			item = strings.Trim(item, "local-hostname:")
-			instanceId = strings.Trim(strings.TrimSpace(item), " ")
+			item = strings.Replace(item, "local-hostname:", "", -1)
+			instanceId = strings.TrimSpace(item)
 		}
 	}
 	_, _ = exec.Command("umount", "/tmp/ins").CombinedOutput()
