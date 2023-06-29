@@ -11,7 +11,7 @@ const (
 	StatusInOK       = "ok"
 	StatusInDeleted  = "deleted"
 	StatusInError    = "error"
-	ebsSsdDisk       = "ssd"
+	ebsSsdDisk       = "SSD"
 
 	DriverEbsDiskTypeName = "ebs-disk.csi.cds.net"
 )
