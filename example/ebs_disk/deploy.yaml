@@ -418,6 +418,18 @@ spec:
             - mountPath: /registration/
               name: registration-dir
         - args:
+            - --v=5
+            - --csi-address=$(ADDRESS)
+            - --leader-election=true
+          env:
+            - name: ADDRESS
+              value: /var/lib/kubelet/plugins/disk.csi.cds.net/csi.sock
+          image: capitalonline/csi-resizer:v1.xxx
+          name: disk-driver-resizer
+          volumeMounts:
+            - mountPath: /var/lib/kubelet/
+              name: kubelet-dir
+        - args:
             - --csi-address=/var/lib/kubelet/plugins/disk.csi.cds.net/csi.sock
             - --health-port=9812
           image: capitalonline/csi-livenessprobe:v2.0.0
