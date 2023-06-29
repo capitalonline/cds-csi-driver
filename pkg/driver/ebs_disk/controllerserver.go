@@ -138,7 +138,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 	if len(diskIdSet) != 1 {
 		return nil, fmt.Errorf("invalid diskIdSet:%s", diskIdSet)
 	}
-	diskID := diskIdSet[1]
+	diskID := diskIdSet[0]
 	taskID := createRes.Data.EventId
 
 	//diskProcessingMap[pvName] = "creating"
