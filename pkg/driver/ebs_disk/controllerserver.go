@@ -516,24 +516,6 @@ func attachDisk(diskID, nodeID string) (string, error) {
 	return res.TaskID, nil
 }
 
-func detachDisk(diskID string) (string, error) {
-	// to detach disk from node
-	log.Infof("detachDisk: diskID: %s", diskID)
-
-	res, err := cdsDisk.DetachDisk(&cdsDisk.DetachDiskArgs{
-		VolumeID: diskID,
-	})
-
-	if err != nil {
-		log.Errorf("detachDisk: cdsDisk.detachDisk api error, err is: %s", err)
-		return "", err
-	}
-
-	log.Infof("detachDisk: cdsDisk.detachDisk task creation succeed, taskID is: %s", res.TaskID)
-
-	return res.TaskID, nil
-}
-
 func describeNodeStatus(ctx context.Context, c *ControllerServer, nodeId string) (v12.ConditionStatus, error) {
 	var nodeStatus v12.ConditionStatus = ""
 
