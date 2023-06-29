@@ -14,6 +14,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"sync"
 	"time"
 )
 
@@ -22,23 +23,28 @@ var pvcCreatedMap = map[string]*csi.Volume{}
 
 // the map of diskId and pvName
 // diskId and pvName is not same under csi plugin
-var diskIdPvMap = map[string]string{}
+// var diskIdPvMap = map[string]string{}
+var diskIdPvMap = new(sync.Map)
 
 // the map od diskID and pvName
 // storing the disk in creating status
-var diskProcessingMap = map[string]string{}
+// var diskProcessingMap = map[string]string{}
+var diskProcessingMap = new(sync.Map)
 
 // storing deleting disk
-var diskDeletingMap = map[string]string{}
+// var diskDeletingMap = map[string]string{}
+var diskDeletingMap = new(sync.Map)
 
 // storing attaching disk
-var diskAttachingMap = map[string]string{}
+// var diskAttachingMap = map[string]string{}
+var diskAttachingMap = new(sync.Map)
 
 // storing detaching disk
-var diskDetachingMap = map[string]string{}
+var diskDetachingMap = new(sync.Map)
 
 // storing expanding disk
-var diskExpandingMap = map[string]string{}
+// var diskExpandingMap = map[string]string{}
+var diskExpandingMap = new(sync.Map)
 
 func NewControllerServer(d *DiskDriver) *ControllerServer {
 	config, err := rest.InClusterConfig()
@@ -101,7 +107,9 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 
 	// Step 4: create disk
 	// check if disk is in creating first
-	if value, ok := diskProcessingMap[pvName]; ok {
+	//if value, ok := diskProcessingMap[pvName]; ok {
+	if v, ok := diskProcessingMap.Load(pvName); ok {
+		value, _ := v.(string)
 		if value == "creating" {
 			log.Warnf("CreateVolume: Disk Volume(%s)'s is in creating, please wait", pvName)
 
@@ -120,7 +128,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 
 	// do request to create ebs disk
 	// diskName, diskType, diskSiteID, diskZoneID string, diskSize, diskIops int
-	createRes, err := createEbsDisk(pvName, diskVol.StorageType, "", "", int(diskRequestGB), 0)
+	createRes, err := createEbsDisk(pvName, diskVol.StorageType, diskVol.AzId, int(diskRequestGB), 0)
 	if err != nil {
 		log.Errorf("CreateVolume: createDisk error, err is: %s", err.Error())
 		return nil, fmt.Errorf("CreateVolume: createDisk error, err is: %s", err.Error())
@@ -133,18 +141,21 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 	diskID := diskIdSet[1]
 	taskID := createRes.Data.EventId
 
-	diskProcessingMap[pvName] = "creating"
+	//diskProcessingMap[pvName] = "creating"
+	diskProcessingMap.Store(pvName, "creating")
 
 	// check create ebs disk event
 	err = describeTaskStatus(taskID)
 	if err != nil {
 		log.Errorf("createDisk: describeTaskStatus task result failed, err is: %s", err.Error())
-		diskProcessingMap[pvName] = "error"
+		//diskProcessingMap[pvName] = "error"
+		diskProcessingMap.Store(pvName, "error")
 		return nil, err
 	}
 
 	// clean creating disk
-	delete(diskProcessingMap, pvName)
+	//delete(diskProcessingMap, pvName)
+	diskProcessingMap.Delete(pvName)
 
 	// Step 5: generate return volume context for /csi.v1.Controller/ControllerPublishVolume GRPC
 	volumeContext := map[string]string{
@@ -165,8 +176,8 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 			},
 		},
 	}
-
-	diskIdPvMap[diskID] = pvName
+	diskIdPvMap.Store(diskID, pvName)
+	//diskIdPvMap[diskID] = pvName
 
 	pvcCreatedMap[pvName] = tmpVol
 
@@ -184,7 +195,9 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 		return nil, fmt.Errorf("DeleteVolume: req.VolumeID cannot be empty")
 	}
 
-	if value, ok := diskDeletingMap[diskID]; ok {
+	//if value, ok := diskDeletingMap[diskID]; ok {
+	if v, ok := diskDeletingMap.Load(diskID); ok {
+		value, _ := v.(string)
 		if value == "deleting" || value == "detaching" {
 			log.Warnf("DeleteVolume: diskID: %s is in [deleting|detaching] status, please wait", diskID)
 			return nil, fmt.Errorf("DeleteVolume: diskID: %s is in [deleting|detaching] status, please wait", diskID)
@@ -200,18 +213,13 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 		log.Errorf("DeleteVolume: findDiskByVolumeID error, err is: %s", err.Error())
 		return nil, err
 	}
-	// TODO enumerate all disk status
-	diskStatus := disk.Data.DiskInfo.Status
-	if diskStatus == StatusInMounted {
-		log.Errorf("DeleteVolume: disk [mounted], cant delete volumeID: %s ", diskID)
-		return nil, fmt.Errorf("DeleteVolume: disk [mounted], cant delete volumeID: %s", diskID)
-	} else if diskStatus == StatusInOK {
-		log.Debugf("DeleteVolume: disk is in [idle], then to delete directly!")
-	} else if diskStatus == StatusInDeleted {
-		log.Warnf("DeleteVolume: disk had been deleted")
-		return &csi.DeleteVolumeResponse{}, nil
-	}
 
+	switch disk.Data.DiskInfo.Status {
+	case "running":
+		return nil, fmt.Errorf("DeleteVolume: disk [mounted], cant delete volumeID: %s", diskID)
+	case "mounting", "unmounting", "updating", "creating_snapshot", "recovering":
+		return nil, fmt.Errorf("DeleteVolume: disk's status is %s ,can't delete volumeID: %s", disk.Data.DiskInfo.Status, diskID)
+	}
 	// Step 4: delete disk
 	deleteRes, err := deleteDisk(diskID)
 	if err != nil {
@@ -220,23 +228,32 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 	}
 
 	// store deleting disk status
-	diskDeletingMap[diskID] = "deleting"
+	//diskDeletingMap[diskID] = "deleting"
+	diskDeletingMap.Store(diskID, "deleting")
 
 	taskID := deleteRes.Data.EventId
 	if err := describeTaskStatus(taskID); err != nil {
 		log.Errorf("deleteDisk: cdsDisk.DeleteDisk task result failed, err is: %s", err)
-		diskDeletingMap[diskID] = "error"
+		//diskDeletingMap[diskID] = "error"
+		diskDeletingMap.Store(diskID, "error")
 		return nil, fmt.Errorf("deleteDisk: cdsDisk.DeleteDisk task result failed, err is: %s", err)
 	}
 
 	// Step 5: delete pvcCreatedMap
-	if pvName, ok := diskIdPvMap[diskID]; ok {
-		delete(pvcCreatedMap, pvName)
+	//if pvName, ok := diskIdPvMap[diskID]; ok {
+	//	delete(pvcCreatedMap, pvName)
+	//}
+	if pvName, ok := diskIdPvMap.Load(diskID); ok {
+		name, _ := pvName.(string)
+		delete(pvcCreatedMap, name)
 	}
 
 	// Step 6: clear diskDeletingMap and diskIdPvMap
-	delete(diskIdPvMap, diskID)
-	delete(diskDeletingMap, diskID)
+	//delete(diskIdPvMap, diskID)
+	diskIdPvMap.Delete(diskID)
+
+	//delete(diskDeletingMap, diskID)
+	diskDeletingMap.Delete(diskID)
 
 	// log.Infof("DeleteVolume: clean [diskIdPvMap] and [pvcMap] and [diskDeletingMap] succeed!")
 	log.Infof("DeleteVolume: Successfully delete diskID: %s !", diskID)
@@ -257,7 +274,9 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 	}
 
 	// check attaching status
-	if value, ok := diskAttachingMap[diskID]; ok {
+	//if value, ok := diskAttachingMap[diskID]; ok {
+	if v, ok := diskAttachingMap.Load(diskID); ok {
+		value, _ := v.(string)
 		if value == "attaching" {
 			log.Warnf("ControllerPublishVolume: diskID: %s is in attaching, please wait", diskID)
 			return nil, fmt.Errorf("ControllerPublishVolume: diskID: %s is in attaching, please wait", diskID)
@@ -302,9 +321,11 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 				return nil, fmt.Errorf("ControllerPublishVolume: detach diskID: %s from nodeID: %s error,  err is: %s", diskID, diskMountedNodeID, err.Error())
 			}
 
-			diskAttachingMap[diskID] = "attaching"
+			//diskAttachingMap[diskID] = "attaching"
+			diskAttachingMap.Store(diskID, "attaching")
 			if err := describeTaskStatus(taskID); err != nil {
-				diskAttachingMap[diskID] = "error"
+				//diskAttachingMap[diskID] = "error"
+				diskAttachingMap.Store(diskID, "error")
 				log.Errorf("ControllerPublishVolume: cdsDisk.detachDisk task result failed, err is: %s", err)
 				return nil, err
 			}
@@ -326,14 +347,17 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 		return nil, err
 	}
 
-	diskAttachingMap[diskID] = "attaching"
+	//diskAttachingMap[diskID] = "attaching"
+	diskAttachingMap.Store(diskID, "attaching")
 	if err = describeTaskStatus(taskID); err != nil {
-		diskAttachingMap[diskID] = "error"
+		//diskAttachingMap[diskID] = "error"
+		diskAttachingMap.Store(diskID, "error")
 		log.Errorf("ControllerPublishVolume: attach disk:%s processing to node: %s with error, err is: %s", diskID, nodeID, err.Error())
 		return nil, err
 	}
 
-	delete(diskAttachingMap, diskID)
+	//delete(diskAttachingMap, diskID)
+	diskAttachingMap.Delete(diskID)
 	log.Infof("ControllerPublishVolume: Successfully attach disk: %s to node: %s", diskID, nodeID)
 
 	return &csi.ControllerPublishVolumeResponse{}, nil
@@ -354,7 +378,9 @@ func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *c
 	}
 
 	// Step 3: check disk status
-	if value, ok := diskDetachingMap[diskID]; ok {
+	//if value, ok := diskDetachingMap[diskID]; ok {
+	if v, ok := diskDetachingMap.Load(diskID); ok {
+		value, _ := v.(string)
 		if value == "detaching" {
 			log.Warnf("ControllerUnpublishVolume: diskID: %s is in detaching, please wait", diskID)
 			return nil, fmt.Errorf("ControllerUnpublishVolume: diskID: %s is in detaching, please wait", diskID)
@@ -387,14 +413,17 @@ func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *c
 		return nil, err
 	}
 
-	diskDetachingMap[diskID] = "detaching"
+	//diskDetachingMap[diskID] = "detaching"
+	diskDetachingMap.Store(diskID, "detaching")
 	if err := describeTaskStatus(taskID); err != nil {
-		diskDetachingMap[diskID] = "error"
+		//diskDetachingMap[diskID] = "error"
+		diskDetachingMap.Store(diskID, "error")
 		log.Errorf("ControllerUnpublishVolume: cdsDisk.detachDisk task result failed, err is: %s", err)
 		return nil, err
 	}
 
-	delete(diskDetachingMap, diskID)
+	//delete(diskDetachingMap, diskID)
+	diskDetachingMap.Delete(diskID)
 	//delete(diskAttachingMap, diskID)
 	log.Infof("ControllerUnpublishVolume: Successfully detach disk: %s from node: %s", diskID, nodeID)
 
@@ -425,7 +454,9 @@ func (c *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.
 	requestGB := int((volSizeBytes + 1024*1024*1024 - 1) / (1024 * 1024 * 1024))
 	diskID := req.VolumeId
 
-	if value, ok := diskExpandingMap[diskID]; ok {
+	//if value, ok := diskExpandingMap[diskID]; ok {
+	if v, ok := diskExpandingMap.Load(diskID); ok {
+		value, _ := v.(string)
 		if value == "creating" {
 			log.Warnf("CreateVolume: Disk Volume(%s)'s is in creating, please wait", diskID)
 			return nil, fmt.Errorf("ControllerExpandVolume: disk Volume(%s) is in expanding, please wait", diskID)
@@ -463,18 +494,21 @@ func (c *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.
 	}
 
 	taskId := resizeRes.Data.EventId
-	diskExpandingMap[diskID] = "expanding"
+	//diskExpandingMap[diskID] = "expanding"
+	diskExpandingMap.Store(diskID, "expanding")
 
 	// check create ebs disk event
 	err = describeTaskStatus(taskId)
 	if err != nil {
 		log.Errorf("createDisk: describeTaskStatus task result failed, err is: %s", err.Error())
-		diskProcessingMap[diskID] = "error"
+		//diskProcessingMap[diskID] = "error"
+		diskProcessingMap.Store(diskID, "error")
 		return nil, err
 	}
 
 	// clean creating disk
-	delete(diskProcessingMap, diskID)
+	//delete(diskProcessingMap, diskID)
+	diskProcessingMap.Delete(diskID)
 
 	checkDisk, err := findDiskByVolumeID(diskID)
 	if err != nil {
@@ -491,12 +525,12 @@ func (c *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.
 	return &csi.ControllerExpandVolumeResponse{CapacityBytes: volSizeBytes, NodeExpansionRequired: true}, nil
 }
 
-func createEbsDisk(diskName, diskType, diskSiteID, diskZoneID string, diskSize, diskIops int) (*cdsDisk.CreateEbsResp, error) {
-	log.Infof("createDisk: diskName: %s, diskType: %s, diskSiteID: %s, diskZoneID: %s, diskSize: %d, diskIops: %d", diskName, diskType, diskSiteID, diskZoneID, diskSize, diskIops)
+func createEbsDisk(diskName, diskType, diskZoneID string, diskSize, diskIops int) (*cdsDisk.CreateEbsResp, error) {
+	log.Infof("createDisk: diskName: %s, diskType: %s,  diskZoneID: %s, diskSize: %d, diskIops: %d", diskName, diskType, diskZoneID, diskSize, diskIops)
 	res, err := cdsDisk.CreateEbs(&cdsDisk.CreateEbsReq{
-		AvailableZoneCode: "",
+		AvailableZoneCode: diskZoneID,
 		DiskName:          diskName,
-		DiskFeature:       DiskFeatureSSD,
+		DiskFeature:       diskType,
 		Size:              diskSize,
 		BillingMethod:     BillingMethodPostPaid,
 	})
