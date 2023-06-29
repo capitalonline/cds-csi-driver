@@ -1,8 +1,6 @@
 package ebs_disk
 
 const (
-	HighDisk         = "high_disk"
-	SsdDisk          = "ssd_disk"
 	mountPointMode   = 0777
 	DefaultFsTypeXfs = "xfs"
 	FsTypeExt4       = "ext4"
