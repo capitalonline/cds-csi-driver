@@ -6,8 +6,8 @@ metadata:
   namespace: kube-system
 type: Opaque
 data:
-  access_key_id: ''
-  access_key_secret: ''
+  access_key_id: '28e44dda6a1211eda59242de7ed185aa'
+  access_key_secret: 'afee6ab5a320b354d07b24287cf73c18'
 
 ---
 apiVersion: v1
@@ -16,7 +16,7 @@ metadata:
   name: cds-properties
   namespace: kube-system
 data:
-  k8s_cluster_id: ""
-  site_id: ""
-  site_name: ""
+  k8s_cluster_id: "dyl-test"
+  site_id: "CN_BeijingA"
+  site_name: "北京"
   oversea: "false"
