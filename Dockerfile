@@ -1,7 +1,8 @@
 FROM golang:1.18-alpine AS build-env
 RUN apk update && apk add git make
 COPY . /go/src/github.com/capitalonline/cds-csi-driver
-RUN cd /go/src/github.com/capitalonline/cds-csi-driver && make container-binary
+RUN go env -w GO111MODULE=on && go env -w GOPROXY=https://goproxy.cn,direct
+RUN cd /go/src/github.com/capitalonline/cds-csi-driver && go mod tidy && make container-binary
 
 FROM alpine:3.6
 RUN apk update --no-cache && apk add ca-certificates
