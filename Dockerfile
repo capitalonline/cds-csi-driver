@@ -6,14 +6,8 @@ COPY cds-csi-driver /go/src/github.com/capitalonline/cds-csi-driver
 RUN cd /go/src/github.com/capitalonline/cds-csi-driver && go mod tidy && make container-binary
 
 FROM alpine:3.6
-RUN apk update --no-cache && apk add -U --no-cache --virtual build-dependencies \
-    build-base \
-    alpine-sdk \
-    fuse \
+RUN apk update --no-cache && apk add -U --no-cache --virtual fuse \
     fuse-dev \
-    automake  \
-    autoconf \
-    git \
     libressl-dev \
     curl-dev libxml2-dev \
     ca-certificates \
