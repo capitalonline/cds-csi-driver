@@ -212,6 +212,8 @@ spec:
         env:
         - name: CSI_ENDPOINT
           value: unix://socketDir/csi.sock
+        - name: API_HOST
+          value: ""
         - name: ACCESS_KEY_ID
           valueFrom:
             secretKeyRef:
@@ -349,6 +351,8 @@ spec:
         env:
         - name: CSI_ENDPOINT
           value: unix://var/lib/kubelet/plugins/ebs-disk.csi.cds.net/csi.sock
+        - name: API_HOST
+          value: ""
         - name: ACCESS_KEY_ID
           valueFrom:
             secretKeyRef:
