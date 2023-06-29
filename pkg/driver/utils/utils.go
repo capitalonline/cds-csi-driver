@@ -95,7 +95,6 @@ func (n *NodeMeta) GetNodeID() string {
 func ReadCloudInitInfo() (string, error) {
 
 	output, err := exec.Command("sh", "-c", "cat /proc/partitions | grep 8192").CombinedOutput()
-	fmt.Println(output, err)
 	list := strings.Split(strings.TrimSpace(string(output)), " ")
 	var devName = ""
 	for _, item := range list {

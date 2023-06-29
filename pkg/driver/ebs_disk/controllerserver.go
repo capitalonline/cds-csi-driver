@@ -120,7 +120,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 
 	// do request to create ebs disk
 	// diskName, diskType, diskSiteID, diskZoneID string, diskSize, diskIops int
-	createRes, err := createEbsDisk(pvName, diskVol.StorageType, "", "", int(diskRequestGB), 0)
+	createRes, err := createEbsDisk(pvName, diskVol.StorageType, diskVol.AzId, int(diskRequestGB), 0)
 	if err != nil {
 		log.Errorf("CreateVolume: createDisk error, err is: %s", err.Error())
 		return nil, fmt.Errorf("CreateVolume: createDisk error, err is: %s", err.Error())
@@ -200,18 +200,13 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 		log.Errorf("DeleteVolume: findDiskByVolumeID error, err is: %s", err.Error())
 		return nil, err
 	}
-	// TODO enumerate all disk status
-	diskStatus := disk.Data.DiskInfo.Status
-	if diskStatus == StatusInMounted {
-		log.Errorf("DeleteVolume: disk [mounted], cant delete volumeID: %s ", diskID)
-		return nil, fmt.Errorf("DeleteVolume: disk [mounted], cant delete volumeID: %s", diskID)
-	} else if diskStatus == StatusInOK {
-		log.Debugf("DeleteVolume: disk is in [idle], then to delete directly!")
-	} else if diskStatus == StatusInDeleted {
-		log.Warnf("DeleteVolume: disk had been deleted")
-		return &csi.DeleteVolumeResponse{}, nil
-	}
 
+	switch disk.Data.DiskInfo.Status {
+	case "running":
+		return nil, fmt.Errorf("DeleteVolume: disk [mounted], cant delete volumeID: %s", diskID)
+	case "mounting", "unmounting", "updating", "creating_snapshot", "recovering":
+		return nil, fmt.Errorf("DeleteVolume: disk's status is %s ,can't delete volumeID: %s", disk.Data.DiskInfo.Status, diskID)
+	}
 	// Step 4: delete disk
 	deleteRes, err := deleteDisk(diskID)
 	if err != nil {
@@ -491,12 +486,12 @@ func (c *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.
 	return &csi.ControllerExpandVolumeResponse{CapacityBytes: volSizeBytes, NodeExpansionRequired: true}, nil
 }
 
-func createEbsDisk(diskName, diskType, diskSiteID, diskZoneID string, diskSize, diskIops int) (*cdsDisk.CreateEbsResp, error) {
-	log.Infof("createDisk: diskName: %s, diskType: %s, diskSiteID: %s, diskZoneID: %s, diskSize: %d, diskIops: %d", diskName, diskType, diskSiteID, diskZoneID, diskSize, diskIops)
+func createEbsDisk(diskName, diskType, diskZoneID string, diskSize, diskIops int) (*cdsDisk.CreateEbsResp, error) {
+	log.Infof("createDisk: diskName: %s, diskType: %s,  diskZoneID: %s, diskSize: %d, diskIops: %d", diskName, diskType, diskZoneID, diskSize, diskIops)
 	res, err := cdsDisk.CreateEbs(&cdsDisk.CreateEbsReq{
-		AvailableZoneCode: "",
+		AvailableZoneCode: diskZoneID,
 		DiskName:          diskName,
-		DiskFeature:       DiskFeatureSSD,
+		DiskFeature:       diskType,
 		Size:              diskSize,
 		BillingMethod:     BillingMethodPostPaid,
 	})
