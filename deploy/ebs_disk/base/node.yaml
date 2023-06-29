@@ -1,25 +1,25 @@
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: ebs_disk-csi-cds-node
+  name: ebs-disk-csi-cds-node
   namespace: kube-system
 spec:
   selector:
     matchLabels:
-      app: ebs_disk-csi-cds-node
+      app: ebs-disk-csi-cds-node
   template:
     metadata:
       labels:
-        app: ebs_disk-csi-cds-node
+        app: ebs-disk-csi-cds-node
     spec:
       tolerations:
       - operator: Exists
       priorityClassName: system-node-critical
-      serviceAccount: ebs_disk-cds-csi-sa
+      serviceAccount: ebs-disk-cds-csi-sa
       hostNetwork: true
       hostPID: true
       containers:
-      - name: ebs_disk-csi-node-server
+      - name: ebs-disk-csi-node-server
         securityContext:
           privileged: true
           capabilities:
@@ -30,10 +30,10 @@ spec:
         args:
         - "--endpoint=$(CSI_ENDPOINT)"
         - "--v=5"
-        - "--driver=ebs_disk.csi.cds.net"
+        - "--driver=ebs-disk.csi.cds.net"
         env:
         - name: CSI_ENDPOINT
-          value: unix://var/lib/kubelet/plugins/ebs_disk.csi.cds.net/csi.sock
+          value: unix://var/lib/kubelet/plugins/ebs-disk.csi.cds.net/csi.sock
         - name: ACCESS_KEY_ID
           valueFrom:
             secretKeyRef:
@@ -59,43 +59,43 @@ spec:
           mountPath: /host/etc
         - name: host-dev
           mountPath: /dev
-      - name: ebs_disk-driver-registrar
+      - name: ebs-disk-driver-registrar
         image: registry-bj.capitalonline.net/cck/csi-node-driver-registrar:v1.2.0
         imagePullPolicy: Always
         lifecycle:
           preStop:
             exec:
-              command: ["/bin/sh", "-c", "rm -rf /registration/ebs_disk.csi.cds.net /registration/ebs_disk.csi.cds.net-reg.sock"]
+              command: ["/bin/sh", "-c", "rm -rf /registration/ebs-disk.csi.cds.net /registration/ebs-disk.csi.cds.net-reg.sock"]
         args:
         - "--v=5"
         - "--csi-address=$(ADDRESS)"
         - "--kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)"
         env:
         - name: ADDRESS
-          value: /var/lib/kubelet/plugins/ebs_disk.csi.cds.net/csi.sock
+          value: /var/lib/kubelet/plugins/ebs-disk.csi.cds.net/csi.sock
         - name: DRIVER_REG_SOCK_PATH
-          value: /var/lib/kubelet/plugins/ebs_disk.csi.cds.net/csi.sock
+          value: /var/lib/kubelet/plugins/ebs-disk.csi.cds.net/csi.sock
         volumeMounts:
         - name: kubelet-dir
           mountPath: /var/lib/kubelet/
         - name: registration-dir
           mountPath: /registration/
-      - name: ebs_disk-driver-resizer
+      - name: ebs-disk-driver-resizer
         args:
           - --v=5
           - --csi-address=$(ADDRESS)
           - --leader-election=true
         env:
           - name: ADDRESS
-            value: /var/lib/kubelet/plugins/ebs_disk.csi.cds.net/csi.sock
+            value: /var/lib/kubelet/plugins/ebs-disk.csi.cds.net/csi.sock
         image: registry-bj.capitalonline.net/cck/csi-resizer:v1.4.0
         volumeMounts:
           - mountPath: /var/lib/kubelet/
             name: kubelet-dir
-      - name: ebs_disk-liveness-probe
+      - name: ebs-disk-liveness-probe
         image: registry-bj.capitalonline.net/cck/csi-livenessprobe:v2.0.0
         args:
-        - "--csi-address=/var/lib/kubelet/plugins/ebs_disk.csi.cds.net/csi.sock"
+        - "--csi-address=/var/lib/kubelet/plugins/ebs-disk.csi.cds.net/csi.sock"
         - "--health-port=9812"
         volumeMounts:
         - name: kubelet-dir

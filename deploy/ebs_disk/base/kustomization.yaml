@@ -1,5 +1,5 @@
 bases:
-- ../../rbac/ebs_disk
+- ../../rbac/ebs-disk
 
 resources:
 - controller.yaml
