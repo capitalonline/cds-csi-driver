@@ -4,8 +4,8 @@ metadata:
   name: disk-csi-csd-sc
 parameters:
   fsType: "ext4"
-  storageType: "ssd"
-  siteId: "beijing001"
+  storageType: "SSD"
+  azId: "beijing001"
 provisioner: disk.csi.cds.net
 reclaimPolicy: Delete
 volumeBindingMode: WaitForFirstConsumer    # Immediate
