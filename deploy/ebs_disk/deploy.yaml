@@ -249,7 +249,7 @@ spec:
             configMapKeyRef:
               key: oversea
               name: cds-properties
-        image: registry-bj.capitalonline.net/cck/cds-csi-driver:v2.0.4
+        image: registry-bj.capitalonline.net/cck/cds-csi-driver-test:v0.0.4
         imagePullPolicy: Always
         livenessProbe:
           exec:
@@ -308,8 +308,8 @@ spec:
         image: registry-bj.capitalonline.net/cck/csi-resizer:v1.4.0
         name: ebs-disk-driver-resizer
         volumeMounts:
-          - mountPath: /var/lib/kubelet/
-            name: kubelet-dir
+          - mountPath: /socketDir
+            name: socket-dir
       - args:
         - --csi-address=$(ADDRESS)
         - --v=5
@@ -381,7 +381,7 @@ spec:
             configMapKeyRef:
               key: oversea
               name: cds-properties
-        image: registry-bj.capitalonline.net/cck/cds-csi-driver:v2.0.4
+        image: registry-bj.capitalonline.net/cck/cds-csi-driver-test:v0.0.4
         imagePullPolicy: Always
         name: ebs-disk-csi-node-server
         securityContext:
