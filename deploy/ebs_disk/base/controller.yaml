@@ -109,6 +109,18 @@ spec:
         volumeMounts:
         - name: socket-dir
           mountPath: /var/lib/csi/sockets/pluginproxy/
+      - name: ebs_disk-driver-resizer
+        args:
+          - --v=5
+          - --csi-address=$(ADDRESS)
+          - --leader-election=true
+        env:
+          - name: ADDRESS
+            value: /var/lib/kubelet/plugins/ebs_disk.csi.cds.net/csi.sock
+        image: registry-bj.capitalonline.net/cck/csi-resizer:v1.4.0
+        volumeMounts:
+          - mountPath: /var/lib/kubelet/
+            name: kubelet-dir
       volumes:
       - name: socket-dir
         emptyDir: {}

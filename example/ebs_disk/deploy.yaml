@@ -424,7 +424,7 @@ spec:
           env:
             - name: ADDRESS
               value: /var/lib/kubelet/plugins/disk.csi.cds.net/csi.sock
-          image: capitalonline/csi-resizer:v1.xxx
+          image: registry-bj.capitalonline.net/cck/csi-resizer:v1.4.0
           name: disk-driver-resizer
           volumeMounts:
             - mountPath: /var/lib/kubelet/
