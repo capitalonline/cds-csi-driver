@@ -617,7 +617,7 @@ OuterLoop:
 		if err = json.Unmarshal([]byte(csiInfo), &csiMap); err != nil {
 			continue
 		}
-		instanceId := csiMap[DriverEbsTypeName]
+		instanceId := csiMap[DriverEbsDiskTypeName]
 		if instanceId != nodeId {
 			continue
 		}

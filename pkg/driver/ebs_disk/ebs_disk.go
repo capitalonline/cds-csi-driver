@@ -8,7 +8,7 @@ import (
 
 // PluginFolder defines the location of disk plugin
 const (
-	driverName            = "ebs.csi.cds.net"
+	driverName            = "ebs_disk.csi.cds.net"
 	csiVersion            = "1.0.0"
 	TopologyZoneKey       = "topology.kubernetes.io/zone"
 	DiskFeatureSSD        = "SSD"
