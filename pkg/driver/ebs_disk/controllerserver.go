@@ -399,6 +399,13 @@ func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *c
 }
 
 func (c *ControllerServer) ValidateVolumeCapabilities(ctx context.Context, req *csi.ValidateVolumeCapabilitiesRequest) (*csi.ValidateVolumeCapabilitiesResponse, error) {
+	log.Infof("ValidateVolumeCapabilities: req is: %+v", req)
+
+	for _, capability := range req.VolumeCapabilities {
+		if capability.GetAccessMode().GetMode() != csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER {
+			return &csi.ValidateVolumeCapabilitiesResponse{Message: ""}, nil
+		}
+	}
 	return &csi.ValidateVolumeCapabilitiesResponse{
 		Confirmed: &csi.ValidateVolumeCapabilitiesResponse_Confirmed{
 			VolumeCapabilities: req.VolumeCapabilities,
@@ -505,6 +512,24 @@ func attachDisk(diskID, nodeID string) (string, error) {
 	}
 
 	log.Infof("attachDisk: cdsDisk.attachDisk task creation succeed, taskID is: %s", res.TaskID)
+
+	return res.TaskID, nil
+}
+
+func detachDisk(diskID string) (string, error) {
+	// to detach disk from node
+	log.Infof("detachDisk: diskID: %s", diskID)
+
+	res, err := cdsDisk.DetachDisk(&cdsDisk.DetachDiskArgs{
+		VolumeID: diskID,
+	})
+
+	if err != nil {
+		log.Errorf("detachDisk: cdsDisk.detachDisk api error, err is: %s", err)
+		return "", err
+	}
+
+	log.Infof("detachDisk: cdsDisk.detachDisk task creation succeed, taskID is: %s", res.TaskID)
 
 	return res.TaskID, nil
 }
