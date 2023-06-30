@@ -214,7 +214,7 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 	// Step 2: find disk by volumeID
 	disk, err := findDiskByVolumeID(req.VolumeId)
 	if err != nil {
-		if disk.Code == "InvalidParameter" && strings.Contains(disk.Message, "云盘信息不存在") {
+		if disk != nil && disk.Code == "InvalidParameter" && strings.Contains(disk.Message, "云盘信息不存在") {
 			log.Warnf("DeleteVolume: disk had been deleted by InvalidParameter")
 			return &csi.DeleteVolumeResponse{}, nil
 		}
