@@ -74,7 +74,7 @@ func GetNodeMetadata() *NodeMeta {
 		if err != nil {
 			// 尝试从cloud-init盘读取数据
 			id, err := ReadCloudInitInfo()
-			log.Infof("successfully get instance id from cloud init info")
+			log.Infof("successfully get instance id:%s from cloud init info", id)
 			if err != nil {
 				log.Fatalf("cannot find metadata file %s: %s", f, err.Error())
 			}
@@ -128,6 +128,7 @@ func ReadCloudInitInfo() (string, error) {
 		if strings.Contains(item, "local-hostname") {
 			item = strings.Replace(item, "local-hostname:", "", -1)
 			instanceId = strings.TrimSpace(item)
+			break
 		}
 	}
 	_, _ = exec.Command("umount", "/tmp/ins").CombinedOutput()
