@@ -617,8 +617,9 @@ func attachDisk(diskID, nodeID string) (string, error) {
 	log.Infof("attachDisk: diskID: %s, nodeID: %s", diskID, nodeID)
 
 	res, err := cdsDisk.AttachDisk(&cdsDisk.AttachDiskArgs{
-		DiskIds:    []string{diskID},
-		InstanceId: nodeID,
+		DiskIds:             []string{diskID},
+		InstanceId:          nodeID,
+		ReleaseWithInstance: 0, // 不随实例删除
 	})
 
 	if err != nil {
