@@ -100,9 +100,26 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 	volSizeBytes := int64(req.GetCapacityRange().GetRequiredBytes())
 	diskRequestGB := req.CapacityRange.RequiredBytes / (1024 * 1024 * 1024)
 
+	if diskRequestGB < MinDiskSize {
+		msg := fmt.Sprintf("CreateVolume: error parameters from input, disk size must greater than %dGB, request size: %d", MinDiskSize, diskRequestGB)
+		log.Error(msg)
+		return nil, status.Errorf(codes.InvalidArgument, msg)
+	}
+
 	log.Infof("CreateVolume: diskRequestGB is: %d", diskRequestGB)
 
 	diskVol, err := parseDiskVolumeOptions(req)
+	res, err := describeDiskQuota(diskVol.AzId)
+	if err != nil || res == nil || len(res.Data.QuotaList) == 0 {
+		log.Errorf("CreateVolume: error when describeDiskQuota,err: %v , res:%v", err, res)
+		return nil, err
+	}
+	if diskRequestGB > int64(res.Data.QuotaList[0].FreeQuota) {
+		quota := res.Data.QuotaList[0].FreeQuota
+		msg := fmt.Sprintf("az %s free quota is: %d,less than requested %d", diskVol.AzId, quota, diskRequestGB)
+		log.Error(msg)
+		return nil, status.Error(codes.InvalidArgument, msg)
+	}
 	if err != nil {
 		log.Errorf("CreateVolume: error parameters from input, err is: %s", err.Error())
 		return nil, status.Errorf(codes.InvalidArgument, "CreateVolume: error parameters from input, err is: %s", err.Error())
@@ -693,4 +710,16 @@ func detachDisk(diskID string) (string, error) {
 	log.Infof("detachDisk: cdsDisk.detachDisk task creation succeed, taskID is: %s", res.Data.EventId)
 
 	return res.Data.EventId, nil
+}
+
+func describeDiskQuota(azId string) (*cdsDisk.DescribeDiskQuotaResponse, error) {
+
+	res, err := cdsDisk.DescribeDiskQuota(azId)
+
+	if err != nil {
+		log.Errorf("deleteDisk: cdsDisk.DeleteDisk api error, err is: %s", err)
+		return nil, err
+	}
+
+	return res, nil
 }
