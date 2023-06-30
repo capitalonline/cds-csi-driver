@@ -10,12 +10,13 @@ import (
 
 var (
 	volumeCap = []csi.VolumeCapability_AccessMode_Mode{
-		csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER,
+		csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
 	}
 
 	controllerCap = []csi.ControllerServiceCapability_RPC_Type{
 		csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME,
 		csi.ControllerServiceCapability_RPC_PUBLISH_UNPUBLISH_VOLUME,
+		csi.ControllerServiceCapability_RPC_EXPAND_VOLUME,
 	}
 )
 
