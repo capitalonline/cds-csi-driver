@@ -626,9 +626,9 @@ func attachDisk(diskID, nodeID string) (string, error) {
 		return "", err
 	}
 
-	log.Infof("attachDisk: cdsDisk.attachDisk task creation succeed, taskID is: %s", res.TaskID)
+	log.Infof("attachDisk: cdsDisk.attachDisk task creation succeed, taskID is: %s", res.EventId)
 
-	return res.TaskID, nil
+	return res.EventId, nil
 }
 
 func describeNodeStatus(ctx context.Context, c *ControllerServer, nodeId string) (v12.ConditionStatus, error) {
@@ -683,7 +683,7 @@ func detachDisk(diskID string) (string, error) {
 		return "", err
 	}
 
-	log.Infof("detachDisk: cdsDisk.detachDisk task creation succeed, taskID is: %s", res.TaskID)
+	log.Infof("detachDisk: cdsDisk.detachDisk task creation succeed, taskID is: %s", res.EventId)
 
-	return res.TaskID, nil
+	return res.EventId, nil
 }
