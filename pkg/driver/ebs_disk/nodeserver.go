@@ -427,7 +427,7 @@ func formatDiskDevice(diskId, deviceName, fsType string) error {
 	}
 
 	// storing formatted disk
-	diskStagingMap.Store(diskId, Formatted)
+	diskFormattedMap.Store(diskId, Formatted)
 	log.Infof("formatDiskDevice: Successfully!")
 	return nil
 }
