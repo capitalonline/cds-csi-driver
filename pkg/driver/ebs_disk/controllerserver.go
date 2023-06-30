@@ -47,6 +47,8 @@ var diskDetachingMap = new(sync.Map)
 // var diskExpandingMap = map[string]string{}
 var diskExpandingMap = new(sync.Map)
 
+var diskPvMap = new(sync.Map)
+
 func NewControllerServer(d *DiskDriver) *ControllerServer {
 	config, err := rest.InClusterConfig()
 	if err != nil {
@@ -184,6 +186,14 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 	//diskIdPvMap[diskID] = pvName
 
 	pvcCreatedMap.Store(pvName, tmpVol)
+
+	diskPvMap.Store(diskID, pvName)
+	pv, err := c.Client.CoreV1().PersistentVolumes().Get(pvName, metav1.GetOptions{})
+	if pv.Annotations == nil {
+		pv.Annotations = make(map[string]string)
+	}
+	pv.Annotations["volumeId"] = diskID
+	c.Client.CoreV1().PersistentVolumes().Update(pv)
 
 	log.Infof("CreateVolume: successfully create disk, pvName is: %s, diskID is: %s", pvName, diskID)
 
