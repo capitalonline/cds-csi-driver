@@ -10,163 +10,165 @@ kind: ClusterRole
 metadata:
   name: ebs-disk-cds-csi-cluster-role
 rules:
-- apiGroups:
-  - ""
-  resources:
-  - secrets
-  verbs:
-  - get
-  - list
-- apiGroups:
-  - ""
-  resources:
-  - persistentvolumes
-  verbs:
-  - patch
-  - get
-  - list
-  - watch
-  - update
-  - create
-  - delete
-- apiGroups:
-  - ""
-  resources:
-  - persistentvolumeclaims
-  verbs:
-  - get
-  - list
-  - watch
-  - update
-- apiGroups:
-  - storage.k8s.io
-  resources:
-  - storageclasses
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - storage.k8s.io
-  resources:
-  - volumeattachments/status
-  verbs:
-  - patch
-- apiGroups:
-  - storage.k8s.io
-  resources:
-  - csinodes
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - events
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-- apiGroups:
-  - ""
-  resources:
-  - endpoints
-  verbs:
-  - get
-  - watch
-  - list
-  - delete
-  - update
-  - create
-- apiGroups:
-  - ""
-  resources:
-  - configmaps
-  verbs:
-  - get
-  - watch
-  - list
-  - delete
-  - update
-  - create
-- apiGroups:
-  - ""
-  resources:
-  - nodes
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - csi.storage.k8s.io
-  resources:
-  - csinodeinfos
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - storage.k8s.io
-  resources:
-  - volumeattachments
-  verbs:
-  - get
-  - patch
-  - list
-  - watch
-  - update
-- apiGroups:
-  - snapshot.storage.k8s.io
-  resources:
-  - volumesnapshotclasses
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - snapshot.storage.k8s.io
-  resources:
-  - volumesnapshotcontents
-  verbs:
-  - create
-  - get
-  - list
-  - watch
-  - update
-  - delete
-- apiGroups:
-  - snapshot.storage.k8s.io
-  resources:
-  - volumesnapshots
-  verbs:
-  - get
-  - list
-  - watch
-  - update
-- apiGroups:
-  - apiextensions.k8s.io
-  resources:
-  - customresourcedefinitions
-  verbs:
-  - create
-  - list
-  - watch
-  - delete
-- apiGroups:
-  - coordination.k8s.io
-  resources:
-  - leases
-  verbs:
-  - get
-  - watch
-  - list
-  - delete
-  - update
-  - create
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+    verbs:
+      - get
+      - list
+  - apiGroups:
+      - ""
+    resources:
+      - persistentvolumes
+    verbs:
+      - patch
+      - get
+      - list
+      - watch
+      - update
+      - create
+      - delete
+  - apiGroups:
+      - ""
+    resources:
+      - persistentvolumeclaims
+    verbs:
+      - get
+      - list
+      - watch
+      - update
+      - patch
+  - apiGroups:
+      - storage.k8s.io
+    resources:
+      - storageclasses
+    verbs:
+      - get
+      - list
+      - watch
+      - patch
+  - apiGroups:
+      - storage.k8s.io
+    resources:
+      - volumeattachments/status
+    verbs:
+      - patch
+  - apiGroups:
+      - storage.k8s.io
+    resources:
+      - csinodes
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - events
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+  - apiGroups:
+      - ""
+    resources:
+      - endpoints
+    verbs:
+      - get
+      - watch
+      - list
+      - delete
+      - update
+      - create
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+    verbs:
+      - get
+      - watch
+      - list
+      - delete
+      - update
+      - create
+  - apiGroups:
+      - ""
+    resources:
+      - nodes
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - csi.storage.k8s.io
+    resources:
+      - csinodeinfos
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - storage.k8s.io
+    resources:
+      - volumeattachments
+    verbs:
+      - get
+      - patch
+      - list
+      - watch
+      - update
+  - apiGroups:
+      - snapshot.storage.k8s.io
+    resources:
+      - volumesnapshotclasses
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - snapshot.storage.k8s.io
+    resources:
+      - volumesnapshotcontents
+    verbs:
+      - create
+      - get
+      - list
+      - watch
+      - update
+      - delete
+  - apiGroups:
+      - snapshot.storage.k8s.io
+    resources:
+      - volumesnapshots
+    verbs:
+      - get
+      - list
+      - watch
+      - update
+  - apiGroups:
+      - apiextensions.k8s.io
+    resources:
+      - customresourcedefinitions
+    verbs:
+      - create
+      - list
+      - watch
+      - delete
+  - apiGroups:
+      - coordination.k8s.io
+    resources:
+      - leases
+    verbs:
+      - get
+      - watch
+      - list
+      - delete
+      - update
+      - create
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -177,9 +179,9 @@ roleRef:
   kind: ClusterRole
   name: ebs-disk-cds-csi-cluster-role
 subjects:
-- kind: ServiceAccount
-  name: ebs-disk-cds-csi-sa
-  namespace: kube-system
+  - kind: ServiceAccount
+    name: ebs-disk-cds-csi-sa
+    namespace: kube-system
 ---
 apiVersion: v1
 kind: Service
@@ -190,8 +192,8 @@ metadata:
   namespace: kube-system
 spec:
   ports:
-  - name: healthz
-    port: 9810
+    - name: healthz
+      port: 9810
   selector:
     type: ebs-disk-csi-provisioner
 ---
@@ -213,104 +215,103 @@ spec:
         type: csi-provisioner
     spec:
       containers:
-      - args:
-        - --endpoint=$(CSI_ENDPOINT)
-        - --v=5
-        - --driver=ebs-disk.csi.cds.net
-        env:
-        - name: CSI_ENDPOINT
-          value: unix://socketDir/csi.sock
-        - name: API_HOST
-          value: ""
-        - name: ACCESS_KEY_ID
-          valueFrom:
-            secretKeyRef:
-              key: access_key_id
-              name: cck-secrets
-        - name: ACCESS_KEY_SECRET
-          valueFrom:
-            secretKeyRef:
-              key: access_key_secret
-              name: cck-secrets
-        - name: CDS_OVERSEA
-          valueFrom:
-            configMapKeyRef:
-              key: oversea
-              name: cds-properties
-        image: registry-bj.capitalonline.net/cck/cds-csi-driver-test:v0.0.4
-        imagePullPolicy: Always
-        livenessProbe:
-          exec:
-            command:
-            - sh
-            - -c
-            - ps -ef | grep cds-csi-driver | grep ebs-disk.csi.cds.net | grep -v grep
-          failureThreshold: 8
-          initialDelaySeconds: 15
-          periodSeconds: 10
-          successThreshold: 1
-          timeoutSeconds: 15
-        name: csi-controller-server
-        resources:
-          limits:
-            cpu: 100m
-            memory: 100Mi
-          requests:
-            cpu: 100m
-            memory: 100Mi
-        securityContext:
-          privileged: true
-        volumeMounts:
-        - mountPath: /var/log/
-          name: host-log
-        - mountPath: /socketDir/
-          name: socket-dir
-        - mountPath: /host/etc
-          name: etc
-      - args:
-        - --csi-address=$(ADDRESS)
-        - --v=5
-        env:
-        - name: ADDRESS
-          value: /socketDir/csi.sock
-        image: registry-bj.capitalonline.net/cck/csi-provisioner:v3.1.0
-        name: csi-provisioner
-        volumeMounts:
-        - mountPath: /socketDir
-          name: socket-dir
-      - args:
-        - --csi-address=/csi/csi.sock
-        - --health-port=9811
-        image: registry-bj.capitalonline.net/cck/csi-livenessprobe:v2.0.0
-        name: liveness-probe
-        volumeMounts:
-        - mountPath: /csi
-          name: socket-dir
-      - args:
-          - --v=5
-          - --csi-address=$(ADDRESS)
-          - --leader-election=true
-        env:
-          - name: ADDRESS
-            value: /var/lib/kubelet/plugins/ebs-disk.csi.cds.net/csi.sock
-        image: registry-bj.capitalonline.net/cck/csi-resizer:v1.4.0
-        name: ebs-disk-driver-resizer
-        volumeMounts:
-          - mountPath: /socketDir
-            name: socket-dir
-      - args:
-        - --csi-address=$(ADDRESS)
-        - --v=5
-        - --leader-election=true
-        - --leader-election-type=leases
-        env:
-        - name: ADDRESS
-          value: /var/lib/csi/sockets/pluginproxy/csi.sock
-        image: registry-bj.capitalonline.net/cck/csi-attacher:v4.3.0
-        name: csi-attacher
-        volumeMounts:
-        - mountPath: /var/lib/csi/sockets/pluginproxy/
-          name: socket-dir
+        - args:
+            - --endpoint=$(CSI_ENDPOINT)
+            - --v=5
+            - --driver=ebs-disk.csi.cds.net
+          env:
+            - name: CSI_ENDPOINT
+              value: unix://socketDir/csi.sock
+            - name: API_HOST
+              value: http://gateway.gic.test
+            - name: ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  key: access_key_id
+                  name: cck-secrets
+            - name: ACCESS_KEY_SECRET
+              valueFrom:
+                secretKeyRef:
+                  key: access_key_secret
+                  name: cck-secrets
+            - name: CDS_OVERSEA
+              valueFrom:
+                configMapKeyRef:
+                  key: oversea
+                  name: cds-properties
+          image: registry-bj.capitalonline.net/cck/cds-csi-driver-test:v0.0.4
+          imagePullPolicy: Always
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - ps -ef | grep cds-csi-driver | grep ebs-disk.csi.cds.net | grep -v grep
+            failureThreshold: 8
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 15
+          name: csi-controller-server
+          resources:
+            limits:
+              cpu: 100m
+              memory: 100Mi
+            requests:
+              cpu: 100m
+              memory: 100Mi
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - mountPath: /var/log/
+              name: host-log
+            - mountPath: /socketDir/
+              name: socket-dir
+            - mountPath: /host/etc
+              name: etc
+        - args:
+            - --csi-address=$(ADDRESS)
+            - --v=5
+          env:
+            - name: ADDRESS
+              value: /socketDir/csi.sock
+          image: registry-bj.capitalonline.net/cck/csi-provisioner:v3.1.0
+          name: csi-provisioner
+          volumeMounts:
+            - mountPath: /socketDir
+              name: socket-dir
+        - args:
+            - --csi-address=/csi/csi.sock
+            - --health-port=9811
+          image: registry-bj.capitalonline.net/cck/csi-livenessprobe:v2.0.0
+          name: liveness-probe
+          volumeMounts:
+            - mountPath: /csi
+              name: socket-dir
+        - args:
+            - --v=5
+            - --csi-address=$(ADDRESS)
+            - --leader-election=true
+          env:
+            - name: ADDRESS
+              value: /var/lib/kubelet/plugins/ebs-disk.csi.cds.net/csi.sock
+          image: registry-bj.capitalonline.net/cck/csi-resizer:v1.4.0
+          name: ebs-disk-driver-resizer
+          volumeMounts:
+            - mountPath: /socketDir
+              name: socket-dir
+        - args:
+            - --csi-address=$(ADDRESS)
+            - --v=5
+            - --leader-election=true
+          env:
+            - name: ADDRESS
+              value: /var/lib/csi/sockets/pluginproxy/csi.sock
+          image: registry-bj.capitalonline.net/cck/csi-attacher:v4.3.0
+          name: csi-attacher
+          volumeMounts:
+            - mountPath: /var/lib/csi/sockets/pluginproxy/
+              name: socket-dir
       hostNetwork: true
       hostPID: true
       nodeSelector:
@@ -318,22 +319,22 @@ spec:
       priorityClassName: system-cluster-critical
       serviceAccount: ebs-disk-cds-csi-sa
       tolerations:
-      - key: node-role.kubernetes.io/control-plane
-        operator: Exists
-        effect: NoSchedule
-      - key: node-role.kubernetes.io/master
-        operator: Exists
-        effect: NoSchedule
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
 
       volumes:
-      - emptyDir: {}
-        name: socket-dir
-      - hostPath:
-          path: /var/log/
-        name: host-log
-      - hostPath:
-          path: /etc
-        name: etc
+        - emptyDir: {}
+          name: socket-dir
+        - hostPath:
+            path: /var/log/
+          name: host-log
+        - hostPath:
+            path: /etc
+          name: etc
   updateStrategy:
     type: RollingUpdate
 ---
@@ -352,117 +353,120 @@ spec:
         app: ebs-disk-csi-cds-node
     spec:
       containers:
-      - args:
-        - --endpoint=$(CSI_ENDPOINT)
-        - --v=5
-        - --driver=ebs-disk.csi.cds.net
-        env:
-        - name: CSI_ENDPOINT
-          value: unix://var/lib/kubelet/plugins/ebs-disk.csi.cds.net/csi.sock
-        - name: API_HOST
-          value: ""
-        - name: ACCESS_KEY_ID
-          valueFrom:
-            secretKeyRef:
-              key: access_key_id
-              name: cck-secrets
-        - name: ACCESS_KEY_SECRET
-          valueFrom:
-            secretKeyRef:
-              key: access_key_secret
-              name: cck-secrets
-        - name: CDS_OVERSEA
-          valueFrom:
-            configMapKeyRef:
-              key: oversea
-              name: cds-properties
-        image: registry-bj.capitalonline.net/cck/cds-csi-driver-test:v0.0.4
-        imagePullPolicy: Always
-        name: ebs-disk-csi-node-server
-        securityContext:
-          allowPrivilegeEscalation: true
-          capabilities:
-            add:
-            - SYS_ADMIN
-          privileged: true
-        volumeMounts:
-        - mountPath: /var/lib/kubelet/
-          mountPropagation: Bidirectional
-          name: kubelet-dir
-        - mountPath: /var/log/
-          name: host-log
-        - mountPath: /host/etc
-          name: etc
-        - mountPath: /dev
-          name: host-dev
-      - args:
-        - --v=5
-        - --csi-address=$(ADDRESS)
-        - --kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)
-        env:
-        - name: ADDRESS
-          value: /var/lib/kubelet/plugins/ebs-disk.csi.cds.net/csi.sock
-        - name: DRIVER_REG_SOCK_PATH
-          value: /var/lib/kubelet/plugins/ebs-disk.csi.cds.net/csi.sock
-        image: registry-bj.capitalonline.net/cck/csi-node-driver-registrar:v1.2.0
-        imagePullPolicy: Always
-        lifecycle:
-          preStop:
-            exec:
-              command:
-              - /bin/sh
-              - -c
-              - rm -rf /registration/ebs-disk.csi.cds.net /registration/ebs-disk.csi.cds.net-reg.sock
-        name: ebs-disk-driver-registrar
-        volumeMounts:
-        - mountPath: /var/lib/kubelet/
-          name: kubelet-dir
-        - mountPath: /registration/
-          name: registration-dir
-      - args:
-        - --csi-address=/var/lib/kubelet/plugins/ebs-disk.csi.cds.net/csi.sock
-        - --health-port=9812
-        image: registry-bj.capitalonline.net/cck/csi-livenessprobe:v2.0.0
-        name: ebs-disk-liveness-probe
-        volumeMounts:
-        - mountPath: /var/lib/kubelet/
-          name: kubelet-dir
-      - args:
-          - --v=5
-          - --csi-address=$(ADDRESS)
-          - --leader-election=true
-        env:
-          - name: ADDRESS
-            value: /var/lib/kubelet/plugins/ebs-disk.csi.cds.net/csi.sock
-        image: registry-bj.capitalonline.net/cck/csi-resizer:v1.4.0
-        name: ebs-disk-driver-resizer
-        volumeMounts:
-          - mountPath: /var/lib/kubelet/
-            name: kubelet-dir
+        - args:
+            - --endpoint=$(CSI_ENDPOINT)
+            - --v=5
+            - --driver=ebs-disk.csi.cds.net
+          env:
+            - name: CSI_ENDPOINT
+              value: unix://var/lib/kubelet/plugins/ebs-disk.csi.cds.net/csi.sock
+            - name: ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  key: access_key_id
+                  name: cck-secrets
+            - name: ACCESS_KEY_SECRET
+              valueFrom:
+                secretKeyRef:
+                  key: access_key_secret
+                  name: cck-secrets
+            - name: CDS_OVERSEA
+              valueFrom:
+                configMapKeyRef:
+                  key: oversea
+                  name: cds-properties
+            - name: API_HOST
+              value: ""
+          image: registry-bj.capitalonline.net/cck/cds-csi-driver-test:v0.0.4
+          imagePullPolicy: Always
+          name: ebs-disk-csi-node-server
+          securityContext:
+            allowPrivilegeEscalation: true
+            capabilities:
+              add:
+                - SYS_ADMIN
+            privileged: true
+          volumeMounts:
+            - mountPath: /var/lib/kubelet/
+              mountPropagation: Bidirectional
+              name: kubelet-dir
+            - mountPath: /var/log/
+              name: host-log
+            - mountPath: /host/etc
+              name: etc
+            - mountPath: /dev
+              name: host-dev
+        - args:
+            - --v=5
+            - --csi-address=$(ADDRESS)
+            - --leader-election=true
+          env:
+            - name: ADDRESS
+              value: /var/lib/kubelet/plugins/ebs-disk.csi.cds.net/csi.sock
+          image: registry-bj.capitalonline.net/cck/csi-resizer:v1.4.0
+          name: ebs-disk-driver-resizer
+          volumeMounts:
+            - mountPath: /socketDir
+              name: socket-dir
+        - args:
+            - --v=5
+            - --csi-address=$(ADDRESS)
+            - --kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)
+          env:
+            - name: ADDRESS
+              value: /var/lib/kubelet/plugins/ebs-disk.csi.cds.net/csi.sock
+            - name: DRIVER_REG_SOCK_PATH
+              value: /var/lib/kubelet/plugins/ebs-disk.csi.cds.net/csi.sock
+          image: registry-bj.capitalonline.net/cck/csi-node-driver-registrar:v1.2.0
+          imagePullPolicy: Always
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - rm -rf /registration/ebs-disk.csi.cds.net /registration/ebs-disk.csi.cds.net-reg.sock
+          name: ebs-disk-driver-registrar
+          volumeMounts:
+            - mountPath: /var/lib/kubelet/
+              name: kubelet-dir
+            - mountPath: /registration/
+              name: registration-dir
+        - args:
+            - --csi-address=/var/lib/kubelet/plugins/ebs-disk.csi.cds.net/csi.sock
+            - --health-port=9812
+          image: registry-bj.capitalonline.net/cck/csi-livenessprobe:v2.0.0
+          name: ebs-disk-liveness-probe
+          volumeMounts:
+            - mountPath: /var/lib/kubelet/
+              name: kubelet-dir
+
       hostNetwork: true
       hostPID: true
       priorityClassName: system-node-critical
       serviceAccount: ebs-disk-cds-csi-sa
       tolerations:
-      - operator: Exists
+        - operator: Exists
       volumes:
-      - hostPath:
-          path: /var/lib/kubelet
-          type: Directory
-        name: kubelet-dir
-      - hostPath:
-          path: /var/lib/kubelet/plugins_registry
-          type: DirectoryOrCreate
-        name: registration-dir
-      - hostPath:
-          path: /var/log/
-        name: host-log
-      - hostPath:
-          path: /etc
-        name: etc
-      - hostPath:
-          path: /dev
-        name: host-dev
+        - emptyDir: {}
+          name: socket-dir
+        - hostPath:
+            path: /var/lib/kubelet
+            type: Directory
+          name: kubelet-dir
+        - hostPath:
+            path: /var/lib/kubelet/plugins_registry
+            type: DirectoryOrCreate
+          name: registration-dir
+        - hostPath:
+            path: /var/log/
+          name: host-log
+        - hostPath:
+            path: /etc
+          name: etc
+        - hostPath:
+            path: /dev
+          name: host-dev
   updateStrategy:
     type: RollingUpdate
 ---
