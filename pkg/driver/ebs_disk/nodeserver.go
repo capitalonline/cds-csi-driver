@@ -9,6 +9,10 @@ import (
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"strings"
 	"sync"
 )
@@ -43,8 +47,17 @@ var diskUnStagingMap = new(sync.Map)
 var diskUnPublishingMap = new(sync.Map)
 
 func NewNodeServer(d *DiskDriver) *NodeServer {
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		log.Fatalf("NewControllerServer:: Failed to create kubernetes config: %v", err)
+	}
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		log.Fatalf("NewControllerServer:: Failed to create kubernetes client: %v", err)
+	}
 	return &NodeServer{
 		DefaultNodeServer: csicommon.NewDefaultNodeServer(d.csiDriver),
+		Client:            clientset,
 	}
 }
 
@@ -103,7 +116,8 @@ func (n *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 	log.Debugf("NodeStageVolume: findDeviceNameByVolumeID succeed, deviceName is: %s", deviceName)
 	fsType := req.GetVolumeContext()["fsType"]
 	diskStagingMap.Store(targetGlobalPath, Staging)
-	if _, ok := diskFormattedMap.Load(diskID); ok {
+
+	if _, ok := diskFormattedMap.Load(diskID); ok || n.GetPvFormat(req.VolumeId, diskID) {
 		log.Warnf("NodeStageVolume: diskID: %s had been formatted, ignore multi format", diskID)
 	} else {
 		// 3 格式化盘
@@ -111,6 +125,11 @@ func (n *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 			diskStagingMap.Store(targetGlobalPath, ErrorStatus)
 			log.Errorf("NodeStageVolume: format deviceName: %s failed, err is: %s", deviceName, err.Error())
 			return nil, err
+		}
+		err = n.SavePvFormat(diskID)
+		if err != nil {
+			err = nil
+			log.Infof("store pv %s format failed", diskID)
 		}
 		log.Debugf("NodeStageVolume: Step 1: formatDiskDevice successfully!")
 	}
@@ -558,4 +577,58 @@ func expandVolume(deviceName string) error {
 	}
 	log.Info("expandVolume: Successfully!")
 	return nil
+}
+
+func (n *NodeServer) SavePvFormat(diskId string) error {
+	log.Debugf("start SavePvFormat %s", diskId)
+	defer diskFormattedMap.Store(diskId, Formatted)
+	for i := 0; i < 2; i++ {
+		pvList, err := n.Client.CoreV1().PersistentVolumes().List(metav1.ListOptions{})
+		if err != nil {
+			return err
+		}
+		var volume = v1.PersistentVolume{}
+		for i := 0; i < len(pvList.Items); i++ {
+			pv := pvList.Items[i]
+			if pv.Annotations == nil {
+				continue
+			}
+			if pv.Annotations["volumeId"] == diskId {
+				volume = pv
+				break
+			}
+		}
+		if volume.Name == "" {
+			return fmt.Errorf("pv %s is not found", diskId)
+		}
+		volume.Annotations["formated"] = "true"
+		_, err = n.Client.CoreV1().PersistentVolumes().Update(&volume)
+		if err != nil {
+			continue
+		}
+		break
+	}
+	log.Debugf("SavePvFormat %s successfully", diskId)
+	return nil
+}
+
+func (n *NodeServer) GetPvFormat(pvName string, diskId string) bool {
+	_, ok := diskFormattedMap.Load(diskId)
+	if ok {
+		return true
+	}
+	pvList, err := n.Client.CoreV1().PersistentVolumes().List(metav1.ListOptions{})
+	if err != nil {
+		return true
+	}
+	for i := 0; i < len(pvList.Items); i++ {
+		pv := pvList.Items[i]
+		if pv.Annotations == nil {
+			return false
+		}
+		if pv.Annotations["volumeId"] == diskId {
+			return pv.Annotations["formated"] == "true"
+		}
+	}
+	return false
 }
