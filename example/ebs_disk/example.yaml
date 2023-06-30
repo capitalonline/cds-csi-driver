@@ -16,7 +16,7 @@ metadata:
   name: disk-csi-cds-pvc
 spec:
   accessModes:
-    - ReadWriteMany
+    - ReadWriteOnce
   storageClassName: disk-csi-csd-sc
   resources:
     requests:
