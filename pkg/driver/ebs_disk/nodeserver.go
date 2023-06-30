@@ -417,7 +417,7 @@ func formatDiskDevice(diskId, deviceName, fsType string) error {
 
 	if out, err := utils.RunCommand(formatDeviceCmd); err != nil {
 		if strings.Contains(out, "existing filesystem") {
-			diskStagingMap.Store(diskId, Formatted)
+			diskFormattedMap.Store(diskId, Formatted)
 			log.Warnf("formatDiskDevice: deviceName: %s had been formatted, avoid multi formatting, return directly", deviceName)
 			// log.Infof("formatDiskDevice: Successfully!")
 			return nil
