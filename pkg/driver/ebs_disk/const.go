@@ -14,4 +14,9 @@ const (
 	DriverEbsDiskTypeName = "ebs-disk.csi.cds.net"
 )
 
+const (
+	StatusEbsMounted = "running"
+	StatusEbsError   = "error"
+)
+
 var IopsArrayInt64 = []int64{3000, 5000, 7500, 10000}
