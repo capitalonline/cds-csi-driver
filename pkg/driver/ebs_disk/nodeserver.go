@@ -225,7 +225,7 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 	}
 
 	// check if disk formatted or not, return error if not formatted
-	if _, ok := diskFormattedMap.Load(volumeID); ok {
+	if _, ok := diskFormattedMap.Load(volumeID); ok || n.GetPvFormat(volumeID) {
 		deviceName, err := findDeviceNameByOrderId(fmt.Sprintf("%s%d", OrderHead, res.Data.DiskInfo.Order))
 		if err != nil {
 			log.Errorf("NodePublishVolume: findDeviceNameByUuid error, err is: %s", err.Error())
