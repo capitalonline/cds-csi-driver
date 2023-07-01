@@ -368,31 +368,6 @@ func (n *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstage
 	return &csi.NodeUnstageVolumeResponse{}, nil
 }
 
-func (n *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
-	diskID := req.VolumeId
-	targetGlobalPath := req.GetStagingTargetPath()
-	if diskID == "" || targetGlobalPath == "" {
-		log.Errorf("NodeExpandVolume: [diskID/NodeStageVolume] cant not be empty")
-		return nil, fmt.Errorf("NodeExpandVolume: [diskID/NodeStageVolume] cant not be empty")
-	}
-	res, err := findDiskByVolumeID(diskID)
-	if err != nil {
-		log.Errorf("NodeStageVolume: find disk uuid failed, err is: %s", err)
-		return nil, err
-	}
-	deviceName, err := findDeviceNameByOrderId(fmt.Sprintf("%s%d", OrderHead, res.Data.DiskInfo.Order))
-	if err != nil {
-		log.Errorf("NodeExpandVolume: findDeviceNameByUuid error, err is: %s", err.Error())
-		return nil, err
-	}
-	err = expandVolume(deviceName)
-	if err != nil {
-		log.Errorf("NodeExpandVolume: expandVolume failed, err is: %s", err.Error())
-		return nil, fmt.Errorf("NodeExpandVolume: expandVolume failed, err is: %s", err.Error())
-	}
-	return &csi.NodeExpandVolumeResponse{}, nil
-}
-
 func findDeviceNameByOrderId(orderId string) (deviceName string, err error) {
 	log.Infof("findDeviceNameByUuid: disk order id is: %s", orderId)
 	cmdScan := fmt.Sprintf("ls /dev/disk/by-id/%s -lh", orderId)
@@ -568,17 +543,6 @@ func unBindMountGlobalPathFromPodPath(targetPath string) error {
 
 	return nil
 
-}
-
-func expandVolume(deviceName string) error {
-	log.Infof("expandVolume: deviceName: %s", deviceName)
-	cmd := fmt.Sprintf("resize2fs %s", deviceName)
-	if _, err := utils.RunCommand(cmd); err != nil {
-		log.Errorf("expandVolume fail: deviceName:%s, err is: %s", deviceName, err.Error())
-		return fmt.Errorf("expandVolume fail: deviceName:%s, err is: %s", deviceName, err.Error())
-	}
-	log.Info("expandVolume: Successfully!")
-	return nil
 }
 
 func (n *NodeServer) SavePvFormat(diskId string) error {
