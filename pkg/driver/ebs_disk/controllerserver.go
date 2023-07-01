@@ -411,7 +411,6 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 		return nil, err
 	}
 	diskEventIdMap.Store(nodeID, taskID)
-
 	//diskAttachingMap[diskID] = "attaching"
 	diskAttachingMap.Store(diskID, "attaching")
 	if err = describeTaskStatus(taskID); err != nil {
@@ -422,7 +421,8 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 	}
 
 	//delete(diskAttachingMap, diskID)
-	diskEventIdMap.Delete(nodeID)
+	defer deleteNodeId(nodeID, taskID)
+
 	diskAttachingMap.Delete(diskID)
 	log.Infof("ControllerPublishVolume: Successfully attach disk: %s to node: %s", diskID, nodeID)
 
@@ -495,7 +495,7 @@ func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *c
 	}
 
 	//delete(diskDetachingMap, diskID)
-	diskEventIdMap.Delete(nodeID)
+	defer deleteNodeId(nodeID, taskID)
 
 	diskDetachingMap.Delete(diskID)
 	//delete(diskAttachingMap, diskID)
@@ -781,4 +781,12 @@ func describeInstances(instancesId string) (*cdsDisk.DescribeInstanceResponse, e
 	}
 
 	return res, nil
+}
+
+func deleteNodeId(nodeId, taskID string) {
+	if v, ok := diskEventIdMap.Load(nodeId); ok {
+		if v == taskID {
+			diskEventIdMap.Delete(nodeId)
+		}
+	}
 }
