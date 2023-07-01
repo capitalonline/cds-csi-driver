@@ -15,6 +15,7 @@ type DiskDriver struct {
 
 type NodeServer struct {
 	*csicommon.DefaultNodeServer
+	Client *kubernetes.Clientset
 }
 
 type ControllerServer struct {
