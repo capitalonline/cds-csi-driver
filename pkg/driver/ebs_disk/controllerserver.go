@@ -385,6 +385,7 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 	if err = describeTaskStatus(taskID); err != nil {
 		//diskAttachingMap[diskID] = "error"
 		diskAttachingMap.Store(diskID, "error")
+		AttachDetachMap.Delete(nodeID)
 		log.Errorf("ControllerPublishVolume: attach disk:%s processing to node: %s with error, err is: %s", diskID, nodeID, err.Error())
 		return nil, err
 	}
