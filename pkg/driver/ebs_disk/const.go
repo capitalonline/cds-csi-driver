@@ -18,6 +18,7 @@ const (
 	StatusEbsMounted = "running"
 	StatusEbsError   = "error"
 	MinDiskSize      = 24
+	EcsMountLimit    = 16
 	StatusEcsRunning = "running"
 )
 

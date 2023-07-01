@@ -366,8 +366,15 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 		return nil, err
 	}
 	if describeRes.Data.Status != StatusEcsRunning {
-		log.Errorf("ControllerPublishVolume: node %s is not running, attach will try again later", nodeID)
-		return nil, err
+		msg := fmt.Sprintf("ControllerPublishVolume: node %s is not running, attach will try again later", nodeID)
+		log.Errorf(msg)
+		return nil, fmt.Errorf(msg)
+	}
+	var number = len(describeRes.Data.Disk.DataDiskConf)
+	if number+1 > 16 {
+		msg := fmt.Sprintf("ControllerPublishVolume: node %s's data disk number is %d,supported max number is 16", nodeID, number)
+		log.Errorf(msg)
+		return nil, fmt.Errorf(msg)
 	}
 
 	// Step 4: attach disk to node
