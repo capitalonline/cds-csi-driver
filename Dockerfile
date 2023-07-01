@@ -18,17 +18,17 @@ RUN apk --no-cache update && apk --no-cache add --virtual build-dependencies \
     curl-dev libxml2-dev \
     ca-certificates \
     udev e2fsprogs xfsprogs nvme-cli
-#
-#RUN git clone https://github.com/s3fs-fuse/s3fs-fuse.git && \
-#    cd s3fs-fuse \
-#    git checkout tags/${S3FS_VERSION} && \
-#    ./autogen.sh && \
-#    ./configure --prefix=/usr && \
-#    make && \
-#    make install && \
-#    s3fs --version && \
-#    cd ../ && \
-#    rm -rf s3fs-fuse
+
+RUN git clone https://github.com/s3fs-fuse/s3fs-fuse.git && \
+    cd s3fs-fuse \
+    git checkout tags/${S3FS_VERSION} && \
+    ./autogen.sh && \
+    ./configure --prefix=/usr && \
+    make && \
+    make install && \
+    s3fs --version && \
+    cd ../ && \
+    rm -rf s3fs-fuse
 
 COPY --from=build-env /cds-csi-driver /cds-csi-driver
 
