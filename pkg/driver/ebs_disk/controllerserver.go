@@ -49,6 +49,8 @@ var diskExpandingMap = new(sync.Map)
 
 var diskEventIdMap = new(sync.Map)
 
+var AttachDetachMap = new(sync.Map)
+
 func NewControllerServer(d *DiskDriver) *ControllerServer {
 	config, err := rest.InClusterConfig()
 	if err != nil {
@@ -316,10 +318,15 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 
 	log.Infof("ControllerPublishVolume: pvName: %s, starting attach diskID: %s to node: %s", req.VolumeId, diskID, nodeID)
 
-	if _, ok := diskEventIdMap.Load(nodeID); ok {
-		log.Errorf("ControllerPublishVolume: Disk has another Event, please wait")
-		return nil, status.Error(codes.InvalidArgument, "ControllerPublishVolume: Disk has another Event, please wait")
+	if _, ok := AttachDetachMap.LoadOrStore(nodeID, "doing"); ok {
+		log.Errorf("The Node %s Has Another Event, Please wait", nodeID)
+		return nil, status.Errorf(codes.InvalidArgument, "The Node %s Has Another Event, Please wait", nodeID)
 	}
+
+	//if _, ok := diskEventIdMap.Load(nodeID); ok {
+	//	log.Errorf("ControllerPublishVolume: Disk has another Event, please wait")
+	//	return nil, status.Error(codes.InvalidArgument, "ControllerPublishVolume: Disk has another Event, please wait")
+	//}
 
 	// Step 2: check necessary params
 	if diskID == "" || nodeID == "" {
@@ -408,11 +415,12 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 	taskID, err := attachDisk(diskID, nodeID)
 	if err != nil {
 		log.Errorf("ControllerPublishVolume: create attach task failed, err is:%s", err.Error())
+		AttachDetachMap.Delete(diskID)
 		return nil, err
 	}
-	diskEventIdMap.Store(nodeID, taskID)
+
 	//diskAttachingMap[diskID] = "attaching"
-	defer deleteNodeId(nodeID, taskID)
+	//defer deleteNodeId(nodeID, taskID)
 
 	diskAttachingMap.Store(diskID, "attaching")
 	if err = describeTaskStatus(taskID); err != nil {
@@ -423,6 +431,8 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 	}
 
 	//delete(diskAttachingMap, diskID)
+	AttachDetachMap.Delete(nodeID)
+
 	diskAttachingMap.Delete(diskID)
 	log.Infof("ControllerPublishVolume: Successfully attach disk: %s to node: %s", diskID, nodeID)
 
@@ -436,6 +446,11 @@ func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *c
 	diskID := req.VolumeId
 	nodeID := req.NodeId
 	log.Infof("ControllerUnpublishVolume: starting detach disk: %s from node: %s", diskID, nodeID)
+
+	if _, ok := AttachDetachMap.LoadOrStore(nodeID, "doing"); ok {
+		log.Errorf("The Node %s Has Another Event, Please wait", nodeID)
+		return nil, status.Errorf(codes.InvalidArgument, "The Node %s Has Another Event, Please wait", nodeID)
+	}
 
 	if _, ok := diskEventIdMap.Load(nodeID); ok {
 		log.Errorf("ControllerPublishVolume: Disk has another Event, please wait")
@@ -481,6 +496,8 @@ func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *c
 	taskID, err := detachDisk(diskID)
 	if err != nil {
 		log.Errorf("ControllerUnpublishVolume: create detach task failed, err is: %s", err.Error())
+		AttachDetachMap.Delete(nodeID)
+
 		return nil, err
 	}
 	diskEventIdMap.Store(nodeID, taskID)
@@ -492,12 +509,16 @@ func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *c
 	if err := describeTaskStatus(taskID); err != nil {
 		//diskDetachingMap[diskID] = "error"
 		diskDetachingMap.Store(diskID, "error")
+		AttachDetachMap.Delete(nodeID)
 		log.Errorf("ControllerUnpublishVolume: cdsDisk.detachDisk task result failed, err is: %s", err)
 		return nil, err
 	}
 
 	//delete(diskDetachingMap, diskID)
 	diskDetachingMap.Delete(diskID)
+
+	AttachDetachMap.Delete(nodeID)
+
 	//delete(diskAttachingMap, diskID)
 	log.Infof("ControllerUnpublishVolume: Successfully detach disk: %s from node: %s", diskID, nodeID)
 
