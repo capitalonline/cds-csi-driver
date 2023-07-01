@@ -483,7 +483,7 @@ func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *c
 		log.Errorf("ControllerUnpublishVolume: create detach task failed, err is: %s", err.Error())
 		return nil, err
 	}
-	diskEventIdMap.Store(diskID, taskID)
+	diskEventIdMap.Store(nodeID, taskID)
 
 	defer deleteNodeId(nodeID, taskID)
 
