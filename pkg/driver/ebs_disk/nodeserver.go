@@ -9,10 +9,15 @@ import (
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"strings"
 	"sync"
+	"time"
 )
 
 const (
@@ -579,54 +584,59 @@ func expandVolume(deviceName string) error {
 
 func (n *NodeServer) SavePvFormat(diskId string) error {
 	log.Debugf("start SavePvFormat %s", diskId)
-	defer diskFormattedMap.Store(diskId, Formatted)
-	//for i := 0; i < 2; i++ {
-	//	pvList, err := n.Client.CoreV1().PersistentVolumes().List(metav1.ListOptions{})
-	//	if err != nil {
-	//		return err
-	//	}
-	//	var volume = v1.PersistentVolume{}
-	//	for i := 0; i < len(pvList.Items); i++ {
-	//		pv := pvList.Items[i]
-	//		if pv.Annotations == nil {
-	//			continue
-	//		}
-	//		if pv.Annotations["volumeId"] == diskId {
-	//			volume = pv
-	//			break
-	//		}
-	//	}
-	//	if volume.Name == "" {
-	//		return fmt.Errorf("pv %s is not found", diskId)
-	//	}
-	//	volume.Annotations["formated"] = "true"
-	//	_, err = n.Client.CoreV1().PersistentVolumes().Update(&volume)
-	//	if err != nil {
-	//		continue
-	//	}
-	//	break
-	//}
-	//log.Debugf("SavePvFormat %s successfully", diskId)
-	return nil
+	diskFormattedMap.Store(diskId, Formatted)
+
+	patchData := []byte(fmt.Sprintf(`{"data": {"%s": "%s"}}`, diskId, Formatted))
+
+	// 执行 Patch 操作
+	_, err := n.Client.CoreV1().ConfigMaps("kube-system").Patch("ebs-formated", types.MergePatchType, patchData)
+
+	if err == nil {
+		return nil
+	}
+	var cm = v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "ebs-formated",
+			Namespace: "kube-system",
+		},
+		Data: map[string]string{
+			diskId: Formatted,
+		},
+	}
+	if errors.IsNotFound(err) {
+		_, err := n.Client.CoreV1().ConfigMaps("kube-system").Create(&cm)
+		if err != nil && !errors.IsAlreadyExists(err) {
+			return err
+		}
+	}
+	for i := 0; i < 2; i++ {
+		_, err = n.Client.CoreV1().ConfigMaps("kube-system").Patch("ebs-formated", types.MergePatchType, patchData)
+		if err != nil {
+			time.Sleep(time.Second * 2)
+		} else {
+			return nil
+		}
+	}
+	return err
 }
 
-func (n *NodeServer) GetPvFormat(pvName string, diskId string) bool {
+func (n *NodeServer) GetPvFormat(diskId string) bool {
 	_, ok := diskFormattedMap.Load(diskId)
 	if ok {
 		return true
 	}
-	//pvList, err := n.Client.CoreV1().PersistentVolumes().List(metav1.ListOptions{})
-	//if err != nil {
-	//	return true
-	//}
-	//for i := 0; i < len(pvList.Items); i++ {
-	//	pv := pvList.Items[i]
-	//	if pv.Annotations == nil {
-	//		return false
-	//	}
-	//	if pv.Annotations["volumeId"] == diskId {
-	//		return pv.Annotations["formated"] == "true"
-	//	}
-	//}
+	for i := 0; i < 2; i++ {
+		cm, err := n.Client.CoreV1().ConfigMaps("kube-system").Get("ebs-formated", metav1.GetOptions{})
+		if err == nil {
+			if cm.Data == nil {
+				return false
+			}
+			return cm.Data[diskId] == Formatted
+		}
+		if errors.IsNotFound(err) {
+			return false
+		}
+		time.Sleep(time.Second * 2)
+	}
 	return false
 }
