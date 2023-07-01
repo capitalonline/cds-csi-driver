@@ -65,7 +65,7 @@ func NewControllerServer(d *DiskDriver) *ControllerServer {
 	}
 }
 
-func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
+func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (resp *csi.CreateVolumeResponse, err error) {
 	//resp, err := eks.CreateBlock("", "")
 	//fmt.Println(resp, err)
 	log.Infof("CreateVolume: Starting CreateVolume, req is:%+v", req)
@@ -77,6 +77,26 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 		log.Warnf("CreateVolume: volume has been created, pvName: %s, volumeContext: %v, return directly", pvName, value.VolumeContext)
 		return &csi.CreateVolumeResponse{Volume: value}, nil
 	}
+
+	// check if disk is in creating first
+	if v, ok := diskProcessingMap.LoadOrStore(pvName, "creating"); ok {
+		value, _ := v.(string)
+		if value == "creating" {
+			log.Warnf("CreateVolume: Disk Volume(%s)'s is in creating, please wait", pvName)
+			return nil, fmt.Errorf("CreateVolume: Disk Volume(%s) is in creating, please wait", pvName)
+		} else if value == "error" {
+			return nil, status.Errorf(codes.Unknown, "CreateVolume: Disk Volume(%s) error", pvName)
+		}
+
+		log.Errorf("CreateVolume: Disk Volume(%s)'s creating process error", pvName)
+		return nil, fmt.Errorf("CreateVolume: Disk Volume(%s)'s creating process error", pvName)
+	}
+
+	defer func() {
+		if resp == nil {
+			diskProcessingMap.Store(pvName, "error")
+		}
+	}()
 
 	// Step 2: check critical params
 	if req.Parameters == nil {
@@ -127,28 +147,6 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 		return nil, status.Errorf(codes.InvalidArgument, "CreateVolume: error parameters from input, err is: %s", err.Error())
 	}
 
-	// Step 4: create disk
-	// check if disk is in creating first
-	//if value, ok := diskProcessingMap[pvName]; ok {
-	if v, ok := diskProcessingMap.Load(pvName); ok {
-		value, _ := v.(string)
-		if value == "creating" {
-			log.Warnf("CreateVolume: Disk Volume(%s)'s is in creating, please wait", pvName)
-
-			if tmp, ok := pvcCreatedMap.Load(pvName); ok {
-				tmpVol, _ := tmp.(*csi.Volume)
-				log.Warnf("CreateVolume: Disk Volume(%s)'s diskID: %s creating process finished, return context", pvName, value)
-				return &csi.CreateVolumeResponse{Volume: tmpVol}, nil
-			}
-
-			return nil, fmt.Errorf("CreateVolume: Disk Volume(%s) is in creating, please wait", pvName)
-		}
-
-		log.Errorf("CreateVolume: Disk Volume(%s)'s creating process error", pvName)
-
-		return nil, fmt.Errorf("CreateVolume: Disk Volume(%s)'s creating process error", pvName)
-	}
-
 	// do request to create ebs disk
 	// diskName, diskType, diskSiteID, diskZoneID string, diskSize, diskIops int
 	createRes, err := createEbsDisk(pvName, diskVol.StorageType, diskVol.AzId, int(diskRequestGB), 0)
@@ -164,21 +162,12 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 	diskID := diskIdSet[0]
 	taskID := createRes.Data.EventId
 
-	//diskProcessingMap[pvName] = "creating"
-	diskProcessingMap.Store(pvName, "creating")
-
 	// check create ebs disk event
 	err = describeTaskStatus(taskID)
 	if err != nil {
 		log.Errorf("createDisk: describeTaskStatus task result failed, err is: %s", err.Error())
-		//diskProcessingMap[pvName] = "error"
-		diskProcessingMap.Store(pvName, "error")
 		return nil, err
 	}
-
-	// clean creating disk
-	//delete(diskProcessingMap, pvName)
-	diskProcessingMap.Delete(pvName)
 
 	// Step 5: generate return volume context for /csi.v1.Controller/ControllerPublishVolume GRPC
 	volumeContext := map[string]string{
@@ -200,37 +189,14 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 		},
 	}
 	diskIdPvMap.Store(diskID, pvName)
-	//diskIdPvMap[diskID] = pvName
-
 	pvcCreatedMap.Store(pvName, tmpVol)
-
-	//for i := 0; i < 2; i++ {
-	//	pv, err := c.Client.CoreV1().PersistentVolumes().Get(pvName, metav1.GetOptions{})
-	//	if pv.Annotations == nil {
-	//		pv.Annotations = make(map[string]string)
-	//	}
-	//
-	//	if pv.Labels == nil {
-	//		pv.Labels = make(map[string]string)
-	//	}
-	//	pv.Annotations["volumeId"] = diskID
-	//	pv.Labels["volumeId"] = diskID
-	//
-	//	_, err = c.Client.CoreV1().PersistentVolumes().Update(pv)
-	//	if err != nil {
-	//		log.Errorf("createDisk: update pv annotaions and lable failed, err is: %s", err.Error())
-	//		time.Sleep(3 * time.Second)
-	//		continue
-	//	}
-	//	break
-	//}
-
+	diskProcessingMap.Delete(pvName)
 	log.Infof("CreateVolume: successfully create disk, pvName is: %s, diskID is: %s", pvName, diskID)
 
 	return &csi.CreateVolumeResponse{Volume: tmpVol}, nil
 }
 
-func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
+func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (resp *csi.DeleteVolumeResponse, err error) {
 	log.Infof("DeleteVolume: Starting deleting volume, req is: %+v", req)
 
 	diskID := req.VolumeId
@@ -239,7 +205,6 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 		return nil, fmt.Errorf("DeleteVolume: req.VolumeID cannot be empty")
 	}
 
-	//if value, ok := diskDeletingMap[diskID]; ok {
 	if v, ok := diskDeletingMap.Load(diskID); ok {
 		value, _ := v.(string)
 		if value == "deleting" || value == "detaching" {
@@ -269,6 +234,15 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 	case "mounting", "unmounting", "updating", "creating_snapshot", "recovering":
 		return nil, fmt.Errorf("DeleteVolume: disk's status is %s ,can't delete volumeID: %s", disk.Data.DiskInfo.Status, diskID)
 	}
+
+	if _, ok := diskDeletingMap.LoadOrStore(diskID, "deleting"); ok {
+		return nil, fmt.Errorf("DeleteVolume: disk:(%s) had another process to delete", diskID)
+	}
+
+	defer func() {
+		diskDeletingMap.Delete(diskID)
+	}()
+
 	// Step 4: delete disk
 	deleteRes, err := deleteDisk(diskID)
 	if err != nil {
@@ -276,33 +250,18 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 		return nil, fmt.Errorf("DeleteVolume: delete disk error, err is: %s", err)
 	}
 
-	// store deleting disk status
-	//diskDeletingMap[diskID] = "deleting"
-	diskDeletingMap.Store(diskID, "deleting")
-
 	taskID := deleteRes.Data.EventId
 	if err := describeTaskStatus(taskID); err != nil {
 		log.Errorf("deleteDisk: cdsDisk.DeleteDisk task result failed, err is: %s", err)
-		//diskDeletingMap[diskID] = "error"
-		diskDeletingMap.Store(diskID, "error")
 		return nil, fmt.Errorf("deleteDisk: cdsDisk.DeleteDisk task result failed, err is: %s", err)
 	}
 
-	// Step 5: delete pvcCreatedMap
-	//if pvName, ok := diskIdPvMap[diskID]; ok {
-	//	delete(pvcCreatedMap, pvName)
-	//}
 	if pvName, ok := diskIdPvMap.Load(diskID); ok {
 		name, _ := pvName.(string)
 		pvcCreatedMap.Delete(name)
 	}
 
-	// Step 6: clear diskDeletingMap and diskIdPvMap
-	//delete(diskIdPvMap, diskID)
 	diskIdPvMap.Delete(diskID)
-
-	//delete(diskDeletingMap, diskID)
-	diskDeletingMap.Delete(diskID)
 
 	// log.Infof("DeleteVolume: clean [diskIdPvMap] and [pvcMap] and [diskDeletingMap] succeed!")
 	log.Infof("DeleteVolume: Successfully delete diskID: %s !", diskID)
