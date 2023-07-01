@@ -204,26 +204,26 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 
 	pvcCreatedMap.Store(pvName, tmpVol)
 
-	for i := 0; i < 2; i++ {
-		pv, err := c.Client.CoreV1().PersistentVolumes().Get(pvName, metav1.GetOptions{})
-		if pv.Annotations == nil {
-			pv.Annotations = make(map[string]string)
-		}
-
-		if pv.Labels == nil {
-			pv.Labels = make(map[string]string)
-		}
-		pv.Annotations["volumeId"] = diskID
-		pv.Labels["volumeId"] = diskID
-
-		_, err = c.Client.CoreV1().PersistentVolumes().Update(pv)
-		if err != nil {
-			log.Errorf("createDisk: update pv annotaions and lable failed, err is: %s", err.Error())
-			time.Sleep(3 * time.Second)
-			continue
-		}
-		break
-	}
+	//for i := 0; i < 2; i++ {
+	//	pv, err := c.Client.CoreV1().PersistentVolumes().Get(pvName, metav1.GetOptions{})
+	//	if pv.Annotations == nil {
+	//		pv.Annotations = make(map[string]string)
+	//	}
+	//
+	//	if pv.Labels == nil {
+	//		pv.Labels = make(map[string]string)
+	//	}
+	//	pv.Annotations["volumeId"] = diskID
+	//	pv.Labels["volumeId"] = diskID
+	//
+	//	_, err = c.Client.CoreV1().PersistentVolumes().Update(pv)
+	//	if err != nil {
+	//		log.Errorf("createDisk: update pv annotaions and lable failed, err is: %s", err.Error())
+	//		time.Sleep(3 * time.Second)
+	//		continue
+	//	}
+	//	break
+	//}
 
 	log.Infof("CreateVolume: successfully create disk, pvName is: %s, diskID is: %s", pvName, diskID)
 
