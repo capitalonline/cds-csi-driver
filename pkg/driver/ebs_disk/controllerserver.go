@@ -316,7 +316,7 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 
 	log.Infof("ControllerPublishVolume: pvName: %s, starting attach diskID: %s to node: %s", req.VolumeId, diskID, nodeID)
 
-	if _, ok := diskEventIdMap.Load(diskID); ok {
+	if _, ok := diskEventIdMap.Load(nodeID); ok {
 		log.Errorf("ControllerPublishVolume: Disk has another Event, please wait")
 		return nil, status.Error(codes.InvalidArgument, "ControllerPublishVolume: Disk has another Event, please wait")
 	}
@@ -410,7 +410,7 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 		log.Errorf("ControllerPublishVolume: create attach task failed, err is:%s", err.Error())
 		return nil, err
 	}
-	diskEventIdMap.Store(diskID, taskID)
+	diskEventIdMap.Store(nodeID, taskID)
 
 	//diskAttachingMap[diskID] = "attaching"
 	diskAttachingMap.Store(diskID, "attaching")
@@ -422,6 +422,7 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 	}
 
 	//delete(diskAttachingMap, diskID)
+	diskEventIdMap.Delete(nodeID)
 	diskAttachingMap.Delete(diskID)
 	log.Infof("ControllerPublishVolume: Successfully attach disk: %s to node: %s", diskID, nodeID)
 
@@ -436,7 +437,7 @@ func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *c
 	nodeID := req.NodeId
 	log.Infof("ControllerUnpublishVolume: starting detach disk: %s from node: %s", diskID, nodeID)
 
-	if _, ok := diskEventIdMap.Load(diskID); ok {
+	if _, ok := diskEventIdMap.Load(nodeID); ok {
 		log.Errorf("ControllerPublishVolume: Disk has another Event, please wait")
 		return nil, status.Error(codes.InvalidArgument, "ControllerPublishVolume: Disk has another Event, please wait")
 	}
@@ -494,6 +495,8 @@ func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *c
 	}
 
 	//delete(diskDetachingMap, diskID)
+	diskEventIdMap.Delete(nodeID)
+
 	diskDetachingMap.Delete(diskID)
 	//delete(diskAttachingMap, diskID)
 	log.Infof("ControllerUnpublishVolume: Successfully detach disk: %s from node: %s", diskID, nodeID)
