@@ -9,8 +9,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"strings"
@@ -117,7 +115,7 @@ func (n *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 	fsType := req.GetVolumeContext()["fsType"]
 	diskStagingMap.Store(targetGlobalPath, Staging)
 
-	if _, ok := diskFormattedMap.Load(diskID); ok || n.GetPvFormat(req.VolumeId, diskID) {
+	if _, ok := diskFormattedMap.Load(diskID); ok {
 		log.Warnf("NodeStageVolume: diskID: %s had been formatted, ignore multi format", diskID)
 	} else {
 		// 3 格式化盘
@@ -582,33 +580,33 @@ func expandVolume(deviceName string) error {
 func (n *NodeServer) SavePvFormat(diskId string) error {
 	log.Debugf("start SavePvFormat %s", diskId)
 	defer diskFormattedMap.Store(diskId, Formatted)
-	for i := 0; i < 2; i++ {
-		pvList, err := n.Client.CoreV1().PersistentVolumes().List(metav1.ListOptions{})
-		if err != nil {
-			return err
-		}
-		var volume = v1.PersistentVolume{}
-		for i := 0; i < len(pvList.Items); i++ {
-			pv := pvList.Items[i]
-			if pv.Annotations == nil {
-				continue
-			}
-			if pv.Annotations["volumeId"] == diskId {
-				volume = pv
-				break
-			}
-		}
-		if volume.Name == "" {
-			return fmt.Errorf("pv %s is not found", diskId)
-		}
-		volume.Annotations["formated"] = "true"
-		_, err = n.Client.CoreV1().PersistentVolumes().Update(&volume)
-		if err != nil {
-			continue
-		}
-		break
-	}
-	log.Debugf("SavePvFormat %s successfully", diskId)
+	//for i := 0; i < 2; i++ {
+	//	pvList, err := n.Client.CoreV1().PersistentVolumes().List(metav1.ListOptions{})
+	//	if err != nil {
+	//		return err
+	//	}
+	//	var volume = v1.PersistentVolume{}
+	//	for i := 0; i < len(pvList.Items); i++ {
+	//		pv := pvList.Items[i]
+	//		if pv.Annotations == nil {
+	//			continue
+	//		}
+	//		if pv.Annotations["volumeId"] == diskId {
+	//			volume = pv
+	//			break
+	//		}
+	//	}
+	//	if volume.Name == "" {
+	//		return fmt.Errorf("pv %s is not found", diskId)
+	//	}
+	//	volume.Annotations["formated"] = "true"
+	//	_, err = n.Client.CoreV1().PersistentVolumes().Update(&volume)
+	//	if err != nil {
+	//		continue
+	//	}
+	//	break
+	//}
+	//log.Debugf("SavePvFormat %s successfully", diskId)
 	return nil
 }
 
@@ -617,18 +615,18 @@ func (n *NodeServer) GetPvFormat(pvName string, diskId string) bool {
 	if ok {
 		return true
 	}
-	pvList, err := n.Client.CoreV1().PersistentVolumes().List(metav1.ListOptions{})
-	if err != nil {
-		return true
-	}
-	for i := 0; i < len(pvList.Items); i++ {
-		pv := pvList.Items[i]
-		if pv.Annotations == nil {
-			return false
-		}
-		if pv.Annotations["volumeId"] == diskId {
-			return pv.Annotations["formated"] == "true"
-		}
-	}
+	//pvList, err := n.Client.CoreV1().PersistentVolumes().List(metav1.ListOptions{})
+	//if err != nil {
+	//	return true
+	//}
+	//for i := 0; i < len(pvList.Items); i++ {
+	//	pv := pvList.Items[i]
+	//	if pv.Annotations == nil {
+	//		return false
+	//	}
+	//	if pv.Annotations["volumeId"] == diskId {
+	//		return pv.Annotations["formated"] == "true"
+	//	}
+	//}
 	return false
 }
