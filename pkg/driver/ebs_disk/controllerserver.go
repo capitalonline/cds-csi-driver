@@ -47,7 +47,7 @@ var diskDetachingMap = new(sync.Map)
 // var diskExpandingMap = map[string]string{}
 var diskExpandingMap = new(sync.Map)
 
-var diskPvMap = new(sync.Map)
+var diskEventIdMap = new(sync.Map)
 
 func NewControllerServer(d *DiskDriver) *ControllerServer {
 	config, err := rest.InClusterConfig()
@@ -316,6 +316,11 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 
 	log.Infof("ControllerPublishVolume: pvName: %s, starting attach diskID: %s to node: %s", req.VolumeId, diskID, nodeID)
 
+	if _, ok := diskEventIdMap.Load(diskID); ok {
+		log.Errorf("ControllerPublishVolume: Disk has another Event, please wait")
+		return nil, status.Error(codes.InvalidArgument, "ControllerPublishVolume: Disk has another Event, please wait")
+	}
+
 	// Step 2: check necessary params
 	if diskID == "" || nodeID == "" {
 		log.Errorf("ControllerPublishVolume: missing [VolumeId/NodeId] in request")
@@ -405,6 +410,7 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 		log.Errorf("ControllerPublishVolume: create attach task failed, err is:%s", err.Error())
 		return nil, err
 	}
+	diskEventIdMap.Store(diskID, taskID)
 
 	//diskAttachingMap[diskID] = "attaching"
 	diskAttachingMap.Store(diskID, "attaching")
@@ -429,6 +435,11 @@ func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *c
 	diskID := req.VolumeId
 	nodeID := req.NodeId
 	log.Infof("ControllerUnpublishVolume: starting detach disk: %s from node: %s", diskID, nodeID)
+
+	if _, ok := diskEventIdMap.Load(diskID); ok {
+		log.Errorf("ControllerPublishVolume: Disk has another Event, please wait")
+		return nil, status.Error(codes.InvalidArgument, "ControllerPublishVolume: Disk has another Event, please wait")
+	}
 
 	// Step 2: check necessary params
 	if diskID == "" || nodeID == "" {
@@ -471,6 +482,7 @@ func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *c
 		log.Errorf("ControllerUnpublishVolume: create detach task failed, err is: %s", err.Error())
 		return nil, err
 	}
+	diskEventIdMap.Store(diskID, taskID)
 
 	//diskDetachingMap[diskID] = "detaching"
 	diskDetachingMap.Store(diskID, "detaching")
