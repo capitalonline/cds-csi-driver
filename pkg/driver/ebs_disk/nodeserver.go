@@ -131,7 +131,7 @@ func (n *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 		err = n.SavePvFormat(diskID)
 		if err != nil {
 			err = nil
-			log.Infof("store pv %s format failed", diskID)
+			log.Infof("store pv %s format failed,err=%v", diskID, err)
 		}
 		log.Debugf("NodeStageVolume: Step 1: formatDiskDevice successfully!")
 	}
@@ -582,7 +582,7 @@ func expandVolume(deviceName string) error {
 }
 
 func (n *NodeServer) SavePvFormat(diskId string) error {
-	log.Debugf("start SavePvFormat %s", diskId)
+	log.Infof("start SavePvFormat %s", diskId)
 	diskFormattedMap.Store(diskId, Formatted)
 
 	patchData := []byte(fmt.Sprintf(`{"data": {"%s": "%s"}}`, diskId, Formatted))
