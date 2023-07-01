@@ -374,7 +374,7 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 	taskID, err := attachDisk(diskID, nodeID)
 	if err != nil {
 		log.Errorf("ControllerPublishVolume: create attach task failed, err is:%s", err.Error())
-		AttachDetachMap.Delete(diskID)
+		AttachDetachMap.Delete(nodeID)
 		return nil, err
 	}
 
