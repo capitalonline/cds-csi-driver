@@ -271,7 +271,7 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 	return &csi.DeleteVolumeResponse{}, nil
 }
 
-func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
+func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (resp *csi.ControllerPublishVolumeResponse, err error) {
 	diskID := req.VolumeId
 	nodeID := req.NodeId
 
@@ -282,10 +282,11 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 		return nil, status.Errorf(codes.InvalidArgument, "The Node %s Has Another Event, Please wait", nodeID)
 	}
 
-	//if _, ok := diskEventIdMap.Load(nodeID); ok {
-	//	log.Errorf("ControllerPublishVolume: Disk has another Event, please wait")
-	//	return nil, status.Error(codes.InvalidArgument, "ControllerPublishVolume: Disk has another Event, please wait")
-	//}
+	defer func() {
+		if resp == nil {
+			AttachDetachMap.Delete(nodeID)
+		}
+	}()
 
 	// Step 2: check necessary params
 	if diskID == "" || nodeID == "" {
@@ -366,8 +367,15 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 		return nil, err
 	}
 	if describeRes.Data.Status != StatusEcsRunning {
-		log.Errorf("ControllerPublishVolume: node %s is not running, attach will try again later", nodeID)
-		return nil, err
+		msg := fmt.Sprintf("ControllerPublishVolume: node %s is not running, attach will try again later", nodeID)
+		log.Errorf(msg)
+		return nil, fmt.Errorf(msg)
+	}
+	var number = len(describeRes.Data.Disk.DataDiskConf)
+	if number+1 > 16 {
+		msg := fmt.Sprintf("ControllerPublishVolume: node %s's data disk number is %d,supported max number is 16", nodeID, number)
+		log.Errorf(msg)
+		return nil, fmt.Errorf(msg)
 	}
 
 	// Step 4: attach disk to node
@@ -400,17 +408,12 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 }
 
 // ControllerUnpublishVolume detach
-func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
+func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (resp *csi.ControllerUnpublishVolumeResponse, err error) {
 
 	// Step 1: get necessary params
 	diskID := req.VolumeId
 	nodeID := req.NodeId
 	log.Infof("ControllerUnpublishVolume: starting detach disk: %s from node: %s", diskID, nodeID)
-
-	if _, ok := AttachDetachMap.LoadOrStore(nodeID, "doing"); ok {
-		log.Errorf("The Node %s Has Another Event, Please wait", nodeID)
-		return nil, status.Errorf(codes.InvalidArgument, "The Node %s Has Another Event, Please wait", nodeID)
-	}
 
 	if _, ok := diskEventIdMap.Load(nodeID); ok {
 		log.Errorf("ControllerPublishVolume: Disk has another Event, please wait")
@@ -452,12 +455,16 @@ func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *c
 		return &csi.ControllerUnpublishVolumeResponse{}, nil
 	}
 
+	if _, ok := AttachDetachMap.LoadOrStore(nodeID, "doing"); ok {
+		log.Errorf("The Node %s Has Another Event, Please wait", nodeID)
+		return nil, status.Errorf(codes.InvalidArgument, "The Node %s Has Another Event, Please wait", nodeID)
+	}
+
 	// Step 4: detach disk
 	taskID, err := detachDisk(diskID)
 	if err != nil {
 		log.Errorf("ControllerUnpublishVolume: create detach task failed, err is: %s", err.Error())
 		AttachDetachMap.Delete(nodeID)
-
 		return nil, err
 	}
 	diskEventIdMap.Store(nodeID, taskID)
