@@ -412,6 +412,8 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 	}
 	diskEventIdMap.Store(nodeID, taskID)
 	//diskAttachingMap[diskID] = "attaching"
+	defer deleteNodeId(nodeID, taskID)
+
 	diskAttachingMap.Store(diskID, "attaching")
 	if err = describeTaskStatus(taskID); err != nil {
 		//diskAttachingMap[diskID] = "error"
@@ -421,8 +423,6 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 	}
 
 	//delete(diskAttachingMap, diskID)
-	defer deleteNodeId(nodeID, taskID)
-
 	diskAttachingMap.Delete(diskID)
 	log.Infof("ControllerPublishVolume: Successfully attach disk: %s to node: %s", diskID, nodeID)
 
@@ -485,6 +485,8 @@ func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *c
 	}
 	diskEventIdMap.Store(diskID, taskID)
 
+	defer deleteNodeId(nodeID, taskID)
+
 	//diskDetachingMap[diskID] = "detaching"
 	diskDetachingMap.Store(diskID, "detaching")
 	if err := describeTaskStatus(taskID); err != nil {
@@ -495,8 +497,6 @@ func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *c
 	}
 
 	//delete(diskDetachingMap, diskID)
-	defer deleteNodeId(nodeID, taskID)
-
 	diskDetachingMap.Delete(diskID)
 	//delete(diskAttachingMap, diskID)
 	log.Infof("ControllerUnpublishVolume: Successfully detach disk: %s from node: %s", diskID, nodeID)
