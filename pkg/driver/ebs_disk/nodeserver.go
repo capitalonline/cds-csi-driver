@@ -9,7 +9,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -120,7 +119,7 @@ func (n *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 	fsType := req.GetVolumeContext()["fsType"]
 	diskStagingMap.Store(targetGlobalPath, Staging)
 
-	if _, ok := diskFormattedMap.Load(diskID); ok {
+	if _, ok := diskFormattedMap.Load(diskID); ok || n.GetPvFormat(diskID) {
 		log.Warnf("NodeStageVolume: diskID: %s had been formatted, ignore multi format", diskID)
 	} else {
 		// 3 格式化盘
@@ -589,26 +588,7 @@ func (n *NodeServer) SavePvFormat(diskId string) error {
 	patchData := []byte(fmt.Sprintf(`{"data": {"%s": "%s"}}`, diskId, Formatted))
 
 	// 执行 Patch 操作
-	_, err := n.Client.CoreV1().ConfigMaps("kube-system").Patch("ebs-formated", types.MergePatchType, patchData)
-
-	if err == nil {
-		return nil
-	}
-	var cm = v1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "ebs-formated",
-			Namespace: "kube-system",
-		},
-		Data: map[string]string{
-			diskId: Formatted,
-		},
-	}
-	if errors.IsNotFound(err) {
-		_, err := n.Client.CoreV1().ConfigMaps("kube-system").Create(&cm)
-		if err != nil && !errors.IsAlreadyExists(err) {
-			return err
-		}
-	}
+	var err error
 	for i := 0; i < 2; i++ {
 		_, err = n.Client.CoreV1().ConfigMaps("kube-system").Patch("ebs-formated", types.MergePatchType, patchData)
 		if err != nil {
