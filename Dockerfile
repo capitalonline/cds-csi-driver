@@ -1,8 +1,8 @@
 FROM golang:1.18-alpine AS build-env
 RUN apk update && apk add git make
-COPY cck-sdk-go /go/src/github.com/capitalonline/cck-sdk-go
-COPY cds-csi-driver /go/src/github.com/capitalonline/cds-csi-driver
-#COPY . /go/src/github.com/capitalonline/cds-csi-driver
+#COPY cck-sdk-go /go/src/github.com/capitalonline/cck-sdk-go
+#COPY cds-csi-driver /go/src/github.com/capitalonline/cds-csi-driver
+COPY . /go/src/github.com/capitalonline/cds-csi-driver
 RUN cd /go/src/github.com/capitalonline/cds-csi-driver && go mod tidy && make container-binary
 
 
