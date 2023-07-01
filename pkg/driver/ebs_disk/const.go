@@ -18,6 +18,7 @@ const (
 	StatusEbsMounted = "running"
 	StatusEbsError   = "error"
 	MinDiskSize      = 24
+	StatusEcsRunning = "running"
 )
 
 var IopsArrayInt64 = []int64{3000, 5000, 7500, 10000}

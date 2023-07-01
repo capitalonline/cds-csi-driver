@@ -389,6 +389,16 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 		return nil, fmt.Errorf("ControllerPublishVolume: diskID: %s was in [deleted|error], cant attach to nodeID", diskID)
 	}
 
+	describeRes, err := describeInstances(nodeID)
+	if err != nil {
+		log.Errorf("ControllerPublishVolume: describeInstances %s failed: %v, it will try again later", nodeID, err)
+		return nil, err
+	}
+	if describeRes.Data.Status != StatusEcsRunning {
+		log.Errorf("ControllerPublishVolume: node %s is not running, attach will try again later", nodeID)
+		return nil, err
+	}
+
 	// Step 4: attach disk to node
 	taskID, err := attachDisk(diskID, nodeID)
 	if err != nil {
@@ -740,7 +750,18 @@ func describeDiskQuota(azId string) (*cdsDisk.DescribeDiskQuotaResponse, error) 
 	res, err := cdsDisk.DescribeDiskQuota(azId)
 
 	if err != nil {
-		log.Errorf("deleteDisk: cdsDisk.DeleteDisk api error, err is: %s", err)
+		log.Errorf("deleteDisk: cdsDisk.describeDiskQuota api error, err is: %s", err)
+		return nil, err
+	}
+
+	return res, nil
+}
+
+func describeInstances(instancesId string) (*cdsDisk.DescribeInstanceResponse, error) {
+	res, err := cdsDisk.DescribeInstance(instancesId)
+
+	if err != nil {
+		log.Errorf("deleteDisk: cdsDisk.describeInstances api error, err is: %s", err)
 		return nil, err
 	}
 
