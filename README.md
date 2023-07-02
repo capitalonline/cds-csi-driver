@@ -21,7 +21,7 @@ kubectl create -f https://raw.githubusercontent.com/capitalonline/cds-csi-driver
 To deploy the CSI EBS-DISK driver to your k8s, simply run:
 - deploy and update the driver settings
 ```bash
-kubectl create -f https://raw.githubusercontent.com/capitalonline/cds-csi-driver/master/deploy/ebs_disk/base.yaml```
+kubectl create -f https://raw.githubusercontent.com/capitalonline/cds-csi-driver/master/deploy/ebs_disk/base.yaml
 ```
 
 - set base64 access_key_id/access_key_secret into secret cck-secrets
@@ -35,6 +35,20 @@ type: Opaque
 data:
   access_key_id: ''
   access_key_secret: ''
+```
+
+PS: generate base64 ak/sk
+```python
+import base64
+
+# write here
+ak = ''
+sk = ''
+access_key_id = str(base64.b64encode(str.encode(ak)), encoding="utf-8")
+print('access_key_id:\n', access_key_id)
+access_key_secret = str(base64.b64encode(str.encode(sk)), encoding="utf-8")
+print('access_key_secret:\n', access_key_secret)
+
 ```
 
 - deploy driver service
@@ -196,7 +210,7 @@ Description:
 | akSecret     | <acckedd_key_secret>           | yes      | Get it from your own bucket's in CDS web |
 | path         | <bucket_path>                  | yes      | Bucket path, default is `/`              |
 
-## To use the EbsDisk driver
+## To use the EBS-DISK driver
 Examples can be found [here](!https://github.com/capitalonline/cds-csi-driver/tree/master/example/ebs_disk)
 
 ### Dynamic Pv
@@ -220,14 +234,14 @@ allowVolumeExpansion: true
 
 Description:
 
-| Key               | Value                     | Required | Description                                                  |
-|-------------------|---------------------------| -------- | ------------------------------------------------------------ |
-| fsType            | [ xfs\|ext4\|ext3 ]       | yes      | Linux filesystem type                                        |
-| storageType       | [ high_disk\|ssd_disk ]   | yes      | Only support `high_disk` and `ssd_disk`.<br />`high_disk` shoud be with iops `3000`.<br />`ssd_disk` should be with iops `[5000|7500|10000]`. |
-| azId              | Eg. "SR_SaoPaulo_A"          | yes      | Cluster's site_id.                                           |
-| provisioner       | ebs-disk.csi.cds.net      | yes      | Disk driver which installed default.                         |
-| reclaimPolicy     | [ Delete\|Retain ]        | yes      | `Delete` means that PV will be deleted with PVC delete<br/>`Retain` means that PV will be retained when PVC delete |
-| volumeBindingMode | WaitForFirstConsumer      | yes      | Only suport `WaitForFirstConsumer` pollicy for disk.csi.cds.net driver. |
+| Key               | Value                | Required | Description                                                                                                        |
+|-------------------|----------------------|----------|--------------------------------------------------------------------------------------------------------------------|
+| fsType            | [ xfs\|ext4 ]        | yes      | Linux filesystem type                                                                                              |
+| storageType       | [ ssd_disk ]         | yes      | Only support `ssd_disk`.<br />                                                                                     |
+| azId              | Eg. "SR_SaoPaulo_A"  | yes      | Cluster's az_id.                                                                                                   |
+| provisioner       | ebs-disk.csi.cds.net | yes      | Disk driver which installed default.                                                                               |
+| reclaimPolicy     | [ Delete\|Retain ]   | yes      | `Delete` means that PV will be deleted with PVC delete<br/>`Retain` means that PV will be retained when PVC delete |
+| volumeBindingMode | WaitForFirstConsumer | yes      | Only suport `WaitForFirstConsumer` pollicy for disk.csi.cds.net driver.                                            |
 
 Kindly Remind:
 
