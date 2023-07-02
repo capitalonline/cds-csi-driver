@@ -18,6 +18,30 @@ To deploy the CSI OSS driver to your k8s, simply run:
 kubectl create -f https://raw.githubusercontent.com/capitalonline/cds-csi-driver/master/deploy/oss/deploy.yaml
 ```
 
+To deploy the CSI EBS-DISK driver to your k8s, simply run:
+- deploy and update the driver settings
+```bash
+kubectl create -f https://raw.githubusercontent.com/capitalonline/cds-csi-driver/master/deploy/ebs_disk/base.yaml```
+```
+
+- set base64 access_key_id/access_key_secret into secret cck-secrets
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cck-secrets
+  namespace: kube-system
+type: Opaque
+data:
+  access_key_id: ''
+  access_key_secret: ''
+```
+
+- deploy driver service
+```bash
+kubectl create -f https://raw.githubusercontent.com/capitalonline/cds-csi-driver/master/deploy/ebs_disk/deploy.yaml
+```
+
 ## To run tests
 
 **NAS:**

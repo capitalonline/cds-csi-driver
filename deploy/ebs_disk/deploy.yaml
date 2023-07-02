@@ -224,7 +224,7 @@ spec:
             - name: CSI_ENDPOINT
               value: unix://socketDir/csi.sock
             - name: API_HOST
-              value: http://gateway.gic.pre
+              value: http://api.capitalonline.net
             - name: ACCESS_KEY_ID
               valueFrom:
                 secretKeyRef:
@@ -365,7 +365,7 @@ spec:
                   key: oversea
                   name: cds-properties
             - name: API_HOST
-              value: http://gateway.gic.pre
+              value: http://api.capitalonline.net
           image: registry-bj.capitalonline.net/cck/cds-csi-driver:v2.1.0
           imagePullPolicy: Always
           name: ebs-disk-csi-node-server
