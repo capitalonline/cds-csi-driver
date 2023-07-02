@@ -172,6 +172,45 @@ Description:
 | akSecret     | <acckedd_key_secret>           | yes      | Get it from your own bucket's in CDS web |
 | path         | <bucket_path>                  | yes      | Bucket path, default is `/`              |
 
+## To use the EbsDisk driver
+Examples can be found [here](!https://github.com/capitalonline/cds-csi-driver/tree/master/example/ebs_disk)
+
+### Dynamic Pv
+
+sc.yaml
+
+```yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: ebs-disk-csi-cds-sc
+parameters:
+  fsType: ext4
+  azId: SR_SaoPaulo_A
+  storageType: SSD
+provisioner: ebs-disk.csi.cds.net
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+```
+
+Description:
+
+| Key               | Value                     | Required | Description                                                  |
+|-------------------|---------------------------| -------- | ------------------------------------------------------------ |
+| fsType            | [ xfs\|ext4\|ext3 ]       | yes      | Linux filesystem type                                        |
+| storageType       | [ high_disk\|ssd_disk ]   | yes      | Only support `high_disk` and `ssd_disk`.<br />`high_disk` shoud be with iops `3000`.<br />`ssd_disk` should be with iops `[5000|7500|10000]`. |
+| azId              | Eg. "SR_SaoPaulo_A"          | yes      | Cluster's site_id.                                           |
+| provisioner       | ebs-disk.csi.cds.net      | yes      | Disk driver which installed default.                         |
+| reclaimPolicy     | [ Delete\|Retain ]        | yes      | `Delete` means that PV will be deleted with PVC delete<br/>`Retain` means that PV will be retained when PVC delete |
+| volumeBindingMode | WaitForFirstConsumer      | yes      | Only suport `WaitForFirstConsumer` pollicy for disk.csi.cds.net driver. |
+
+Kindly Remind:
+
+​	For disk storage, recommending using `volumeBindingMode:` `WaitForFirstConsumer ` in SC.yaml.
+
+​	If not, please apply your `ebs-disk.csi.cds.net` csi driver's `csi-provisioner` in k8s with following:
+
 
 ## To use the Disk driver 
 
