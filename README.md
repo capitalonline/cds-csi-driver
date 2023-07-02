@@ -22,6 +22,7 @@ To deploy the CSI EBS-DISK driver to your k8s, simply run:
 - deploy and update the driver settings
 ```bash
 kubectl create -f https://raw.githubusercontent.com/capitalonline/cds-csi-driver/master/deploy/ebs_disk/base.yaml```
+```
 
 - set base64 access_key_id/access_key_secret into secret cck-secrets
 ```yaml
