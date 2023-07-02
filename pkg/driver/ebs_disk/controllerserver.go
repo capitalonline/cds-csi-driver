@@ -438,8 +438,8 @@ func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *c
 	log.Infof("ControllerUnpublishVolume: starting detach disk: %s from node: %s", diskID, nodeID)
 
 	if _, ok := diskEventIdMap.Load(nodeID); ok {
-		log.Errorf("ControllerPublishVolume: Disk has another Event, please wait")
-		return nil, status.Error(codes.InvalidArgument, "ControllerPublishVolume: Disk has another Event, please wait")
+		log.Errorf("ControllerUnpublishVolume: Disk has another Event, please wait")
+		return nil, status.Error(codes.InvalidArgument, "ControllerUnpublishVolume: Disk has another Event, please wait")
 	}
 
 	// Step 2: check necessary params
