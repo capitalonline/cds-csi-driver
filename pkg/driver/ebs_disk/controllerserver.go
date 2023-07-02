@@ -300,6 +300,7 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 		log.Errorf("ControllerPublishVolume: findDiskByVolumeID api error, err is: %s", err)
 		return nil, fmt.Errorf("ControllerPublishVolume: findDiskByVolumeID api error, err is: %s", err)
 	}
+	log.Infof("Attach Disk Info %v", res.Data.DiskInfo)
 
 	diskStatus := res.Data.DiskInfo.Status
 	diskMountedNodeID := res.Data.DiskInfo.EcsId
@@ -439,7 +440,7 @@ func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *c
 		log.Errorf("ControllerUnpublishVolume: findDiskByVolumeID res is nil")
 		return nil, fmt.Errorf("ControllerUnpublishVolume: findDiskByVolumeID res is nil")
 	}
-
+	log.Infof("Detach Disk Info %v", res.Data.DiskInfo)
 	if res.Data.DiskInfo.EcsId != nodeID {
 		log.Warnf("ControllerUnpublishVolume: diskID: %s had been detached from nodeID: %s", diskID, nodeID)
 		return &csi.ControllerUnpublishVolumeResponse{}, nil
