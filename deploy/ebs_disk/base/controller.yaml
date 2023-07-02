@@ -1,23 +1,23 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: block-csi-cds-controller
+  name: ebs-disk-csi-cds-controller
   namespace: kube-system
 spec:
   replicas: 1
-  serviceName: block-csi-provisioner
+  serviceName: ebs-disk-csi-provisioner
   selector:
     matchLabels:
-      app: block-csi-cds-controller
+      app: ebs-disk-csi-cds-controller
   template:
     metadata:
       labels:
-        app: block-csi-cds-controller
+        app: ebs-disk-csi-cds-controller
         type: csi-provisioner
     spec:
       nodeSelector:
         node.cck.net/role.infra: "True"
-      serviceAccount: block-cds-csi-sa
+      serviceAccount: ebs-disk-cds-csi-sa
       hostNetwork: true
       hostPID: true
       priorityClassName: system-cluster-critical
@@ -31,7 +31,7 @@ spec:
         args:
         - "--endpoint=$(CSI_ENDPOINT)"
         - "--v=5"
-        - "--driver=block.csi.cds.net"
+        - "--driver=ebs-disk.csi.cds.net"
         env:
         - name: CSI_ENDPOINT
           value: unix://socketDir/csi.sock
@@ -71,7 +71,7 @@ spec:
             command:
             - sh
             - -c
-            - ps -ef | grep cds-csi-driver | grep block.csi.cds.net | grep -v grep
+            - ps -ef | grep cds-csi-driver | grep ebs-disk.csi.cds.net | grep -v grep
           failureThreshold: 8
           initialDelaySeconds: 15
           periodSeconds: 10
@@ -109,6 +109,18 @@ spec:
         volumeMounts:
         - name: socket-dir
           mountPath: /var/lib/csi/sockets/pluginproxy/
+      - name: ebs-disk-driver-resizer
+        args:
+          - --v=5
+          - --csi-address=$(ADDRESS)
+          - --leader-election=true
+        env:
+          - name: ADDRESS
+            value: /var/lib/kubelet/plugins/ebs-disk.csi.cds.net/csi.sock
+        image: registry-bj.capitalonline.net/cck/csi-resizer:v1.4.0
+        volumeMounts:
+          - mountPath: /var/lib/kubelet/
+            name: kubelet-dir
       volumes:
       - name: socket-dir
         emptyDir: {}

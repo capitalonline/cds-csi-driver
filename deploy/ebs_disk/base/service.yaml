@@ -1,13 +1,13 @@
 kind: Service
 apiVersion: v1
 metadata:
-  name: block-csi-provisioner
+  name: ebs-disk-csi-provisioner
   namespace: kube-system
   labels:
-    name: block-csi-provisioner
+    name: ebs-disk-csi-provisioner
 spec:
   selector:
-    type: block-csi-provisioner
+    type: ebs-disk-csi-provisioner
   ports:
   - name: healthz
     port: 9810

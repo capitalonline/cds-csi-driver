@@ -197,6 +197,7 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 	// Step 2: find disk by volumeID
 	disk, err := findDiskByVolumeID(req.VolumeId)
 	if err != nil {
+
 		log.Errorf("DeleteVolume: findDiskByVolumeID error, err is: %s", err.Error())
 		return nil, err
 	}
@@ -235,7 +236,7 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 		return nil, fmt.Errorf("deleteDisk: cdsDisk.DeleteDisk task result failed, err is: %s", err)
 	}
 
-	// Step 5: delete pvcCreatedMap 
+	// Step 5: delete pvcCreatedMap
 	if pvName, ok := diskIdPvMap[diskID]; ok {
 		delete(pvcCreatedMap, pvName)
 	}
@@ -578,4 +579,3 @@ func describeTaskStatus(taskID string) error {
 
 	return fmt.Errorf("task time out, running more than 20 minutes")
 }
-

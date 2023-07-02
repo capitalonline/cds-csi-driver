@@ -2,6 +2,7 @@ package utils
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/getsentry/sentry-go"
@@ -23,6 +24,7 @@ import (
 
 const (
 	NodeMetaDataFile = "/host/etc/cds/node-meta"
+	CloudInitDevSize = 8 * 1024
 )
 
 // Metrics represents the used and available bytes of the Volume.
@@ -70,7 +72,13 @@ func GetNodeMetadata() *NodeMeta {
 	return func(f string) *NodeMeta {
 		b, err := ioutil.ReadFile(f)
 		if err != nil {
-			log.Fatalf("cannot find metadata file %s: %s", f, err.Error())
+			// 尝试从cloud-init盘读取数据
+			id, err := ReadCloudInitInfo()
+			log.Infof("successfully get instance id:%s from cloud init info", id)
+			if err != nil {
+				log.Fatalf("cannot find metadata file %s: %s", f, err.Error())
+			}
+			return &NodeMeta{NodeID: id}
 		}
 		var nodeMeta NodeMeta
 		if err := json.Unmarshal(b, &nodeMeta); err != nil {
@@ -82,6 +90,52 @@ func GetNodeMetadata() *NodeMeta {
 
 func (n *NodeMeta) GetNodeID() string {
 	return n.NodeID
+}
+
+func ReadCloudInitInfo() (string, error) {
+
+	output, err := exec.Command("sh", "-c", "cat /proc/partitions | grep 8192").CombinedOutput()
+	list := strings.Split(strings.TrimSpace(string(output)), " ")
+	var devName = ""
+	for _, item := range list {
+		if !strings.HasPrefix(item, "sd") {
+			continue
+		}
+		devName = item
+	}
+	if devName == "" {
+		return "", errors.New("cannot find cloudinit device")
+	}
+
+	if err = os.Mkdir("/tmp/ins", 0777); err != nil && !os.IsExist(err) {
+		msg := fmt.Sprintf("can not make dir err:%s", err.Error())
+		log.Errorf(msg)
+		return "", errors.New(msg)
+	}
+	cmd := exec.Command("mount", fmt.Sprintf("/dev/%s", devName), "/tmp/ins")
+	_, err = cmd.CombinedOutput()
+	if err != nil {
+		return "", errors.New("cannot mount device")
+	}
+	file, err := os.ReadFile("/tmp/ins/meta-data")
+	if err != nil {
+		return "", errors.New(fmt.Sprintf("cannot open /tmp/ins/meta-data,err:%s", err.Error()))
+	}
+
+	list = strings.Split(string(file), "\n")
+	var instanceId = ""
+	for _, item := range list {
+		if strings.Contains(item, "local-hostname") {
+			item = strings.Replace(item, "local-hostname:", "", -1)
+			instanceId = strings.TrimSpace(item)
+			break
+		}
+	}
+	_, _ = exec.Command("umount", "/tmp/ins").CombinedOutput()
+	if len(instanceId) == 0 {
+		return "", errors.New(fmt.Sprintf("invalid instance_id"))
+	}
+	return instanceId, nil
 }
 
 // Mounted checks whether a volume is mounted
@@ -183,8 +237,7 @@ func ServerReachable(host, port string, timeout time.Duration) bool {
 
 func SentrySendError(errorInfo error) {
 	// will init by ENVIRONMENT named "SENTRY_DSN"
-	err := sentry.Init(sentry.ClientOptions{
-	})
+	err := sentry.Init(sentry.ClientOptions{})
 
 	if err != nil {
 		log.Fatalf("sentry.Init: %s", err)

@@ -1,8 +1,6 @@
-package block
+package ebs_disk
 
 const (
-	HighDisk         = "high_disk"
-	Ssd              = "ssd"
 	mountPointMode   = 0777
 	DefaultFsTypeXfs = "xfs"
 	FsTypeExt4       = "ext4"
@@ -11,6 +9,18 @@ const (
 	StatusInOK       = "ok"
 	StatusInDeleted  = "deleted"
 	StatusInError    = "error"
+	ebsSsdDisk       = "SSD"
+
+	DriverEbsDiskTypeName = "ebs-disk.csi.cds.net"
+)
+
+const (
+	StatusEbsMounted = "running"
+	StatusEbsError   = "error"
+	StatusWaitEbs    = "waiting"
+	MinDiskSize      = 24
+	EcsMountLimit    = 16
+	StatusEcsRunning = "running"
 )
 
 var IopsArrayInt64 = []int64{3000, 5000, 7500, 10000}

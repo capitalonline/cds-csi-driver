@@ -1,4 +1,4 @@
-package block
+package ebs_disk
 
 import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -10,7 +10,7 @@ import (
 
 var (
 	volumeCap = []csi.VolumeCapability_AccessMode_Mode{
-		csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER,
+		csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
 	}
 
 	controllerCap = []csi.ControllerServiceCapability_RPC_Type{
@@ -23,16 +23,14 @@ type IdentityServer struct {
 	*csicommon.DefaultIdentityServer
 }
 
-
-func NewIdentityServer(b *BlockDriver) *IdentityServer {
-	b.csiDriver.AddVolumeCapabilityAccessModes(volumeCap)
-	b.csiDriver.AddControllerServiceCapabilities(controllerCap)
+func NewIdentityServer(d *DiskDriver) *IdentityServer {
+	d.csiDriver.AddVolumeCapabilityAccessModes(volumeCap)
+	d.csiDriver.AddControllerServiceCapabilities(controllerCap)
 	return &IdentityServer{
-		DefaultIdentityServer: csicommon.NewDefaultIdentityServer(b.csiDriver),
+		DefaultIdentityServer: csicommon.NewDefaultIdentityServer(d.csiDriver),
 	}
 }
 
-// GetPluginCapabilities returns available capabilities of the plugin
 func (iden *IdentityServer) GetPluginCapabilities(ctx context.Context, req *csi.GetPluginCapabilitiesRequest) (*csi.GetPluginCapabilitiesResponse, error) {
 	log.Infof("Identity:GetPluginCapabilities is called")
 	resp := &csi.GetPluginCapabilitiesResponse{
@@ -55,4 +53,3 @@ func (iden *IdentityServer) GetPluginCapabilities(ctx context.Context, req *csi.
 	}
 	return resp, nil
 }
-
