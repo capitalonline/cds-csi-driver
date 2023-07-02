@@ -322,6 +322,14 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 		if nodeStatus != "True" {
 			// node is not exist or NotReady status, detach force
 			log.Warnf("ControllerPublishVolume: diskMountedNodeID: %s is in [NotRead|Not Exist], detach forcely", diskMountedNodeID)
+
+			if _, ok := AttachDetachMap.LoadOrStore(nodeID, "doing"); ok {
+				log.Errorf("The Node %s Has Another Event, Please wait", nodeID)
+				return nil, status.Errorf(codes.InvalidArgument, "The Node %s Has Another Event, Please wait", nodeID)
+			}
+			defer func() {
+				AttachDetachMap.Delete(nodeID)
+			}()
 			taskID, err := detachDisk(diskID)
 			if err != nil {
 				log.Errorf("ControllerPublishVolume: detach diskID: %s from nodeID: %s error,  err is: %s", diskID, diskMountedNodeID, err.Error())
