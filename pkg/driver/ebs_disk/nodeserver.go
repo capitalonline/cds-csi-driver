@@ -584,3 +584,7 @@ func (n *NodeServer) GetPvFormat(diskId string) bool {
 	}
 	return false
 }
+
+func (n *NodeServer) NodeExpandVolume(context.Context, *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "")
+}

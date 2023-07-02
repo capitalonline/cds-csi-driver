@@ -684,3 +684,7 @@ func deleteNodeId(nodeId, taskID string) {
 		}
 	}
 }
+
+func (c *ControllerServer) ControllerExpandVolume(context.Context, *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "")
+}
