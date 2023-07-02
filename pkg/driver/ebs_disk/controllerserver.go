@@ -345,6 +345,9 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 	} else if diskStatus == StatusEbsError {
 		log.Errorf("ControllerPublishVolume: diskID: %s was in [deleted|error], cant attach to nodeID", diskID)
 		return nil, fmt.Errorf("ControllerPublishVolume: diskID: %s was in [deleted|error], cant attach to nodeID", diskID)
+	} else if diskStatus != StatusWaitEbs {
+		log.Errorf("ControllerPublishVolume: diskID %s status is %s, cant attach to nodeID %s", diskID, diskStatus, nodeID)
+		return nil, fmt.Errorf("ControllerPublishVolume: diskID %s status is %s, cant attach to nodeID %s", diskID, diskStatus, nodeID)
 	}
 
 	describeRes, err := describeInstances(nodeID)
@@ -440,8 +443,9 @@ func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *c
 		log.Errorf("ControllerUnpublishVolume: findDiskByVolumeID res is nil")
 		return nil, fmt.Errorf("ControllerUnpublishVolume: findDiskByVolumeID res is nil")
 	}
-	log.Infof("Detach Disk Info %v", res.Data.DiskInfo)
-	if res.Data.DiskInfo.EcsId != nodeID {
+	log.Infof("Detach Disk Info %#v", res.Data.DiskInfo)
+
+	if res.Data.DiskInfo.EcsId == "" || res.Data.DiskInfo.EcsId != nodeID {
 		log.Warnf("ControllerUnpublishVolume: diskID: %s had been detached from nodeID: %s", diskID, nodeID)
 		return &csi.ControllerUnpublishVolumeResponse{}, nil
 	}
