@@ -110,6 +110,12 @@ func (n *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 		log.Errorf("NodeStageVolume: find disk uuid failed, err is: %s", err)
 		return nil, err
 	}
+	// 查询失败
+	if res.Data.DiskInfo.Order == 0 || res.Data.DiskInfo.EcsId == "" {
+		var msg = fmt.Sprintf("查询磁盘信息失败,接口返回值:%v", res)
+		log.Errorf(msg)
+		return nil, fmt.Errorf(msg)
+	}
 	deviceName, err := findDeviceNameByOrderId(fmt.Sprintf("%s%d", OrderHead, res.Data.DiskInfo.Order))
 	if err != nil {
 		log.Errorf("NodeStageVolume: findDeviceNameByUuid error, err is: %s", err.Error())
@@ -411,6 +417,13 @@ func formatDiskDevice(diskId, deviceName, fsType string) error {
 		return fmt.Errorf("formatDiskDevice: fsType not support, should be [ext4/ext3/xfs]")
 	}
 
+	if out, err := utils.RunCommand(fmt.Sprintf("blkid %s", deviceName)); err == nil {
+		if strings.Contains(out, "TYPE") {
+			diskFormattedMap.Store(diskId, Formatted)
+			log.Warnf("formatDiskDevice: deviceName: %s had been formatted, avoid multi formatting, return directly", deviceName)
+			return nil
+		}
+	}
 	if out, err := utils.RunCommand(formatDeviceCmd); err != nil {
 		if strings.Contains(out, "existing filesystem") {
 			diskFormattedMap.Store(diskId, Formatted)
