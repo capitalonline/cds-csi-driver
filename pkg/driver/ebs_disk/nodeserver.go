@@ -417,6 +417,13 @@ func formatDiskDevice(diskId, deviceName, fsType string) error {
 		return fmt.Errorf("formatDiskDevice: fsType not support, should be [ext4/ext3/xfs]")
 	}
 
+	if out, err := utils.RunCommand(fmt.Sprintf("blkid %s", deviceName)); err == nil {
+		if strings.Contains(out, "TYPE") {
+			diskFormattedMap.Store(diskId, Formatted)
+			log.Warnf("formatDiskDevice: deviceName: %s had been formatted, avoid multi formatting, return directly", deviceName)
+			return nil
+		}
+	}
 	if out, err := utils.RunCommand(formatDeviceCmd); err != nil {
 		if strings.Contains(out, "existing filesystem") {
 			diskFormattedMap.Store(diskId, Formatted)
