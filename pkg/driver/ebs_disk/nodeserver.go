@@ -110,6 +110,12 @@ func (n *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 		log.Errorf("NodeStageVolume: find disk uuid failed, err is: %s", err)
 		return nil, err
 	}
+	// 查询失败
+	if res.Data.DiskInfo.Order == 0 || res.Data.DiskInfo.EcsId == "" {
+		var msg = fmt.Sprintf("查询磁盘信息失败,接口返回值:%v", res)
+		log.Errorf(msg)
+		return nil, fmt.Errorf(msg)
+	}
 	deviceName, err := findDeviceNameByOrderId(fmt.Sprintf("%s%d", OrderHead, res.Data.DiskInfo.Order))
 	if err != nil {
 		log.Errorf("NodeStageVolume: findDeviceNameByUuid error, err is: %s", err.Error())
