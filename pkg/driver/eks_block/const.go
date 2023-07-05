@@ -13,4 +13,11 @@ const (
 	StatusInError    = "error"
 )
 
+const (
+	DiskFeatureSSD   = "SSD"
+	TaskStatusFinish = "finish"
+	TaskStatusDoing  = "doing"
+	TaskStatusError  = "error"
+)
+
 var IopsArrayInt64 = []int64{3000, 5000, 7500, 10000}

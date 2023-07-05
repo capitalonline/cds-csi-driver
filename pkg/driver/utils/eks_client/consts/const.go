@@ -12,10 +12,14 @@ const (
 )
 
 const (
-	ActionCreateBlock = "CreateBlock"
-	ActionDeleteBlock = "DeleteBlock"
-	ActionAttachBlock = "AttachBlock"
-	ActionDetachBlock = "DetachBlock"
+	ActionCreateBlock        = "CreateBlock"
+	ActionDeleteBlock        = "DeleteBlock"
+	ActionAttachBlock        = "AttachBlock"
+	ActionDetachBlock        = "DetachBlock"
+	ActionTaskStatus         = "TaskStatus"
+	ActionDescribeBlockLimit = "DescribeBlockLimit"
+	ActionUpdateBlockFormat  = "UpdateBlockFormat"
+	ActionDescribeBlockInfo  = "DescribeBlockInfo"
 )
 
 const (

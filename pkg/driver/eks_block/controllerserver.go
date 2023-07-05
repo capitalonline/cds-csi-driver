@@ -5,6 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	cdsDisk "github.com/capitalonline/cck-sdk-go/pkg/eks/ebs"
+	api "github.com/capitalonline/cds-csi-driver/pkg/driver/eks_block/api"
+	"github.com/capitalonline/cds-csi-driver/pkg/driver/utils/eks_client"
+	common "github.com/capitalonline/cds-csi-driver/pkg/driver/utils/eks_client/http"
+	"github.com/capitalonline/cds-csi-driver/pkg/driver/utils/eks_client/profile"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	csicommon "github.com/kubernetes-csi/drivers/pkg/csi-common"
 	log "github.com/sirupsen/logrus"
@@ -14,7 +18,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"strings"
+	"net/http"
 	"sync"
 	"time"
 )
@@ -117,14 +121,14 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 	}
 
 	// todo 查询余量
-	res, err := describeDiskQuota(diskVol.AzId)
-	if err != nil || res == nil || len(res.Data.QuotaList) == 0 {
+	res, err := describeBlockLimit(diskVol.AzId)
+	if err != nil || res == nil || res.Data.MaxRestVolume == 0 {
 		log.Errorf("CreateVolume: error when describeDiskQuota,err: %v , res:%v", err, res)
 		return nil, err
 	}
 	// todo 查询余量是否满足条件 -> openapi
-	if diskRequestGB > int64(res.Data.QuotaList[0].FreeQuota) {
-		quota := res.Data.QuotaList[0].FreeQuota
+	if diskRequestGB > int64(res.Data.MaxRestVolume) {
+		quota := res.Data.MaxRestVolume
 		msg := fmt.Sprintf("az %s free quota is: %d,less than requested %d", diskVol.AzId, quota, diskRequestGB)
 		log.Error(msg)
 		return nil, status.Error(codes.InvalidArgument, msg)
@@ -146,22 +150,19 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 
 	log.Infof("CreateVolume: diskRequestGB is: %d", diskRequestGB)
 
-	// todo eks openapi 创建盘（pv）-> pv_name -> creating
-	createRes, err := createEbsDisk(pvName, diskVol.StorageType, diskVol.AzId, int(diskRequestGB), 0)
+	createRes, err := createBlock(pvName, int(diskRequestGB), diskVol.AzId)
 	if err != nil {
 		log.Errorf("CreateVolume: createDisk error, err is: %s", err.Error())
 		return nil, fmt.Errorf("CreateVolume: createDisk error, err is: %s", err.Error())
 	}
 
-	diskIdSet := createRes.Data.DiskIdSet
-	if len(diskIdSet) != 1 {
-		return nil, fmt.Errorf("invalid diskIdSet:%s", diskIdSet)
+	blockId := createRes.Data.BlockId
+	if blockId == "" {
+		return nil, fmt.Errorf("创建块存储失败,返回值：%+v", createRes)
 	}
-	diskID := diskIdSet[0]
-	taskID := createRes.Data.EventId
 
 	// todo eks openapi 任务查询
-	err = describeTaskStatus(taskID)
+	err = waitTaskFinsh(createRes.Data.TaskId)
 	if err != nil {
 		log.Errorf("createDisk: describeTaskStatus task result failed, err is: %s", err.Error())
 		return nil, err
@@ -176,7 +177,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 	}
 
 	tmpVol := &csi.Volume{
-		VolumeId:      diskID,
+		VolumeId:      blockId,
 		CapacityBytes: int64(volSizeBytes),
 		VolumeContext: volumeContext,
 		AccessibleTopology: []*csi.Topology{
@@ -187,7 +188,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 			},
 		},
 	}
-	log.Infof("CreateVolume: successfully create disk, pvName is: %s, diskID is: %s", pvName, diskID)
+	log.Infof("CreateVolume: successfully create disk, pvName is: %s, diskID is: %s", pvName, blockId)
 
 	return &csi.CreateVolumeResponse{Volume: tmpVol}, nil
 }
@@ -200,35 +201,19 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 		log.Error("DeleteVolume: req.VolumeID cannot be empty")
 		return nil, fmt.Errorf("DeleteVolume: req.VolumeID cannot be empty")
 	}
-	// todo 不要查询内存
-	//if v, ok := diskDeletingMap.Load(diskID); ok {
-	//	value, _ := v.(string)
-	//	if value == "deleting" || value == "detaching" {
-	//		log.Warnf("DeleteVolume: diskID: %s is in [deleting|detaching] status, please wait", diskID)
-	//		return nil, fmt.Errorf("DeleteVolume: diskID: %s is in [deleting|detaching] status, please wait", diskID)
-	//	}
-	//
-	//	log.Errorf("DeleteVolume: diskID: %s has been deleted but failed, please manual deal with it", diskID)
-	//	return nil, fmt.Errorf("DeleteVolume: diskID: %s has been deleted but failed, please manual deal with it", diskID)
-	//}
-
 	// 直接为openapi查询
-	disk, err := findDiskByVolumeID(req.VolumeId)
+	disk, err := describeBlockInfo(req.VolumeId)
 	if err != nil {
 		log.Errorf("DeleteVolume: findDiskByVolumeID error, err is: %s", err.Error())
 		return nil, err
 	}
 
-	if disk != nil && disk.Code == "InvalidParameter" && strings.Contains(disk.Message, "云盘信息不存在") {
-		log.Warnf("DeleteVolume: disk had been deleted by InvalidParameter")
-		return &csi.DeleteVolumeResponse{}, nil
-	}
 	// todo 查询盘如果不处于 待挂载waiting 状态，异常错误的
-	switch disk.Data.DiskInfo.Status {
+	switch disk.Data.Status {
 	case "running":
 		return nil, fmt.Errorf("DeleteVolume: disk [mounted], cant delete volumeID: %s", diskID)
 	case "mounting", "unmounting", "updating", "creating_snapshot", "recovering":
-		return nil, fmt.Errorf("DeleteVolume: disk's status is %s ,can't delete volumeID: %s", disk.Data.DiskInfo.Status, diskID)
+		return nil, fmt.Errorf("DeleteVolume: disk's status is %s ,can't delete volumeID: %s", disk.Data.Status, diskID)
 	}
 
 	// todo 去除diskDeletingMap锁
@@ -247,8 +232,8 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 		return nil, fmt.Errorf("DeleteVolume: delete disk error, err is: %s", err)
 	}
 
-	taskID := deleteRes.Data.EventId
-	if err := describeTaskStatus(taskID); err != nil {
+	taskID := deleteRes.Data.TaskId
+	if err := waitTaskFinsh(taskID); err != nil {
 		log.Errorf("deleteDisk: cdsDisk.DeleteDisk task result failed, err is: %s", err)
 		return nil, fmt.Errorf("deleteDisk: cdsDisk.DeleteDisk task result failed, err is: %s", err)
 	}
@@ -281,15 +266,15 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 	}
 
 	// Step 3: check disk status
-	res, err := findDiskByVolumeID(diskID)
+	res, err := describeBlockInfo(diskID)
 	if err != nil {
 		log.Errorf("ControllerPublishVolume: findDiskByVolumeID api error, err is: %s", err)
 		return nil, fmt.Errorf("ControllerPublishVolume: findDiskByVolumeID api error, err is: %s", err)
 	}
-	log.Infof("Attach Disk Info %v", res.Data.DiskInfo)
+	log.Infof("Attach Disk Info %+v", res)
 
-	diskStatus := res.Data.DiskInfo.Status
-	diskMountedNodeID := res.Data.DiskInfo.EcsId
+	diskStatus := res.Data.Status
+	diskMountedNodeID := res.Data.NodeId
 	// 挂载操作
 	switch diskStatus {
 	case StatusWaitEbs:
@@ -329,12 +314,12 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 		}()
 
 		// Step 4: attach disk to node
-		taskID, err := attachDisk(diskID, nodeID)
+		attachRes, err := attachDisk(diskID, nodeID)
 		if err != nil {
 			log.Errorf("ControllerPublishVolume: create attach task failed, err is:%s", err.Error())
 			return nil, err
 		}
-		if err = describeTaskStatus(taskID); err != nil {
+		if err = waitTaskFinsh(attachRes.Data.TaskId); err != nil {
 			log.Errorf("ControllerPublishVolume: attach disk:%s processing to node: %s with error, err is: %s", diskID, nodeID, err.Error())
 			return nil, err
 		}
@@ -379,13 +364,13 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 					DiskMultiTaskMap.Delete(diskID)
 				}()
 				// todo nodeid running，diskid running， 可以卸载
-				taskID, err := detachDisk(diskID)
+				detachRes, err := detachDisk(diskID)
 				if err != nil {
 					log.Errorf("ControllerPublishVolume: detach diskID: %s from nodeID: %s error,  err is: %s", diskID, diskMountedNodeID, err.Error())
 					return nil, fmt.Errorf("ControllerPublishVolume: detach diskID: %s from nodeID: %s error,  err is: %s", diskID, diskMountedNodeID, err.Error())
 				}
 
-				if err := describeTaskStatus(taskID); err != nil {
+				if err := waitTaskFinsh(detachRes.Data.TaskId); err != nil {
 					log.Errorf("ControllerPublishVolume: cdsDisk.detachDisk task result failed, err is: %s", err)
 					return nil, err
 				}
@@ -425,7 +410,7 @@ func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *c
 		return nil, status.Error(codes.InvalidArgument, "ControllerUnpublishVolume: missing [VolumeId/NodeId] in request")
 	}
 
-	res, err := findDiskByVolumeID(diskID)
+	res, err := describeBlockInfo(diskID)
 	if err != nil {
 		log.Errorf("ControllerUnpublishVolume: findDiskByVolumeID error, err is: %s", err)
 		return nil, fmt.Errorf("ControllerUnpublishVolume: findDiskByVolumeID error, err is: %s", err)
@@ -436,9 +421,9 @@ func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *c
 		return nil, fmt.Errorf("ControllerUnpublishVolume: findDiskByVolumeID res is nil")
 	}
 	// todo 如果是卸载中，返回异常
-	log.Infof("Detach Disk Info %#v", res.Data.DiskInfo)
+	log.Infof("Detach Disk Info %+v", res)
 
-	if res.Data.DiskInfo.EcsId == "" || res.Data.DiskInfo.EcsId != nodeID {
+	if res.Data.NodeId == "" || res.Data.NodeId != nodeID {
 		log.Warnf("ControllerUnpublishVolume: diskID: %s had been detached from nodeID: %s", diskID, nodeID)
 		return &csi.ControllerUnpublishVolumeResponse{}, nil
 	}
@@ -461,7 +446,7 @@ func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *c
 	}()
 
 	// Step 4: detach disk todo 优化成 锁+操作+事件 封装一个函数
-	taskID, err := detachDisk(diskID)
+	detachRes, err := detachDisk(diskID)
 	if err != nil {
 		log.Errorf("ControllerUnpublishVolume: create detach task failed, err is: %s", err.Error())
 		return nil, err
@@ -469,7 +454,7 @@ func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *c
 
 	//diskDetachingMap[diskID] = "detaching"
 
-	if err := describeTaskStatus(taskID); err != nil {
+	if err := waitTaskFinsh(detachRes.Data.TaskId); err != nil {
 		//diskDetachingMap[diskID] = "error"
 
 		log.Errorf("ControllerUnpublishVolume: cdsDisk.detachDisk task result failed, err is: %s", err)
@@ -496,107 +481,87 @@ func (c *ControllerServer) ValidateVolumeCapabilities(ctx context.Context, req *
 	}, nil
 }
 
-// todo+操作+事件 同步
-func createEbsDisk(diskName, diskType, diskZoneID string, diskSize, diskIops int) (*cdsDisk.CreateEbsResp, error) {
-	log.Infof("createDisk: diskName: %s, diskType: %s,  diskZoneID: %s, diskSize: %d, diskIops: %d", diskName, diskType, diskZoneID, diskSize, diskIops)
-	res, err := cdsDisk.CreateEbs(&cdsDisk.CreateEbsReq{
-		AvailableZoneCode: diskZoneID,
-		DiskName:          diskName,
-		DiskFeature:       diskType,
-		Size:              diskSize,
-		BillingMethod:     BillingMethodPostPaid,
-	})
-
-	if err != nil {
-		log.Errorf("createDisk: cdsDisk.CreateDisk api error, err is: %s", err.Error())
-		return nil, err
-	}
-
-	log.Infof("createDisk: successfully!")
-
-	return res, nil
+// ControllerExpandVolume 这期不做
+func (c *ControllerServer) ControllerExpandVolume(context.Context, *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "")
 }
 
-func describeTaskStatus(taskID string) error {
-	log.Infof("describeTaskStatus: taskID is: %s", taskID)
-	// todo eks openapi 查询任务
-	for i := 1; i < 120; i++ {
-		res, err := cdsDisk.DescribeTaskStatus(taskID)
-		if err != nil {
-			log.Errorf("task api error, err is: %s", err)
-			return fmt.Errorf("apiError")
-		}
-		switch res.Data.EventStatus {
-		case "finish", "success":
-			return nil
-		case "error", "failed", "part_fail":
-			return fmt.Errorf("taskError")
-		case "doing", "init":
-			log.Debugf("task:%s is running, sleep 10s", taskID)
-			time.Sleep(10 * time.Second)
-		default:
-			return fmt.Errorf("unkonw task status:%s ,taskId: %s", res.Data.EventStatus, taskID)
+func createBlock(diskName string, diskSize int, azId string) (*api.CreateBlockResponse, error) {
+	cpf := profile.NewClientProfileWithMethod(http.MethodPost)
+	client, _ := api.NewClient(eks_client.NewCredential(), "", cpf)
+	request := &api.CreateBlockRequest{
+		BaseRequest: &common.BaseRequest{},
+		DiskFeature: DiskFeatureSSD,
+		DiskSize:    diskSize,
+		DiskName:    diskName,
+		AzId:        azId,
+	}
+	return client.CreateBlock(request)
+}
+
+func waitTaskFinsh(taskID string) error {
+	timer := time.NewTimer(time.Second * 2)
+	ctx, _ := context.WithTimeout(context.Background(), time.Minute*40)
+	for {
+		select {
+		case <-timer.C:
+			resp, err := describeTaskStatus(taskID)
+			if err != nil {
+				continue
+			}
+			taskStatus := resp.Data.TaskStatus
+			if taskStatus == TaskStatusFinish {
+				return nil
+			}
+			if taskStatus == TaskStatusError {
+				return fmt.Errorf("task %s err,resp: %+v", taskID, resp)
+			}
+		case <-ctx.Done():
+			return fmt.Errorf("describe task %s time out", taskID)
 		}
 	}
-
-	return fmt.Errorf("task time out, running more than 20 minutes")
 }
 
-func findDiskByVolumeID(volumeID string) (*cdsDisk.FindDiskByVolumeIDResponse, error) {
-
-	log.Infof("findDiskByVolumeID: volumeID is: %s", volumeID)
-
-	res, err := cdsDisk.FindDiskByVolumeID(&cdsDisk.FindDiskByVolumeIDArgs{
-		DiskId: volumeID,
-	})
-
-	if err != nil {
-		log.Errorf("findDiskByVolumeID: cdsDisk.FindDiskByVolumeID [api error], err is: %s", err)
-		return nil, err
+func describeTaskStatus(taskId string) (*api.TaskStatusResponse, error) {
+	cpf := profile.NewClientProfileWithMethod(http.MethodGet)
+	client, _ := api.NewClient(eks_client.NewCredential(), "", cpf)
+	request := &api.TaskStatusRequest{
+		BaseRequest: &common.BaseRequest{},
+		TaskId:      taskId,
 	}
-
-	log.Infof("findDiskByVolumeID: Successfully!")
-
-	return res, nil
+	return client.TaskStatus(request)
 }
 
-// todo+操作+事件 同步
-func deleteDisk(diskID string) (*cdsDisk.DeleteDiskResponse, error) {
-	log.Infof("deleteDisk: diskID is:%s", diskID)
-
-	res, err := cdsDisk.DeleteDisk(&cdsDisk.DeleteDiskArgs{
-		DiskIds: []string{diskID},
-	})
-
-	if err != nil {
-		log.Errorf("deleteDisk: cdsDisk.DeleteDisk api error, err is: %s", err)
-		return nil, err
+func describeBlockInfo(diskID string) (*api.DescribeBlockInfoResponse, error) {
+	cpf := profile.NewClientProfileWithMethod(http.MethodGet)
+	client, _ := api.NewClient(eks_client.NewCredential(), "", cpf)
+	request := &api.DescribeBlockInfoRequest{
+		BaseRequest: &common.BaseRequest{},
+		BlockId:     diskID,
 	}
+	return client.DescribeBlockInfo(request)
+}
 
-	log.Infof("deleteDisk: cdsDisk.DeleteDisk task creation succeed, taskID is: %s", res.Data.EventId)
-
-	return res, nil
+func deleteDisk(diskID string) (*api.DeleteBlockResponse, error) {
+	cpf := profile.NewClientProfileWithMethod(http.MethodPost)
+	client, _ := api.NewClient(eks_client.NewCredential(), "", cpf)
+	request := &api.DeleteBlockRequest{
+		BaseRequest: &common.BaseRequest{},
+		BlockId:     diskID,
+	}
+	return client.DeleteBlock(request)
 }
 
 // todo 建议：内存锁， 查询事件的逻辑写道这里来（完成流程，同时做好内存锁的锁定和释放），当检查到有锁的时候抛异常
-func attachDisk(diskID, nodeID string) (string, error) {
-	// attach disk to node
-	log.Infof("attachDisk: diskID: %s, nodeID: %s", diskID, nodeID)
-
-	res, err := cdsDisk.AttachDisk(&cdsDisk.AttachDiskArgs{
-		DiskIds:             []string{diskID},
-		InstanceId:          nodeID,
-		ReleaseWithInstance: 0, // 不随实例删除
-	})
-
-	if err != nil {
-		log.Errorf("attachDisk: cdsDisk.attachDisk api error, err is: %s", err)
-		return "", err
+func attachDisk(diskID, nodeID string) (*api.AttachBlockResponse, error) {
+	cpf := profile.NewClientProfileWithMethod(http.MethodPost)
+	client, _ := api.NewClient(eks_client.NewCredential(), "", cpf)
+	request := &api.AttachBlockRequest{
+		BaseRequest: &common.BaseRequest{},
+		BlockId:     diskID,
+		NodeId:      nodeID,
 	}
-
-	log.Infof("attachDisk: cdsDisk.attachDisk task creation succeed, taskID is: %s", res.Data.EventId)
-
-	return res.Data.EventId, nil
+	return client.AttachBlock(request)
 }
 
 func describeNodeStatus(ctx context.Context, c *ControllerServer, nodeId string) (v12.ConditionStatus, error) {
@@ -639,34 +604,24 @@ OuterLoop:
 }
 
 // todo 建议：内存锁， 查询事件的逻辑写道这里来（完成流程，同时做好内存锁的锁定和释放），当检查到有锁的时候抛异常
-func detachDisk(diskID string) (string, error) {
-	// to detach disk from node
-	log.Infof("detachDisk: diskID: %s", diskID)
-
-	res, err := cdsDisk.DetachDisk(&cdsDisk.DetachDiskArgs{
-		DiskIds: []string{diskID},
-	})
-
-	if err != nil {
-		log.Errorf("detachDisk: cdsDisk.detachDisk api error, err is: %s", err)
-		return "", err
+func detachDisk(diskID string) (*api.DetachBlockResponse, error) {
+	cpf := profile.NewClientProfileWithMethod(http.MethodPost)
+	client, _ := api.NewClient(eks_client.NewCredential(), "", cpf)
+	request := &api.DetachBlockRequest{
+		BaseRequest: &common.BaseRequest{},
+		BlockId:     diskID,
 	}
-
-	log.Infof("detachDisk: cdsDisk.detachDisk task creation succeed, taskID is: %s", res.Data.EventId)
-
-	return res.Data.EventId, nil
+	return client.DetachBlock(request)
 }
 
-func describeDiskQuota(azId string) (*cdsDisk.DescribeDiskQuotaResponse, error) {
-
-	res, err := cdsDisk.DescribeDiskQuota(azId)
-
-	if err != nil {
-		log.Errorf("deleteDisk: cdsDisk.describeDiskQuota api error, err is: %s", err)
-		return nil, err
+func describeBlockLimit(azId string) (*api.DescribeBlockLimitResponse, error) {
+	cpf := profile.NewClientProfileWithMethod(http.MethodGet)
+	client, _ := api.NewClient(eks_client.NewCredential(), "", cpf)
+	request := &api.DescribeBlockLimitRequest{
+		BaseRequest:        &common.BaseRequest{},
+		AvailableZoneCodes: []string{azId},
 	}
-
-	return res, nil
+	return client.DescribeBlockLimit(request)
 }
 
 func describeInstances(instancesId string) (*cdsDisk.DescribeInstanceResponse, error) {
@@ -676,9 +631,4 @@ func describeInstances(instancesId string) (*cdsDisk.DescribeInstanceResponse, e
 		return nil, err
 	}
 	return res, nil
-}
-
-// ControllerExpandVolume 这期不做
-func (c *ControllerServer) ControllerExpandVolume(context.Context, *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "")
 }

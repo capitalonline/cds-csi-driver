@@ -19,3 +19,18 @@ func NewClientProfile() *ClientProfile {
 		Language:        "zh-CN",
 	}
 }
+func NewClientProfileWithMethod(method string) *ClientProfile {
+	httpProfile := NewHttpProfile()
+	httpProfile.ReqMethod = method
+	return &ClientProfile{
+		HttpProfile:     httpProfile,
+		SignMethod:      "HmacSHA1",
+		UnsignedPayload: false,
+		Language:        "zh-CN",
+	}
+}
+
+func (c *ClientProfile) SetMethod(method string) *ClientProfile {
+	c.HttpProfile.ReqMethod = method
+	return c
+}

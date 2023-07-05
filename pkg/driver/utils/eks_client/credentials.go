@@ -1,15 +1,17 @@
 package eks_client
 
+import "os"
+
 type Credential struct {
 	SecretId  string
 	SecretKey string
 	Token     string
 }
 
-func NewCredential(secretId, secretKey string) *Credential {
+func NewCredential() *Credential {
 	return &Credential{
-		SecretId:  secretId,
-		SecretKey: secretKey,
+		SecretId:  os.Getenv("ACCESS_KEY_ID"),
+		SecretKey: os.Getenv("ACCESS_KEY_SECRET"),
 	}
 }
 

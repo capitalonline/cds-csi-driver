@@ -110,3 +110,95 @@ func (c *Client) DetachBlock(request *DetachBlockRequest) (response *DetachBlock
 	err = c.Send(request, response)
 	return
 }
+
+func NewTaskStatusRequest() (request *TaskStatusRequest) {
+	request = &TaskStatusRequest{
+		BaseRequest: &cdshttp.BaseRequest{},
+	}
+	request.SetDomain(consts.ApiHost)
+	request.Init().WithApiInfo(consts.ServiceEKS, consts.ApiVersion, consts.ActionTaskStatus)
+	return
+}
+
+func NewTaskStatusResponse() (response *TaskStatusResponse) {
+	response = &TaskStatusResponse{BaseResponse: &cdshttp.BaseResponse{}}
+	return
+}
+
+func (c *Client) TaskStatus(request *TaskStatusRequest) (response *TaskStatusResponse, err error) {
+	if request == nil {
+		request = NewTaskStatusRequest()
+	}
+	response = NewTaskStatusResponse()
+	err = c.Send(request, response)
+	return
+}
+
+func NewDescribeBlockLimitRequest() (request *DescribeBlockLimitRequest) {
+	request = &DescribeBlockLimitRequest{
+		BaseRequest: &cdshttp.BaseRequest{},
+	}
+	request.SetDomain(consts.ApiHost)
+	request.Init().WithApiInfo(consts.ServiceEKS, consts.ApiVersion, consts.ActionDescribeBlockLimit)
+	return
+}
+
+func NewDescribeBlockLimitResponse() (response *DescribeBlockLimitResponse) {
+	response = &DescribeBlockLimitResponse{BaseResponse: &cdshttp.BaseResponse{}}
+	return
+}
+
+func (c *Client) DescribeBlockLimit(request *DescribeBlockLimitRequest) (response *DescribeBlockLimitResponse, err error) {
+	if request == nil {
+		request = NewDescribeBlockLimitRequest()
+	}
+	response = NewDescribeBlockLimitResponse()
+	err = c.Send(request, response)
+	return
+}
+
+func NewDescribeBlockInfoRequest() (request *DescribeBlockInfoRequest) {
+	request = &DescribeBlockInfoRequest{
+		BaseRequest: &cdshttp.BaseRequest{},
+	}
+	request.SetDomain(consts.ApiHost)
+	request.Init().WithApiInfo(consts.ServiceEKS, consts.ApiVersion, consts.ActionDescribeBlockInfo)
+	return
+}
+
+func NewDescribeBlockInfoResponse() (response *DescribeBlockInfoResponse) {
+	response = &DescribeBlockInfoResponse{BaseResponse: &cdshttp.BaseResponse{}}
+	return
+}
+
+func (c *Client) DescribeBlockInfo(request *DescribeBlockInfoRequest) (response *DescribeBlockInfoResponse, err error) {
+	if request == nil {
+		request = NewDescribeBlockInfoRequest()
+	}
+	response = NewDescribeBlockInfoResponse()
+	err = c.Send(request, response)
+	return
+}
+
+func NewUpdateBlockFormatRequest() (request *UpdateBlockFormatRequest) {
+	request = &UpdateBlockFormatRequest{
+		BaseRequest: &cdshttp.BaseRequest{},
+	}
+	request.SetDomain(consts.ApiHost)
+	request.Init().WithApiInfo(consts.ServiceEKS, consts.ApiVersion, consts.ActionUpdateBlockFormat)
+	return
+}
+
+func NewUpdateBlockFormatResponse() (response *UpdateBlockFormatResponse) {
+	response = &UpdateBlockFormatResponse{BaseResponse: &cdshttp.BaseResponse{}}
+	return
+}
+
+func (c *Client) UpdateBlockFormat(request *UpdateBlockFormatRequest) (response *UpdateBlockFormatResponse, err error) {
+	if request == nil {
+		request = NewUpdateBlockFormatRequest()
+	}
+	response = NewUpdateBlockFormatResponse()
+	err = c.Send(request, response)
+	return
+}

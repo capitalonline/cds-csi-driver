@@ -38,6 +38,9 @@ func (c *Client) Send(request cdshttp.Request, response cdshttp.Response) (err e
 	if request.GetHttpMethod() == "" {
 		request.SetHttpMethod(c.httpProfile.ReqMethod)
 	}
+	if request.GetScheme() == "" {
+		request.SetScheme(c.httpProfile.Scheme)
+	}
 	cdshttp.CompleteCdsParams(c.credential.SecretId, request)
 	return c.sendWithSignatureCds(request, response)
 }
@@ -90,7 +93,7 @@ func (c *Client) sendWithSignatureCds(request cdshttp.Request, response cdshttp.
 		requestPayload = string(b)
 	}
 
-	url := "https://" + request.GetDomain() + request.GetPath()
+	url := request.GetScheme() + "//" + request.GetDomain() + request.GetPath()
 	if canonicalQueryString != "" {
 		url = url + "?" + canonicalQueryString
 	}
@@ -140,7 +143,7 @@ func (c *Client) GetDebug() bool {
 }
 
 func (c *Client) WithSecretId(secretId, secretKey string) *Client {
-	c.credential = NewCredential(secretId, secretKey)
+	c.credential = NewCredential()
 	return c
 }
 

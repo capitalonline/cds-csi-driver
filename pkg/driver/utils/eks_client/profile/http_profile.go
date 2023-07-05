@@ -1,5 +1,10 @@
 package profile
 
+import (
+	url2 "net/url"
+	"os"
+)
+
 type HttpProfile struct {
 	ReqMethod  string
 	ReqTimeout int
@@ -8,10 +13,16 @@ type HttpProfile struct {
 }
 
 func NewHttpProfile() *HttpProfile {
+	var apiHost = os.Getenv("API_HOST")
+	endpoint, scheme := "", "HTTPS"
+	if url, err := url2.Parse(apiHost); err != nil {
+		endpoint = url.Host
+		scheme = url.Scheme
+	}
 	return &HttpProfile{
 		ReqMethod:  "POST",
 		ReqTimeout: 60,
-		Endpoint:   "",
-		Scheme:     "HTTPS",
+		Endpoint:   endpoint,
+		Scheme:     scheme,
 	}
 }

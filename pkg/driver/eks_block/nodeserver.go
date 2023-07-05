@@ -121,12 +121,12 @@ func (n *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 			log.Warnf("NodeStageVolume: diskID: %s has been staged to targetGlobalPath: %s, and still going to staged to another targetGlobalPath: %s", diskID, value, targetGlobalPath)
 		}
 	}
-	res, err := findDiskByVolumeID(diskID)
+	res, err := describeBlockInfo(diskID)
 	if err != nil {
 		log.Errorf("NodeStageVolume: find disk uuid failed, err is: %s", err)
 		return nil, err
 	}
-	deviceName, err := findDeviceNameByOrderId(fmt.Sprintf("%s%d", OrderHead, res.Data.DiskInfo.Order))
+	deviceName, err := findDeviceNameByOrderId(fmt.Sprintf("%s%d", OrderHead, res.Data.Order))
 	if err != nil {
 		log.Errorf("NodeStageVolume: findDeviceNameByUuid error, err is: %s", err.Error())
 		return nil, err
@@ -229,13 +229,13 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 	}
 	// check if device mounted to node global, if not mount it
 	diskPublishingMap.Store(podPath, Publishing)
-	res, err := findDiskByVolumeID(volumeID)
+	res, err := describeBlockInfo(volumeID)
 	if err != nil {
 		diskPublishingMap.Delete(podPath)
 		log.Errorf("NodePublishVolume: cdsDisk.FindDiskByVolumeID error, err is: %s", err)
 		return nil, fmt.Errorf("NodePublishVolume: cdsDisk.FindDiskByVolumeID error, err is: %s", err)
 	}
-	if res.Data.DiskInfo.DiskId == "" {
+	if res.Data.BlockId == "" {
 		diskPublishingMap.Delete(podPath)
 		log.Errorf("NodePublishVolume: findDiskByVolumeID res is nil")
 		return nil, fmt.Errorf("NodeStageVolume: findDiskByVolumeID res is nil")
@@ -243,7 +243,7 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 
 	// check if disk formatted or not, return error if not formatted
 	if _, ok := diskFormattedMap.Load(volumeID); ok || n.GetPvFormat(volumeID) {
-		deviceName, err := findDeviceNameByOrderId(fmt.Sprintf("%s%d", OrderHead, res.Data.DiskInfo.Order))
+		deviceName, err := findDeviceNameByOrderId(fmt.Sprintf("%s%d", OrderHead, res.Data.Order))
 		if err != nil {
 			log.Errorf("NodePublishVolume: findDeviceNameByUuid error, err is: %s", err.Error())
 			return nil, err

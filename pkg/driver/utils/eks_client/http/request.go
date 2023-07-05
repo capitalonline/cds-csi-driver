@@ -32,6 +32,8 @@ type Request interface {
 	SetDomain(string)
 	SetHttpMethod(string)
 	SetPath(string)
+	SetScheme(string2 string)
+	GetScheme() string
 }
 
 type BaseRequest struct {
@@ -40,10 +42,19 @@ type BaseRequest struct {
 	path       string
 	params     map[string]string
 	formParams map[string]string
+	scheme     string
 
 	service string
 	version string
 	action  string
+}
+
+func (r *BaseRequest) GetScheme() string {
+	return r.scheme
+}
+
+func (r *BaseRequest) SetScheme(scheme string) {
+	r.scheme = scheme
 }
 
 func (r *BaseRequest) GetAction() string {

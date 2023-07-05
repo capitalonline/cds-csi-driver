@@ -8,9 +8,11 @@ import (
 // CreateBlockRequest 创建块存储
 type CreateBlockRequest struct {
 	*cdshttp.BaseRequest
-	DiskInfo CreateBlockRequestDiskInfo `json:"DiskInfo"`
-	DiskName string                     `json:"DiskName"`
-	AzId     string                     `json:"AzId"`
+	//DiskInfo CreateBlockRequestDiskInfo `json:"DiskInfo"`
+	DiskFeature string `json:"DiskFeature"`
+	DiskSize    int    `json:"DiskSize"`
+	DiskName    string `json:"DiskName"`
+	AzId        string `json:"AzId"`
 }
 
 // CreateBlockRequestDiskInfo 块存储磁盘信息
@@ -30,9 +32,10 @@ func (req *CreateBlockRequest) FromJsonString(s string) error {
 
 type CreateBlockResponse struct {
 	*cdshttp.BaseResponse
-	Code string                   `json:"Code"`
-	Msg  string                   `json:"Msg"`
-	Data *CreateBlockResponseData `json:"Data"`
+	Code      string                   `json:"Code"`
+	Msg       string                   `json:"Msg"`
+	Data      *CreateBlockResponseData `json:"Data"`
+	RequestId string                   `json:"RequestId"`
 }
 
 func (resp *CreateBlockResponse) ToJsonString() string {
@@ -65,9 +68,10 @@ func (req *DeleteBlockRequest) FromJsonString(s string) error {
 
 type DeleteBlockResponse struct {
 	*cdshttp.BaseResponse
-	Code string                   `json:"Code"`
-	Msg  string                   `json:"Msg"`
-	Data *DeleteBlockResponseData `json:"Data"`
+	Code      string                   `json:"Code"`
+	Msg       string                   `json:"Msg"`
+	Data      *DeleteBlockResponseData `json:"Data"`
+	RequestId string                   `json:"RequestId"`
 }
 
 type DeleteBlockResponseData struct {
@@ -86,11 +90,8 @@ func (resp *DeleteBlockResponse) FromJsonString(s string) error {
 
 type AttachBlockRequest struct {
 	*cdshttp.BaseRequest
-	BlockId         string `json:"BlockId"`
-	EbsId           string `json:"EbsId"`
-	NodeId          string `json:"NodeId"`
-	NodeName        string `json:"NodeName"`
-	AvailableZoneId string `json:"AvailableZoneId"`
+	BlockId string `json:"BlockId"`
+	NodeId  string `json:"NodeId"`
 }
 
 func (req *AttachBlockRequest) ToJsonString() string {
@@ -104,9 +105,10 @@ func (req *AttachBlockRequest) FromJsonString(s string) error {
 
 type AttachBlockResponse struct {
 	*cdshttp.BaseResponse
-	Code string                   `json:"Code"`
-	Msg  string                   `json:"Msg"`
-	Data *AttachBlockResponseData `json:"Data"`
+	Code      string                   `json:"Code"`
+	Msg       string                   `json:"Msg"`
+	Data      *AttachBlockResponseData `json:"Data"`
+	RequestId string                   `json:"RequestId"`
 }
 
 type AttachBlockResponseData struct {
@@ -125,10 +127,7 @@ func (resp *AttachBlockResponse) FromJsonString(s string) error {
 
 type DetachBlockRequest struct {
 	*cdshttp.BaseRequest
-	BlockId         string
-	EbsId           string
-	NodeId          string
-	AvailableZoneId string
+	BlockId string
 }
 
 func (req *DetachBlockRequest) ToJsonString() string {
@@ -142,9 +141,10 @@ func (req *DetachBlockRequest) FromJsonString(s string) error {
 
 type DetachBlockResponse struct {
 	*cdshttp.BaseResponse
-	Code string                   `json:"Code"`
-	Msg  string                   `json:"Msg"`
-	Data *DetachBlockResponseData `json:"Data"`
+	Code      string                   `json:"Code"`
+	Msg       string                   `json:"Msg"`
+	Data      *DetachBlockResponseData `json:"Data"`
+	RequestId string                   `json:"RequestId"`
 }
 
 type DetachBlockResponseData struct {
@@ -158,5 +158,163 @@ func (resp *DetachBlockResponse) ToJsonString() string {
 }
 
 func (resp *DetachBlockResponse) FromJsonString(s string) error {
+	return json.Unmarshal([]byte(s), &resp)
+}
+
+type TaskStatusRequest struct {
+	*cdshttp.BaseRequest
+	TaskId string `json:"TaskId"`
+}
+
+func (req *TaskStatusRequest) ToJsonString() string {
+	b, _ := json.Marshal(req)
+	return string(b)
+}
+
+func (req *TaskStatusRequest) FromJsonString(s string) error {
+	return json.Unmarshal([]byte(s), &req)
+}
+
+type TaskStatusResponse struct {
+	*cdshttp.BaseResponse
+	Code      string                 `json:"Code"`
+	Msg       string                 `json:"Msg"`
+	Data      TaskStatusResponseData `json:"Data"`
+	RequestId string                 `json:"RequestId"`
+}
+
+type TaskStatusResponseData struct {
+	TaskId     string `json:"TaskId"`
+	TaskMsg    string `json:"TaskMsg"`
+	TaskStatus string `json:"TaskStatus"`
+}
+
+func (resp *TaskStatusResponse) ToJsonString() string {
+	b, _ := json.Marshal(resp)
+	return string(b)
+}
+
+func (resp *TaskStatusResponse) FromJsonString(s string) error {
+	return json.Unmarshal([]byte(s), &resp)
+}
+
+type DescribeBlockLimitRequest struct {
+	*cdshttp.BaseRequest
+	AvailableZoneCodes []string `json:"AvailableZoneCodes"`
+}
+
+func (req *DescribeBlockLimitRequest) ToJsonString() string {
+	b, _ := json.Marshal(req)
+	return string(b)
+}
+
+func (req *DescribeBlockLimitRequest) FromJsonString(s string) error {
+	return json.Unmarshal([]byte(s), &req)
+}
+
+type DescribeBlockLimitResponse struct {
+	*cdshttp.BaseResponse
+	Code      string                         `json:"Code"`
+	Msg       string                         `json:"Msg"`
+	Data      DescribeBlockLimitResponseData `json:"Data"`
+	RequestId string                         `json:"RequestId"`
+}
+
+type DescribeBlockLimitResponseData struct {
+	MaxRestVolume   int                                            `json:"MaxRestVolume"`
+	TotalRestVolume int                                            `json:"TotalRestVolume"`
+	RestVolumeList  []DescribeBlockLimitResponseDataRestVolumeList `json:"RestVolumeList"`
+}
+
+type DescribeBlockLimitResponseDataRestVolumeList struct {
+	AvailableZoneCode string `json:"AvailableZoneCode"`
+	AvailableZoneId   string `json:"AvailableZoneId"`
+	RestVolume        int    `json:"RestVolume"`
+}
+
+func (resp *DescribeBlockLimitResponse) ToJsonString() string {
+	b, _ := json.Marshal(resp)
+	return string(b)
+}
+
+func (resp *DescribeBlockLimitResponse) FromJsonString(s string) error {
+	return json.Unmarshal([]byte(s), &resp)
+}
+
+type DescribeBlockInfoRequest struct {
+	*cdshttp.BaseRequest
+	BlockId   string `json:"BlockId,omitempty"`
+	BlockName string `json:"BlockName,omitempty"`
+}
+
+func (req *DescribeBlockInfoRequest) ToJsonString() string {
+	b, _ := json.Marshal(req)
+	return string(b)
+}
+
+func (req *DescribeBlockInfoRequest) FromJsonString(s string) error {
+	return json.Unmarshal([]byte(s), &req)
+}
+
+type DescribeBlockInfoResponse struct {
+	*cdshttp.BaseResponse
+	Code string                        `json:"Code"`
+	Msg  string                        `json:"Msg"`
+	Data DescribeBlockInfoResponseData `json:"Data"`
+}
+
+type DescribeBlockInfoResponseData struct {
+	BlockId     string `json:"BlockId"`
+	EbsId       string `json:"EbsId"`
+	BlockName   string `json:"BlockName"`
+	DiskSize    int    `json:"DiskSize"`
+	NodeId      string `json:"NodeId"`
+	NodeName    string `json:"NodeName"`
+	Status      string `json:"Status"`
+	StatusStr   string `json:"StatusStr"`
+	Order       int    `json:"Order"`
+	IsFormat    int    `json:"IsFormat"`
+	FsType      string `json:"FsType"`
+	DiskFeature string `json:"DiskFeature"`
+}
+
+func (resp *DescribeBlockInfoResponse) ToJsonString() string {
+	b, _ := json.Marshal(resp)
+	return string(b)
+}
+
+func (resp *DescribeBlockInfoResponse) FromJsonString(s string) error {
+	return json.Unmarshal([]byte(s), &resp)
+}
+
+type UpdateBlockFormatRequest struct {
+	*cdshttp.BaseRequest
+	BlockId  string `json:"BlockId"`
+	IsFormat int    `json:"IsFormat"`
+}
+
+func (req *UpdateBlockFormatRequest) ToJsonString() string {
+	b, _ := json.Marshal(req)
+	return string(b)
+}
+
+func (req *UpdateBlockFormatRequest) FromJsonString(s string) error {
+	return json.Unmarshal([]byte(s), &req)
+}
+
+type UpdateBlockFormatResponse struct {
+	*cdshttp.BaseResponse
+	Code      string      `json:"Code"`
+	Msg       string      `json:"Msg"`
+	Data      interface{} `json:"Data"`
+	RequestId string      `json:"RequestId"`
+}
+
+func (resp *UpdateBlockFormatResponse) ToJsonString() string {
+	b, _ := json.Marshal(resp)
+	return string(b)
+}
+
+func (resp *UpdateBlockFormatResponse) FromJsonString(s string) error {
 	return json.Unmarshal([]byte(s), &resp)
 }
