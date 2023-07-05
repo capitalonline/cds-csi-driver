@@ -18,7 +18,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"net/http"
-	"sync"
 	"time"
 )
 
@@ -60,9 +59,9 @@ const (
 //
 //var diskEventIdMap = new(sync.Map)
 
-var AttachDetachMap = new(sync.Map)
-
-var DiskMultiTaskMap = new(sync.Map)
+//var AttachDetachMap = new(sync.Map)
+//
+//var DiskMultiTaskMap = new(sync.Map)
 
 func NewControllerServer(d *DiskDriver) *ControllerServer {
 	config, err := rest.InClusterConfig()
@@ -295,7 +294,7 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 			log.Errorf("The Node %s Has Another Event, Please wait", nodeID)
 			return nil, status.Errorf(codes.InvalidArgument, "The Node %s Has Another Event, Please wait", nodeID)
 		}
-		defer AttachDetachMap.Delete(nodeID)
+		defer CacheLockMap.Delete(nodeID)
 		if value, ok := CacheLockMap.LoadOrStore(diskID, "attaching"); ok {
 			msg := fmt.Sprintf("disk %s is ,please wait", value)
 			log.Errorf(msg)
@@ -379,15 +378,9 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 
 // ControllerUnpublishVolume 卸载
 func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (resp *csi.ControllerUnpublishVolumeResponse, err error) {
-	// Step 1: get necessary params
 	diskID := req.VolumeId
 	nodeID := req.NodeId
 	log.Infof("ControllerUnpublishVolume: starting detach disk: %s from node: %s", diskID, nodeID)
-	// todo 事件处理？无用
-	//if _, ok := diskEventIdMap.Load(nodeID); ok {
-	//	log.Errorf("ControllerUnpublishVolume: Disk has another Event, please wait")
-	//	return nil, status.Error(codes.InvalidArgument, "ControllerUnpublishVolume: Disk has another Event, please wait")
-	//}
 
 	if diskID == "" || nodeID == "" {
 		log.Errorf("ControllerUnpublishVolume: missing [VolumeId/NodeId] in request")
@@ -432,11 +425,7 @@ func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *c
 		return nil, err
 	}
 
-	//diskDetachingMap[diskID] = "detaching"
-
 	if err := waitTaskFinsh(detachRes.Data.TaskId); err != nil {
-		//diskDetachingMap[diskID] = "error"
-
 		log.Errorf("ControllerUnpublishVolume: cdsDisk.detachDisk task result failed, err is: %s", err)
 		return nil, err
 	}
