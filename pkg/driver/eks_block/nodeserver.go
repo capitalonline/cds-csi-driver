@@ -121,7 +121,7 @@ func (n *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 			log.Warnf("NodeStageVolume: diskID: %s has been staged to targetGlobalPath: %s, and still going to staged to another targetGlobalPath: %s", diskID, value, targetGlobalPath)
 		}
 	}
-	res, err := describeBlockInfo(diskID)
+	res, err := describeBlockInfo(diskID, "")
 	if err != nil {
 		log.Errorf("NodeStageVolume: find disk uuid failed, err is: %s", err)
 		return nil, err
@@ -229,7 +229,7 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 	}
 	// check if device mounted to node global, if not mount it
 	diskPublishingMap.Store(podPath, Publishing)
-	res, err := describeBlockInfo(volumeID)
+	res, err := describeBlockInfo(volumeID, "")
 	if err != nil {
 		diskPublishingMap.Delete(podPath)
 		log.Errorf("NodePublishVolume: cdsDisk.FindDiskByVolumeID error, err is: %s", err)
