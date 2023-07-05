@@ -14,10 +14,14 @@ const (
 )
 
 const (
-	DiskFeatureSSD   = "SSD"
-	TaskStatusFinish = "finish"
-	TaskStatusDoing  = "doing"
-	TaskStatusError  = "error"
+	DiskFeatureSSD    = "SSD"
+	TaskStatusFinish  = "finish"
+	TaskStatusDoing   = "doing"
+	TaskStatusError   = "error"
+	DiskStatusWaiting = "waiting"
+	DiskStatusRunning = "running"
+	DiskStatusError   = "error"
+	DiskStatusDeleted = "deleted"
 )
 
 var IopsArrayInt64 = []int64{3000, 5000, 7500, 10000}

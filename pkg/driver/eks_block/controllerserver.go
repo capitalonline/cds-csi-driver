@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	cdsDisk "github.com/capitalonline/cck-sdk-go/pkg/eks/ebs"
 	api "github.com/capitalonline/cds-csi-driver/pkg/driver/eks_block/api"
 	"github.com/capitalonline/cds-csi-driver/pkg/driver/utils/eks_client"
 	common "github.com/capitalonline/cds-csi-driver/pkg/driver/utils/eks_client/http"
@@ -120,13 +119,11 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 		return nil, status.Errorf(codes.InvalidArgument, msg)
 	}
 
-	// todo 查询余量
 	res, err := describeBlockLimit(diskVol.AzId)
 	if err != nil || res == nil || res.Data.MaxRestVolume == 0 {
 		log.Errorf("CreateVolume: error when describeDiskQuota,err: %v , res:%v", err, res)
 		return nil, err
 	}
-	// todo 查询余量是否满足条件 -> openapi
 	if diskRequestGB > int64(res.Data.MaxRestVolume) {
 		quota := res.Data.MaxRestVolume
 		msg := fmt.Sprintf("az %s free quota is: %d,less than requested %d", diskVol.AzId, quota, diskRequestGB)
@@ -150,6 +147,11 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 
 	log.Infof("CreateVolume: diskRequestGB is: %d", diskRequestGB)
 
+	if _, ok := CacheLockMap.LoadOrStore(pvName, struct{}{}); ok {
+		time.Sleep(time.Second * 10)
+		return nil, fmt.Errorf("当前pv有其它操作正在进行，请稍后再试")
+	}
+	defer CacheLockMap.Delete(pvName)
 	createRes, err := createBlock(pvName, int(diskRequestGB), diskVol.AzId)
 	if err != nil {
 		log.Errorf("CreateVolume: createDisk error, err is: %s", err.Error())
@@ -161,7 +163,6 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 		return nil, fmt.Errorf("创建块存储失败,返回值：%+v", createRes)
 	}
 
-	// todo eks openapi 任务查询
 	err = waitTaskFinsh(createRes.Data.TaskId)
 	if err != nil {
 		log.Errorf("createDisk: describeTaskStatus task result failed, err is: %s", err.Error())
@@ -207,24 +208,22 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 		log.Errorf("DeleteVolume: findDiskByVolumeID error, err is: %s", err.Error())
 		return nil, err
 	}
-
-	// todo 查询盘如果不处于 待挂载waiting 状态，异常错误的
-	switch disk.Data.Status {
-	case "running":
-		return nil, fmt.Errorf("DeleteVolume: disk [mounted], cant delete volumeID: %s", diskID)
-	case "mounting", "unmounting", "updating", "creating_snapshot", "recovering":
-		return nil, fmt.Errorf("DeleteVolume: disk's status is %s ,can't delete volumeID: %s", disk.Data.Status, diskID)
+	// 非终态，不允许删除
+	if disk.Data.Status != DiskStatusError && disk.Data.Status != DiskStatusWaiting {
+		time.Sleep(time.Second * 10)
+		msg := fmt.Sprintf("block status is %s ,not allowed to delete", disk.Data.Status)
+		return nil, fmt.Errorf(msg)
+	}
+	// 已经删除
+	if disk.Data.BlockId == "" {
+		return &csi.DeleteVolumeResponse{}, nil
 	}
 
-	// todo 去除diskDeletingMap锁
-	//if _, ok := diskDeletingMap.LoadOrStore(diskID, "deleting"); ok {
-	//	return nil, fmt.Errorf("DeleteVolume: disk:(%s) had another process to delete", diskID)
-	//}
-	//
-	//defer func() {
-	//	diskDeletingMap.Delete(diskID)
-	//}()
-
+	if _, ok := CacheLockMap.LoadOrStore(diskID, struct{}{}); ok {
+		time.Sleep(time.Second * 10)
+		return nil, fmt.Errorf("当前pv有其它操作正在进行，请稍后再试")
+	}
+	defer CacheLockMap.Delete(diskID)
 	// Step 4: delete disk
 	deleteRes, err := deleteDisk(diskID)
 	if err != nil {
@@ -237,18 +236,7 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 		log.Errorf("deleteDisk: cdsDisk.DeleteDisk task result failed, err is: %s", err)
 		return nil, fmt.Errorf("deleteDisk: cdsDisk.DeleteDisk task result failed, err is: %s", err)
 	}
-
-	// todo 去除
-	//if pvName, ok := diskIdPvMap.Load(diskID); ok {
-	//	name, _ := pvName.(string)
-	//	pvcCreatedMap.Delete(name)
-	//}
-	//
-	//diskIdPvMap.Delete(diskID)
-
-	// log.Infof("DeleteVolume: clean [diskIdPvMap] and [pvcMap] and [diskDeletingMap] succeed!")
 	log.Infof("DeleteVolume: Successfully delete diskID: %s !", diskID)
-
 	return &csi.DeleteVolumeResponse{}, nil
 }
 
@@ -259,17 +247,20 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 
 	log.Infof("ControllerPublishVolume: pvName: %s, starting attach diskID: %s to node: %s", req.VolumeId, diskID, nodeID)
 
-	// Step 2: check necessary params
 	if diskID == "" || nodeID == "" {
 		log.Errorf("ControllerPublishVolume: missing [VolumeId/NodeId] in request")
 		return nil, status.Error(codes.InvalidArgument, "ControllerPublishVolume missing [VolumeId/NodeId] in request")
 	}
 
-	// Step 3: check disk status
 	res, err := describeBlockInfo(diskID)
 	if err != nil {
 		log.Errorf("ControllerPublishVolume: findDiskByVolumeID api error, err is: %s", err)
 		return nil, fmt.Errorf("ControllerPublishVolume: findDiskByVolumeID api error, err is: %s", err)
+	}
+	// 块存储不存在
+	if res.Data.BlockId == "" {
+		msg := fmt.Sprintf("block %s not found", diskID)
+		return nil, status.Errorf(codes.NotFound, msg)
 	}
 	log.Infof("Attach Disk Info %+v", res)
 
@@ -277,43 +268,41 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 	diskMountedNodeID := res.Data.NodeId
 	// 挂载操作
 	switch diskStatus {
-	case StatusWaitEbs:
-		// todo openapi eks查询节点（状态，挂盘数量）
-		describeRes, err := describeInstances(nodeID)
+
+	case DiskStatusWaiting: // 待挂载
+		describeRes, err := describeNodeMountNum(nodeID)
 		if err != nil {
 			log.Errorf("ControllerPublishVolume: describeInstances %s failed: %v, it will try again later", nodeID, err)
 			return nil, err
 		}
-		if describeRes.Data.Status != StatusEcsRunning {
+
+		if describeRes.Data.NodeStatus != StatusEcsRunning {
 			msg := fmt.Sprintf("ControllerPublishVolume: node %s is not running, attach will try again later", nodeID)
 			log.Errorf(msg)
 			return nil, fmt.Errorf(msg)
 		}
-		var number = len(describeRes.Data.Disk.DataDiskConf)
-		if number+1 > 16 {
-			msg := fmt.Sprintf("ControllerPublishVolume: node %s's data disk number is %d,supported max number is 16", nodeID, number)
-			log.Errorf(msg)
-			return nil, fmt.Errorf(msg)
-		}
-		// todo 简化内存锁
-		if _, ok := AttachDetachMap.LoadOrStore(nodeID, "doing"); ok {
+
+		// TODO 挂盘数量限制
+		//var number = len(describeRes.Data.Disk.DataDiskConf)
+		//if number+1 > 16 {
+		//	msg := fmt.Sprintf("ControllerPublishVolume: node %s's data disk number is %d,supported max number is 16", nodeID, number)
+		//	log.Errorf(msg)
+		//	return nil, fmt.Errorf(msg)
+		//}
+
+		// 对节点和盘都上锁
+		if _, ok := CacheLockMap.LoadOrStore(nodeID, "doing"); ok {
 			log.Errorf("The Node %s Has Another Event, Please wait", nodeID)
 			return nil, status.Errorf(codes.InvalidArgument, "The Node %s Has Another Event, Please wait", nodeID)
 		}
-		defer func() {
-			AttachDetachMap.Delete(nodeID)
-		}()
-
-		if _, ok := DiskMultiTaskMap.LoadOrStore(diskID, "doing"); ok {
-			log.Errorf("The Disk %s Has Another Event, Please wait", diskID)
-			return nil, status.Errorf(codes.InvalidArgument, "The Disk %s Has Another Event, Please wait", diskID)
+		defer AttachDetachMap.Delete(nodeID)
+		if value, ok := CacheLockMap.LoadOrStore(diskID, "attaching"); ok {
+			msg := fmt.Sprintf("disk %s is ,please wait", value)
+			log.Errorf(msg)
+			return nil, fmt.Errorf(msg)
 		}
+		defer CacheLockMap.Delete(diskID)
 
-		defer func() {
-			DiskMultiTaskMap.Delete(diskID)
-		}()
-
-		// Step 4: attach disk to node
 		attachRes, err := attachDisk(diskID, nodeID)
 		if err != nil {
 			log.Errorf("ControllerPublishVolume: create attach task failed, err is:%s", err.Error())
@@ -324,9 +313,10 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 			return nil, err
 		}
 		log.Infof("ControllerPublishVolume: Successfully attach disk: %s to node: %s", diskID, nodeID)
-	case StatusEbsMounted:
+	case DiskStatusRunning: // 已挂载
 		// 下面的逻辑是为了解决挂载漂移的（卸载错误的节点，挂载正确的节点）
 		if diskMountedNodeID != "" {
+			// 已经挂载在目标机器，直接退出
 			if diskMountedNodeID == nodeID {
 				log.Warnf("ControllerPublishVolume: diskID: %s had been attached to nodeID: %s", diskID, nodeID)
 				return &csi.ControllerPublishVolumeResponse{}, nil
@@ -346,24 +336,20 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 				// node is not exist or NotReady status, detach force
 				log.Warnf("ControllerPublishVolume: diskMountedNodeID: %s is in [NotRead|Not Exist], detach forcely", diskMountedNodeID)
 
-				// todo 内存锁可以有， 简化一下， key：id， value：bool
-				if _, ok := AttachDetachMap.LoadOrStore(nodeID, "doing"); ok {
+				// 锁节点
+				if _, ok := CacheLockMap.LoadOrStore(nodeID, true); ok {
 					log.Errorf("The Node %s Has Another Event, Please wait", nodeID)
 					return nil, status.Errorf(codes.InvalidArgument, "The Node %s Has Another Event, Please wait", nodeID)
 				}
-				defer func() {
-					AttachDetachMap.Delete(nodeID)
-				}()
+				defer CacheLockMap.Delete(nodeID)
 
-				if _, ok := DiskMultiTaskMap.LoadOrStore(diskID, "doing"); ok {
-					log.Errorf("The Disk %s Has Another Event, Please wait", diskID)
-					return nil, status.Errorf(codes.InvalidArgument, "The Disk %s Has Another Event, Please wait", diskID)
+				// 锁disk
+				if _, ok := CacheLockMap.LoadOrStore(diskID, true); ok {
+					log.Errorf("The Node %s Has Another Event, Please wait", nodeID)
+					return nil, status.Errorf(codes.InvalidArgument, "The Node %s Has Another Event, Please wait", nodeID)
 				}
+				defer CacheLockMap.Delete(diskID)
 
-				defer func() {
-					DiskMultiTaskMap.Delete(diskID)
-				}()
-				// todo nodeid running，diskid running， 可以卸载
 				detachRes, err := detachDisk(diskID)
 				if err != nil {
 					log.Errorf("ControllerPublishVolume: detach diskID: %s from nodeID: %s error,  err is: %s", diskID, diskMountedNodeID, err.Error())
@@ -386,7 +372,6 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 		// todo 整理一下返回信息， 拦截
 		log.Errorf("ControllerPublishVolume: diskID %s status is %s, cant attach to nodeID %s", diskID, diskStatus, nodeID)
 		return nil, fmt.Errorf("ControllerPublishVolume: diskID %s status is %s, cant attach to nodeID %s", diskID, diskStatus, nodeID)
-
 	}
 
 	return &csi.ControllerPublishVolumeResponse{}, nil
@@ -404,7 +389,6 @@ func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *c
 	//	return nil, status.Error(codes.InvalidArgument, "ControllerUnpublishVolume: Disk has another Event, please wait")
 	//}
 
-	// Step 2: check necessary params
 	if diskID == "" || nodeID == "" {
 		log.Errorf("ControllerUnpublishVolume: missing [VolumeId/NodeId] in request")
 		return nil, status.Error(codes.InvalidArgument, "ControllerUnpublishVolume: missing [VolumeId/NodeId] in request")
@@ -427,25 +411,21 @@ func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *c
 		log.Warnf("ControllerUnpublishVolume: diskID: %s had been detached from nodeID: %s", diskID, nodeID)
 		return &csi.ControllerUnpublishVolumeResponse{}, nil
 	}
-	// todo 内存锁 简化
-	if _, ok := AttachDetachMap.LoadOrStore(nodeID, "doing"); ok {
+	// 锁节点
+	if _, ok := CacheLockMap.LoadOrStore(nodeID, nil); ok {
 		log.Errorf("The Node %s Has Another Event, Please wait", nodeID)
 		return nil, status.Errorf(codes.InvalidArgument, "The Node %s Has Another Event, Please wait", nodeID)
 	}
-	defer func() {
-		AttachDetachMap.Delete(nodeID)
-	}()
+	defer CacheLockMap.Delete(nodeID)
 
-	if _, ok := DiskMultiTaskMap.LoadOrStore(diskID, "doing"); ok {
-		log.Errorf("The Disk %s Has Another Event, Please wait", diskID)
-		return nil, status.Errorf(codes.InvalidArgument, "The Disk %s Has Another Event, Please wait", diskID)
+	// 锁disk
+	if _, ok := CacheLockMap.LoadOrStore(diskID, nil); ok {
+		log.Errorf("The disk %s Has Another Event, Please wait", diskID)
+		return nil, status.Errorf(codes.InvalidArgument, "The disk %s Has Another Event, Please wait", diskID)
+
 	}
+	defer CacheLockMap.Delete(diskID)
 
-	defer func() {
-		DiskMultiTaskMap.Delete(diskID)
-	}()
-
-	// Step 4: detach disk todo 优化成 锁+操作+事件 封装一个函数
 	detachRes, err := detachDisk(diskID)
 	if err != nil {
 		log.Errorf("ControllerUnpublishVolume: create detach task failed, err is: %s", err.Error())
@@ -502,11 +482,13 @@ func createBlock(diskName string, diskSize int, azId string) (*api.CreateBlockRe
 func waitTaskFinsh(taskID string) error {
 	timer := time.NewTimer(time.Second * 2)
 	ctx, _ := context.WithTimeout(context.Background(), time.Minute*40)
+	var count int64
 	for {
 		select {
 		case <-timer.C:
 			resp, err := describeTaskStatus(taskID)
 			if err != nil {
+				count++
 				continue
 			}
 			taskStatus := resp.Data.TaskStatus
@@ -518,6 +500,9 @@ func waitTaskFinsh(taskID string) error {
 			}
 		case <-ctx.Done():
 			return fmt.Errorf("describe task %s time out", taskID)
+		}
+		if count > 10 {
+			return fmt.Errorf("query task faild more than %d", count)
 		}
 	}
 }
@@ -624,11 +609,12 @@ func describeBlockLimit(azId string) (*api.DescribeBlockLimitResponse, error) {
 	return client.DescribeBlockLimit(request)
 }
 
-func describeInstances(instancesId string) (*cdsDisk.DescribeInstanceResponse, error) {
-	res, err := cdsDisk.DescribeInstance(instancesId)
-	if err != nil {
-		log.Errorf("deleteDisk: cdsDisk.describeInstances api error, err is: %s", err)
-		return nil, err
+func describeNodeMountNum(instancesId string) (*api.DescribeNodeMountNumResponse, error) {
+	cpf := profile.NewClientProfileWithMethod(http.MethodGet)
+	client, _ := api.NewClient(eks_client.NewCredential(), "", cpf)
+	request := &api.DescribeNodeMountNumRequest{
+		BaseRequest: &common.BaseRequest{},
+		NodeId:      instancesId,
 	}
-	return res, nil
+	return client.DescribeNodeMountNum(request)
 }

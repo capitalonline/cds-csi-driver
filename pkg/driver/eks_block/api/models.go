@@ -318,3 +318,40 @@ func (resp *UpdateBlockFormatResponse) ToJsonString() string {
 func (resp *UpdateBlockFormatResponse) FromJsonString(s string) error {
 	return json.Unmarshal([]byte(s), &resp)
 }
+
+type DescribeNodeMountNumRequest struct {
+	*cdshttp.BaseRequest
+	NodeId string `json:"NodeId"`
+}
+
+func (req *DescribeNodeMountNumRequest) ToJsonString() string {
+	b, _ := json.Marshal(req)
+	return string(b)
+}
+
+func (req *DescribeNodeMountNumRequest) FromJsonString(s string) error {
+	return json.Unmarshal([]byte(s), &req)
+}
+
+type DescribeNodeMountNumResponse struct {
+	*cdshttp.BaseResponse
+	Code      string                           `json:"Code"`
+	Msg       string                           `json:"Msg"`
+	Data      DescribeNodeMountNumResponseData `json:"Data"`
+	RequestId string                           `json:"RequestId"`
+}
+
+type DescribeNodeMountNumResponseData struct {
+	BlockNum   int    `json:"BlockNum"`
+	NodeStatus string `json:"NodeStatus"`
+	StatusStr  string `json:"StatusStr"`
+}
+
+func (resp *DescribeNodeMountNumResponse) ToJsonString() string {
+	b, _ := json.Marshal(resp)
+	return string(b)
+}
+
+func (resp *DescribeNodeMountNumResponse) FromJsonString(s string) error {
+	return json.Unmarshal([]byte(s), &resp)
+}

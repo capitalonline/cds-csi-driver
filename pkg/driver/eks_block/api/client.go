@@ -202,3 +202,26 @@ func (c *Client) UpdateBlockFormat(request *UpdateBlockFormatRequest) (response 
 	err = c.Send(request, response)
 	return
 }
+
+func NewDescribeNodeMountNumRequest() (request *DescribeNodeMountNumRequest) {
+	request = &DescribeNodeMountNumRequest{
+		BaseRequest: &cdshttp.BaseRequest{},
+	}
+	request.SetDomain(consts.ApiHost)
+	request.Init().WithApiInfo(consts.ServiceEKS, consts.ApiVersion, consts.ActionDescribeNodeMountNum)
+	return
+}
+
+func NewDescribeNodeMountNumResponse() (response *DescribeNodeMountNumResponse) {
+	response = &DescribeNodeMountNumResponse{BaseResponse: &cdshttp.BaseResponse{}}
+	return
+}
+
+func (c *Client) DescribeNodeMountNum(request *DescribeNodeMountNumRequest) (response *DescribeNodeMountNumResponse, err error) {
+	if request == nil {
+		request = NewDescribeNodeMountNumRequest()
+	}
+	response = NewDescribeNodeMountNumResponse()
+	err = c.Send(request, response)
+	return
+}

@@ -12,14 +12,15 @@ const (
 )
 
 const (
-	ActionCreateBlock        = "CreateBlock"
-	ActionDeleteBlock        = "DeleteBlock"
-	ActionAttachBlock        = "AttachBlock"
-	ActionDetachBlock        = "DetachBlock"
-	ActionTaskStatus         = "TaskStatus"
-	ActionDescribeBlockLimit = "DescribeBlockLimit"
-	ActionUpdateBlockFormat  = "UpdateBlockFormat"
-	ActionDescribeBlockInfo  = "DescribeBlockInfo"
+	ActionCreateBlock          = "CreateBlock"
+	ActionDeleteBlock          = "DeleteBlock"
+	ActionAttachBlock          = "AttachBlock"
+	ActionDetachBlock          = "DetachBlock"
+	ActionTaskStatus           = "TaskStatus"
+	ActionDescribeBlockLimit   = "DescribeBlockLimit"
+	ActionUpdateBlockFormat    = "UpdateBlockFormat"
+	ActionDescribeBlockInfo    = "DescribeBlockInfo"
+	ActionDescribeNodeMountNum = "DescribeNodeMountNum"
 )
 
 const (
