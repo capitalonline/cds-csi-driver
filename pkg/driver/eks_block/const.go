@@ -32,4 +32,13 @@ const (
 	DiskMountLimit = 14
 )
 
-var IopsArrayInt64 = []int64{3000, 5000, 7500, 10000}
+const (
+	OrderHead    = "scsi-0QEMU_QEMU_HARDDISK_drive-scsi0-0-0-"
+	ErrorStatus  = "error"
+	Staging      = "staging"
+	Formatted    = "formatted"
+	Publishing   = "publishing"
+	UnPublishing = "unPublishing"
+	UnStaing     = "UnStaing"
+	Ok           = "ok"
+)

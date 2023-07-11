@@ -19,33 +19,6 @@ import (
 	"time"
 )
 
-const (
-	OrderHead    = "scsi-0QEMU_QEMU_HARDDISK_drive-scsi0-0-0-"
-	ErrorStatus  = "error"
-	Staging      = "staging"
-	Formatted    = "formatted"
-	Publishing   = "publishing"
-	UnPublishing = "unPublishing"
-	UnStaing     = "UnStaing"
-	Ok           = "ok"
-)
-
-/*
-字段
-1. format
-2. pv_name（disk_name）
-3. fs_type
-接口
-创建盘
-删除盘
-挂载盘
-卸载盘
-查询盘剩余容量 todo
-查询节点状态以及已挂载盘的数量 todo
-更新格式化 todo
-查询盘详情(id, name)！todo
-*/
-
 // storing staging disk
 var diskStagingMap = new(sync.Map)
 
@@ -414,7 +387,14 @@ func formatDiskDevice(diskId, deviceName, fsType string) error {
 		log.Errorf("formatDiskDevice: scanDeviceCmd: %s failed, err is: %s", scanDeviceCmd, err.Error())
 		return err
 	}
-
+	// check deviceName is formatted
+	if out, err := utils.RunCommand(fmt.Sprintf("blkid %s", deviceName)); err == nil {
+		if strings.Contains(out, "TYPE") {
+			diskFormattedMap.Store(diskId, Formatted)
+			log.Warnf("formatDiskDevice: deviceName: %s had been formatted, avoid multi formatting, return directly", deviceName)
+			return nil
+		}
+	}
 	// Step 2: format deviceName(disk)
 	var formatDeviceCmd string
 	if fsType == DefaultFsTypeXfs {
