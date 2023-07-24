@@ -6,6 +6,7 @@ import (
 	"github.com/capitalonline/cds-csi-driver/pkg/driver/disk"
 	"github.com/capitalonline/cds-csi-driver/pkg/driver/ebs_disk"
 	"github.com/capitalonline/cds-csi-driver/pkg/driver/oss"
+	"github.com/capitalonline/cds-csi-driver/pkg/driver/vmwaredisk"
 	"os"
 	"path"
 
@@ -16,10 +17,11 @@ import (
 )
 
 const (
-	DriverNasTypeName     = "nas.csi.cds.net"
-	DriverOssTypeName     = "oss.csi.cds.net"
-	DriverDiskTypeName    = "disk.csi.cds.net"
-	DriverEbsDiskTypeName = "ebs-disk.csi.cds.net"
+	DriverNasTypeName        = "nas.csi.cds.net"
+	DriverOssTypeName        = "oss.csi.cds.net"
+	DriverDiskTypeName       = "disk.csi.cds.net"
+	DriverVmwareDiskTypeName = "vmware.disk.csi.cds.net"
+	DriverEbsDiskTypeName    = "ebs-disk.csi.cds.net"
 )
 
 var (
@@ -81,6 +83,9 @@ func main() {
 		ossDriver.Run()
 	case DriverDiskTypeName:
 		diskDriver := disk.NewDriver(DriverDiskTypeName, nodeID, endpoint)
+		diskDriver.Run()
+	case DriverVmwareDiskTypeName:
+		diskDriver := vmwaredisk.NewDriver(DriverVmwareDiskTypeName, endpoint)
 		diskDriver.Run()
 	case DriverEbsDiskTypeName:
 		diskDriver := ebs_disk.NewDriver(DriverEbsDiskTypeName, nodeID, endpoint)
