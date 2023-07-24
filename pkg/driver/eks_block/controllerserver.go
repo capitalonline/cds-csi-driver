@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"time"
+
 	api "github.com/capitalonline/cds-csi-driver/pkg/driver/eks_block/api"
 	"github.com/capitalonline/cds-csi-driver/pkg/driver/utils/eks_client"
 	common "github.com/capitalonline/cds-csi-driver/pkg/driver/utils/eks_client/http"
@@ -17,8 +20,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"net/http"
-	"time"
 )
 
 const (
@@ -29,7 +30,7 @@ const (
 	EcsMountLimit         = 16
 	StatusEcsRunning      = "running"
 	ebsSsdDisk            = "SSD"
-	DriverEbsDiskTypeName = "ebs-disk.csi.cds.net"
+	DriverEbsDiskTypeName = "eks-disk.csi.cds.net"
 	BillingMethodPostPaid = "0"
 )
 

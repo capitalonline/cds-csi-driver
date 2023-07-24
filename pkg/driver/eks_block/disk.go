@@ -8,7 +8,7 @@ import (
 
 // PluginFolder defines the location of disk plugin
 const (
-	driverName      = "block.csi.eks.net"
+	driverName      = "eks-disk.csi.cds.net"
 	csiVersion      = "1.0.0"
 	TopologyZoneKey = "topology.kubernetes.io/zone"
 )

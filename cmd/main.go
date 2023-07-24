@@ -3,14 +3,15 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/capitalonline/cds-csi-driver/pkg/driver/disk"
-	"github.com/capitalonline/cds-csi-driver/pkg/driver/ebs_disk"
-	"github.com/capitalonline/cds-csi-driver/pkg/driver/oss"
 	"os"
 	"path"
 
 	"github.com/capitalonline/cds-csi-driver/pkg/common"
+	"github.com/capitalonline/cds-csi-driver/pkg/driver/disk"
+	"github.com/capitalonline/cds-csi-driver/pkg/driver/ebs_disk"
+	"github.com/capitalonline/cds-csi-driver/pkg/driver/eks_block"
 	"github.com/capitalonline/cds-csi-driver/pkg/driver/nas"
+	"github.com/capitalonline/cds-csi-driver/pkg/driver/oss"
 	"github.com/capitalonline/cds-csi-driver/pkg/driver/utils"
 	log "github.com/sirupsen/logrus"
 )
@@ -20,6 +21,7 @@ const (
 	DriverOssTypeName     = "oss.csi.cds.net"
 	DriverDiskTypeName    = "disk.csi.cds.net"
 	DriverEbsDiskTypeName = "ebs-disk.csi.cds.net"
+	DriverEksDiskTypeName = "eks-disk.csi.cds.net"
 )
 
 var (
@@ -84,6 +86,9 @@ func main() {
 		diskDriver.Run()
 	case DriverEbsDiskTypeName:
 		diskDriver := ebs_disk.NewDriver(DriverEbsDiskTypeName, nodeID, endpoint)
+		diskDriver.Run()
+	case DriverEksDiskTypeName:
+		diskDriver := eks_block.NewDriver(DriverEksDiskTypeName, nodeID, endpoint)
 		diskDriver.Run()
 	default:
 		log.Fatalf("unsupported driver type: %s", driverName)
