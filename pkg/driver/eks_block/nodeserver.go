@@ -3,20 +3,20 @@ package eks_block
 import (
 	"context"
 	"fmt"
+	api "github.com/capitalonline/cds-csi-driver/pkg/driver/eks_block/api"
 	"github.com/capitalonline/cds-csi-driver/pkg/driver/utils"
+	"github.com/capitalonline/cds-csi-driver/pkg/driver/utils/eks_client"
+	"github.com/capitalonline/cds-csi-driver/pkg/driver/utils/eks_client/profile"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/kubernetes-csi/drivers/pkg/csi-common"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"net/http"
 	"strings"
 	"sync"
-	"time"
 )
 
 // storing staging disk
@@ -117,7 +117,6 @@ func (n *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 			log.Errorf("NodeStageVolume: format deviceName: %s failed, err is: %s", deviceName, err.Error())
 			return nil, err
 		}
-		// todo
 		err = n.SavePvFormat(diskID)
 		if err != nil {
 			err = nil
@@ -542,46 +541,40 @@ func unBindMountGlobalPathFromPodPath(targetPath string) error {
 
 }
 
-// todo openapi Format
+// SavePvFormat openapi Format
 func (n *NodeServer) SavePvFormat(diskId string) error {
 	log.Infof("start SavePvFormat %s", diskId)
-	diskFormattedMap.Store(diskId, Formatted)
-
-	patchData := []byte(fmt.Sprintf(`{"data": {"%s": "%s"}}`, diskId, Formatted))
-
-	// 执行 Patch 操作
-	var err error
-	for i := 0; i < 2; i++ {
-		_, err = n.Client.CoreV1().ConfigMaps("kube-system").Patch("ebs-formated", types.MergePatchType, patchData)
-		if err != nil {
-			time.Sleep(time.Second * 2)
+	cpf := profile.NewClientProfileWithMethod(http.MethodPost)
+	client, _ := api.NewClient(eks_client.NewCredential(), "", cpf)
+	request := api.NewUpdateBlockFormatRequest()
+	request.IsFormat = 1
+	request.BlockId = diskId
+	resp, err := client.UpdateBlockFormat(request)
+	if err != nil {
+		return err
+	} else {
+		if resp.Code == "Success" {
+			diskFormattedMap.Store(diskId, Formatted)
 		} else {
-			return nil
+			return fmt.Errorf("%v", resp.Msg)
 		}
 	}
 	return err
 }
 
-// todo 查询disk详情
+// GetPvFormat 查询disk是否Format
 func (n *NodeServer) GetPvFormat(diskId string) bool {
 	_, ok := diskFormattedMap.Load(diskId)
 	if ok {
-		return true
-	}
-	for i := 0; i < 2; i++ {
-		cm, err := n.Client.CoreV1().ConfigMaps("kube-system").Get("ebs-formated", metav1.GetOptions{})
-		if err == nil {
-			if cm.Data == nil {
-				return false
-			}
-			return cm.Data[diskId] == Formatted
-		}
-		if errors.IsNotFound(err) {
+		return ok
+	} else {
+		resp, _ := describeBlockInfo(diskId, "")
+		if resp.Data.NodeId != "" {
+			return resp.Data.IsFormat == 1
+		} else {
 			return false
 		}
-		time.Sleep(time.Second * 2)
 	}
-	return false
 }
 
 func (n *NodeServer) NodeExpandVolume(context.Context, *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {

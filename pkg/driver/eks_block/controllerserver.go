@@ -26,7 +26,7 @@ const (
 	StatusEbsMounted      = "running"
 	StatusEbsError        = "error"
 	StatusWaitEbs         = "waiting"
-	MinDiskSize           = 24
+	MinDiskSize           = 80
 	EcsMountLimit         = 16
 	StatusEcsRunning      = "running"
 	ebsSsdDisk            = "SSD"
@@ -131,10 +131,10 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 	case DiskStatusBuilding:
 		return nil, fmt.Errorf("块存储%s正在创建中！", pvName)
 	case DiskStatusError:
-		// todo 中断
+		// 中断
 		return nil, fmt.Errorf("块存储%s创建失败！", pvName)
 	case "":
-		// 不存在
+		// 不存在，忽略
 	default:
 		return &csi.CreateVolumeResponse{Volume: &csi.Volume{
 			VolumeId:      describeRes.Data.BlockId,
@@ -164,7 +164,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 
 	blockId := createRes.Data.BlockId
 	if blockId == "" {
-		return nil, fmt.Errorf("创建块存储失败,返回值：%+v", createRes)
+		return nil, fmt.Errorf("创建块存储失败,返回值：%#v", createRes)
 	}
 
 	err = waitTaskFinish(createRes.Data.TaskId)
@@ -255,7 +255,7 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 		msg := fmt.Sprintf("block %s not found", diskID)
 		return nil, status.Errorf(codes.NotFound, msg)
 	}
-	log.Infof("Attach Disk Info %+v", res)
+	log.Infof("Attach Disk Info %#v", res)
 
 	diskStatus := res.Data.Status
 	diskMountedNodeID := res.Data.NodeId
@@ -293,13 +293,13 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 				}
 				log.Warnf("ControllerPublishVolume: detach diskID: %s from nodeID: %s successfully", diskID, diskMountedNodeID)
 			} else {
-				// 当前pv 已挂载一个正常的节点是，应该不需要进行挂载迁移的操作 todo 中断
+				// 当前pv 已挂载一个正常的节点是，应该不需要进行挂载迁移的操作 中断
 				log.Errorf("ControllerPublishVolume: diskID: %s had been attached to [Ready] nodeID: %s, cant attach to different nodeID: %s", diskID, diskMountedNodeID, nodeID)
 				return nil, fmt.Errorf("ControllerPublishVolume: diskID: %s had been attached to [Ready] nodeID: %s, cant attach to different nodeID: %s", diskID, diskMountedNodeID, nodeID)
 			}
 		}
 	default:
-		// todo 拦截
+		// 拦截
 		log.Errorf("ControllerPublishVolume: diskID %s status is %s, cant attach to nodeID %s", diskID, diskStatus, nodeID)
 		return nil, fmt.Errorf("ControllerPublishVolume: diskID %s status is %s, cant attach to nodeID %s", diskID, diskStatus, nodeID)
 	}
@@ -381,13 +381,11 @@ func (c *ControllerServer) ControllerExpandVolume(context.Context, *csi.Controll
 func createBlock(diskName string, diskSize int, azId string) (*api.CreateBlockResponse, error) {
 	cpf := profile.NewClientProfileWithMethod(http.MethodPost)
 	client, _ := api.NewClient(eks_client.NewCredential(), "", cpf)
-	request := &api.CreateBlockRequest{
-		BaseRequest: &common.BaseRequest{},
-		DiskFeature: DiskFeatureSSD,
-		DiskSize:    diskSize,
-		DiskName:    diskName,
-		AzId:        azId,
-	}
+	request := api.NewCreateBlockRequest()
+	request.DiskFeature = DiskFeatureSSD
+	request.DiskSize = diskSize
+	request.DiskName = diskName
+	request.AzId = azId
 	return client.CreateBlock(request)
 }
 
@@ -447,10 +445,8 @@ func deleteDisk(diskID string) (*api.DeleteBlockResponse, error) {
 	defer CacheLockMap.Delete(diskID)
 	cpf := profile.NewClientProfileWithMethod(http.MethodPost)
 	client, _ := api.NewClient(eks_client.NewCredential(), "", cpf)
-	request := &api.DeleteBlockRequest{
-		BaseRequest: &common.BaseRequest{},
-		BlockId:     diskID,
-	}
+	request := api.NewDeleteBlockRequest()
+	request.BlockId = diskID
 	deleteRes, err := client.DeleteBlock(request)
 	taskID := deleteRes.Data.TaskId
 	if err = waitTaskFinish(taskID); err != nil {
@@ -476,11 +472,9 @@ func attachDisk(diskID, nodeID string) (*api.AttachBlockResponse, error) {
 	defer CacheLockMap.Delete(diskID)
 	cpf := profile.NewClientProfileWithMethod(http.MethodPost)
 	client, _ := api.NewClient(eks_client.NewCredential(), "", cpf)
-	request := &api.AttachBlockRequest{
-		BaseRequest: &common.BaseRequest{},
-		BlockId:     diskID,
-		NodeId:      nodeID,
-	}
+	request := api.NewAttachBlockRequest()
+	request.BlockId = diskID
+	request.NodeId = nodeID
 	resp, err := client.AttachBlock(request)
 	if err = waitTaskFinish(resp.Data.TaskId); err != nil {
 		log.Errorf("ControllerPublishVolume: attach disk:%s processing to node: %s with error, err is: %s", diskID, nodeID, err.Error())
@@ -543,11 +537,8 @@ func detachDisk(diskID string, nodeId string) (*api.DetachBlockResponse, error) 
 	defer CacheLockMap.Delete(diskID)
 	cpf := profile.NewClientProfileWithMethod(http.MethodPost)
 	client, _ := api.NewClient(eks_client.NewCredential(), "", cpf)
-	request := &api.DetachBlockRequest{
-		BaseRequest: &common.BaseRequest{},
-		BlockId:     diskID,
-	}
-
+	request := api.NewDetachBlockRequest()
+	request.BlockId = diskID
 	resp, err := client.DetachBlock(request)
 	if err = waitTaskFinish(resp.Data.TaskId); err != nil {
 		log.Errorf("ControllerPublishVolume: attach disk:%s processing to node: %s with error, err is: %s", diskID, nodeId, err.Error())
@@ -559,19 +550,15 @@ func detachDisk(diskID string, nodeId string) (*api.DetachBlockResponse, error) 
 func describeBlockLimit(azId string) (*api.DescribeBlockLimitResponse, error) {
 	cpf := profile.NewClientProfileWithMethod(http.MethodGet)
 	client, _ := api.NewClient(eks_client.NewCredential(), "", cpf)
-	request := &api.DescribeBlockLimitRequest{
-		BaseRequest:        &common.BaseRequest{},
-		AvailableZoneCodes: []string{azId},
-	}
+	request := api.NewDescribeBlockLimitRequest()
+	request.AvailableZoneCodes = []string{azId}
 	return client.DescribeBlockLimit(request)
 }
 
 func describeNodeMountNum(instancesId string) (*api.DescribeNodeMountNumResponse, error) {
 	cpf := profile.NewClientProfileWithMethod(http.MethodGet)
 	client, _ := api.NewClient(eks_client.NewCredential(), "", cpf)
-	request := &api.DescribeNodeMountNumRequest{
-		BaseRequest: &common.BaseRequest{},
-		NodeId:      instancesId,
-	}
+	request := api.NewDescribeNodeMountNumRequest()
+	request.NodeId = instancesId
 	return client.DescribeNodeMountNum(request)
 }
