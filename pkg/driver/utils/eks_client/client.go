@@ -93,7 +93,7 @@ func (c *Client) sendWithSignatureCds(request cdshttp.Request, response cdshttp.
 		requestPayload = string(b)
 	}
 
-	url := request.GetScheme() + "//" + request.GetDomain() + request.GetPath()
+	url := request.GetScheme() + "//:" + request.GetDomain() + request.GetPath()
 	if canonicalQueryString != "" {
 		url = url + "?" + canonicalQueryString
 	}
