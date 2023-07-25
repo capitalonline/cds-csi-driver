@@ -9,7 +9,6 @@ import (
 
 	api "github.com/capitalonline/cds-csi-driver/pkg/driver/eks_block/api"
 	"github.com/capitalonline/cds-csi-driver/pkg/driver/utils/eks_client"
-	common "github.com/capitalonline/cds-csi-driver/pkg/driver/utils/eks_client/http"
 	"github.com/capitalonline/cds-csi-driver/pkg/driver/utils/eks_client/profile"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	csicommon "github.com/kubernetes-csi/drivers/pkg/csi-common"
@@ -420,21 +419,17 @@ func waitTaskFinish(taskID string) error {
 func describeTaskStatus(taskId string) (*api.TaskStatusResponse, error) {
 	cpf := profile.NewClientProfileWithMethod(http.MethodGet)
 	client, _ := api.NewClient(eks_client.NewCredential(), "", cpf)
-	request := &api.TaskStatusRequest{
-		BaseRequest: &common.BaseRequest{},
-		TaskId:      taskId,
-	}
+	request := api.NewTaskStatusRequest()
+	request.TaskId = taskId
 	return client.TaskStatus(request)
 }
 
 func describeBlockInfo(diskID string, blockName string) (*api.DescribeBlockInfoResponse, error) {
 	cpf := profile.NewClientProfileWithMethod(http.MethodGet)
 	client, _ := api.NewClient(eks_client.NewCredential(), "", cpf)
-	request := &api.DescribeBlockInfoRequest{
-		BaseRequest: &common.BaseRequest{},
-		BlockId:     diskID,
-		BlockName:   blockName,
-	}
+	request := api.NewDescribeBlockInfoRequest()
+	request.BlockId = diskID
+	request.BlockName = blockName
 	return client.DescribeBlockInfo(request)
 }
 
