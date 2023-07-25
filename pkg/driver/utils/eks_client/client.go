@@ -97,6 +97,7 @@ func (c *Client) sendWithSignatureCds(request cdshttp.Request, response cdshttp.
 	if canonicalQueryString != "" {
 		url = url + "?" + canonicalQueryString
 	}
+	log.Printf("url: %s, request body: %v \n", url, requestPayload)
 	httpRequest, err := http.NewRequest(httpRequestMethod, url, strings.NewReader(requestPayload))
 	if err != nil {
 		return err
@@ -115,6 +116,7 @@ func (c *Client) sendWithSignatureCds(request cdshttp.Request, response cdshttp.
 		return errors.NewCdsSDKError("ClientError.NetworkError. Errors.Code:", msg, "")
 	}
 	err = cdshttp.ParseFromHttpResponse(httpResponse, response, request)
+	log.Printf("response: %#v", response)
 	return err
 }
 
