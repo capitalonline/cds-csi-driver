@@ -392,30 +392,25 @@ func createBlock(diskName string, diskSize int, azId, fs string) (*api.CreateBlo
 }
 
 func waitTaskFinish(taskID string) error {
-	timer := time.NewTimer(time.Second * 2)
-	ctx, _ := context.WithTimeout(context.Background(), time.Minute*20)
-	var count int64
+	count := 0
 	for {
-		select {
-		case <-timer.C:
-			resp, err := describeTaskStatus(taskID)
-			if err != nil {
-				count++
-				continue
-			}
-			taskStatus := resp.Data.TaskStatus
-			if taskStatus == TaskStatusFinish {
-				return nil
-			}
-			if taskStatus == TaskStatusError {
-				return fmt.Errorf("task %s err,resp: %+v", taskID, resp)
-			}
-		case <-ctx.Done():
-			return fmt.Errorf("describe task %s time out", taskID)
-		}
-		if count > 10 {
+		time.Sleep(5 * time.Second)
+		if count > 150 {
 			return fmt.Errorf("query task faild more than %d", count)
 		}
+		resp, err := describeTaskStatus(taskID)
+		if err != nil {
+			count++
+			continue
+		}
+		taskStatus := resp.Data.TaskStatus
+		if taskStatus == TaskStatusFinish {
+			return nil
+		}
+		if taskStatus == TaskStatusError {
+			return fmt.Errorf("task %s err,resp: %+v", taskID, resp)
+		}
+		count++
 	}
 }
 
