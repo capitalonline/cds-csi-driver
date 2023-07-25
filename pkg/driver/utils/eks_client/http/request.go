@@ -140,7 +140,6 @@ func (r *BaseRequest) GetBodyReader() io.Reader {
 }
 
 func (r *BaseRequest) Init() *BaseRequest {
-	r.domain = ""
 	r.path = Path
 	r.params = make(map[string]string)
 	r.formParams = make(map[string]string)

@@ -1,6 +1,8 @@
 package eks_client
 
-import "os"
+import (
+	"github.com/capitalonline/cds-csi-driver/pkg/driver/utils/eks_client/consts"
+)
 
 type Credential struct {
 	SecretId  string
@@ -10,8 +12,8 @@ type Credential struct {
 
 func NewCredential() *Credential {
 	return &Credential{
-		SecretId:  os.Getenv("ACCESS_KEY_ID"),
-		SecretKey: os.Getenv("ACCESS_KEY_SECRET"),
+		SecretId:  consts.AccessKeyID,
+		SecretKey: consts.AccessKeySecret,
 	}
 }
 

@@ -23,8 +23,8 @@ func NewCreateBlockRequest() (request *CreateBlockRequest) {
 	request = &CreateBlockRequest{
 		BaseRequest: &cdshttp.BaseRequest{},
 	}
-	request.SetDomain(consts.ApiHost)
 	request.Init().WithApiInfo(consts.ServiceEKS, consts.ApiVersion, consts.ActionCreateBlock)
+	request.SetDomain(consts.ApiHost)
 	return
 }
 
@@ -46,8 +46,8 @@ func NewDeleteBlockRequest() (request *DeleteBlockRequest) {
 	request = &DeleteBlockRequest{
 		BaseRequest: &cdshttp.BaseRequest{},
 	}
-	request.SetDomain(consts.ApiHost)
 	request.Init().WithApiInfo(consts.ServiceEKS, consts.ApiVersion, consts.ActionDeleteBlock)
+	request.SetDomain(consts.ApiHost)
 	return
 }
 
@@ -69,8 +69,8 @@ func NewAttachBlockRequest() (request *AttachBlockRequest) {
 	request = &AttachBlockRequest{
 		BaseRequest: &cdshttp.BaseRequest{},
 	}
-	request.SetDomain(consts.ApiHost)
 	request.Init().WithApiInfo(consts.ServiceEKS, consts.ApiVersion, consts.ActionAttachBlock)
+	request.SetDomain(consts.ApiHost)
 	return
 }
 
@@ -92,8 +92,8 @@ func NewDetachBlockRequest() (request *DetachBlockRequest) {
 	request = &DetachBlockRequest{
 		BaseRequest: &cdshttp.BaseRequest{},
 	}
-	request.SetDomain(consts.ApiHost)
 	request.Init().WithApiInfo(consts.ServiceEKS, consts.ApiVersion, consts.ActionDetachBlock)
+	request.SetDomain(consts.ApiHost)
 	return
 }
 
@@ -115,8 +115,8 @@ func NewTaskStatusRequest() (request *TaskStatusRequest) {
 	request = &TaskStatusRequest{
 		BaseRequest: &cdshttp.BaseRequest{},
 	}
-	request.SetDomain(consts.ApiHost)
 	request.Init().WithApiInfo(consts.ServiceEKS, consts.ApiVersion, consts.ActionTaskStatus)
+	request.SetDomain(consts.ApiHost)
 	return
 }
 
@@ -138,8 +138,8 @@ func NewDescribeBlockLimitRequest() (request *DescribeBlockLimitRequest) {
 	request = &DescribeBlockLimitRequest{
 		BaseRequest: &cdshttp.BaseRequest{},
 	}
-	request.SetDomain(consts.ApiHost)
 	request.Init().WithApiInfo(consts.ServiceEKS, consts.ApiVersion, consts.ActionDescribeBlockLimit)
+	request.SetDomain(consts.ApiHost)
 	return
 }
 
@@ -161,8 +161,8 @@ func NewDescribeBlockInfoRequest() (request *DescribeBlockInfoRequest) {
 	request = &DescribeBlockInfoRequest{
 		BaseRequest: &cdshttp.BaseRequest{},
 	}
-	request.SetDomain(consts.ApiHost)
 	request.Init().WithApiInfo(consts.ServiceEKS, consts.ApiVersion, consts.ActionDescribeBlockInfo)
+	request.SetDomain(consts.ApiHost)
 	return
 }
 
@@ -184,8 +184,8 @@ func NewUpdateBlockFormatRequest() (request *UpdateBlockFormatRequest) {
 	request = &UpdateBlockFormatRequest{
 		BaseRequest: &cdshttp.BaseRequest{},
 	}
-	request.SetDomain(consts.ApiHost)
 	request.Init().WithApiInfo(consts.ServiceEKS, consts.ApiVersion, consts.ActionUpdateBlockFormat)
+	request.SetDomain(consts.ApiHost)
 	return
 }
 
@@ -207,8 +207,8 @@ func NewDescribeNodeMountNumRequest() (request *DescribeNodeMountNumRequest) {
 	request = &DescribeNodeMountNumRequest{
 		BaseRequest: &cdshttp.BaseRequest{},
 	}
-	request.SetDomain(consts.ApiHost)
 	request.Init().WithApiInfo(consts.ServiceEKS, consts.ApiVersion, consts.ActionDescribeNodeMountNum)
+	request.SetDomain(consts.ApiHost)
 	return
 }
 
