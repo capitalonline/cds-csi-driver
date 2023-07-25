@@ -156,7 +156,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 	log.Infof("CreateVolume: diskRequestGB is: %d", diskRequestGB)
 
 	createRes, err := createBlock(pvName, int(diskRequestGB), diskVol.AzId, diskVol.FsType)
-	if err != nil {
+	if err != nil || createRes.Data == nil {
 		log.Errorf("CreateVolume: createDisk error, err is: %s", err.Error())
 		return nil, fmt.Errorf("CreateVolume: createDisk error, err is: %s", err.Error())
 	}
@@ -441,6 +441,10 @@ func deleteDisk(diskID string) (*api.DeleteBlockResponse, error) {
 	request := api.NewDeleteBlockRequest()
 	request.BlockId = diskID
 	deleteRes, err := client.DeleteBlock(request)
+	if err != nil || deleteRes.Code != "Success" {
+		log.Errorf("ControllerPublishVolume: attach disk:%s  err is: %s", diskID, err.Error())
+		return nil, err
+	}
 	taskID := deleteRes.Data.TaskId
 	if err = waitTaskFinish(taskID); err != nil {
 		log.Errorf("deleteDisk: cdsDisk.DeleteDisk task result failed, err is: %s", err)
@@ -469,6 +473,10 @@ func attachDisk(diskID, nodeID string) (*api.AttachBlockResponse, error) {
 	request.BlockId = diskID
 	request.NodeId = nodeID
 	resp, err := client.AttachBlock(request)
+	if err != nil || resp.Code != "Success" {
+		log.Errorf("ControllerPublishVolume: attach disk:%s processing to node: %s with error, err is: %s", diskID, nodeID, err.Error())
+		return nil, err
+	}
 	if err = waitTaskFinish(resp.Data.TaskId); err != nil {
 		log.Errorf("ControllerPublishVolume: attach disk:%s processing to node: %s with error, err is: %s", diskID, nodeID, err.Error())
 		return nil, err
@@ -533,6 +541,10 @@ func detachDisk(diskID string, nodeId string) (*api.DetachBlockResponse, error) 
 	request := api.NewDetachBlockRequest()
 	request.BlockId = diskID
 	resp, err := client.DetachBlock(request)
+	if err != nil || resp.Code != "Success" {
+		log.Errorf("ControllerPublishVolume: attach disk:%s, err is: %s", diskID, err.Error())
+		return nil, err
+	}
 	if err = waitTaskFinish(resp.Data.TaskId); err != nil {
 		log.Errorf("ControllerPublishVolume: attach disk:%s processing to node: %s with error, err is: %s", diskID, nodeId, err.Error())
 		return nil, err
