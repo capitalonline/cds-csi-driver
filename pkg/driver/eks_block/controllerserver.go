@@ -548,7 +548,7 @@ func detachDisk(diskID string, nodeId string) (*api.DetachBlockResponse, error) 
 }
 
 func describeBlockLimit(azId string) (*api.DescribeBlockLimitResponse, error) {
-	cpf := profile.NewClientProfileWithMethod(http.MethodGet)
+	cpf := profile.NewClientProfileWithMethod(http.MethodPost)
 	client, _ := api.NewClient(eks_client.NewCredential(), "", cpf)
 	request := api.NewDescribeBlockLimitRequest()
 	request.AvailableZoneCodes = []string{azId}
