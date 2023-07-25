@@ -1,6 +1,8 @@
 package common
 
 import (
+	"encoding/json"
+	"fmt"
 	"github.com/capitalonline/cds-csi-driver/pkg/driver/utils/eks_client/consts"
 	"io"
 	"net/url"
@@ -165,9 +167,12 @@ func GetServiceDomain(service string) (domain string) {
 }
 
 func ConstructParams(req Request) (err error) {
-	value := reflect.ValueOf(req).Elem()
-	err = flatStructure(value, req, "")
-	//log.Printf("[DEBUG] params=%s", req.GetParams())
+	var p = make(map[string]interface{})
+	bytes, _ := json.Marshal(req)
+	_ = json.Unmarshal(bytes, &p)
+	for key, value := range p {
+		req.GetParams()[key] = fmt.Sprintf("%v", value)
+	}
 	return
 }
 
