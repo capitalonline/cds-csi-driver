@@ -1,6 +1,7 @@
 package common
 
 import (
+	"github.com/capitalonline/cds-csi-driver/pkg/driver/utils/eks_client/consts"
 	"io"
 	"net/url"
 	"reflect"
@@ -140,6 +141,11 @@ func (r *BaseRequest) GetBodyReader() io.Reader {
 }
 
 func (r *BaseRequest) Init() *BaseRequest {
+	if consts.ApiHost == consts.ApiHostAddress {
+		r.scheme = "https"
+	} else {
+		r.scheme = "http"
+	}
 	r.path = Path
 	r.params = make(map[string]string)
 	r.formParams = make(map[string]string)
