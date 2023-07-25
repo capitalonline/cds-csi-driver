@@ -155,7 +155,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 
 	log.Infof("CreateVolume: diskRequestGB is: %d", diskRequestGB)
 
-	createRes, err := createBlock(pvName, int(diskRequestGB), diskVol.AzId)
+	createRes, err := createBlock(pvName, int(diskRequestGB), diskVol.AzId, diskVol.FsType)
 	if err != nil {
 		log.Errorf("CreateVolume: createDisk error, err is: %s", err.Error())
 		return nil, fmt.Errorf("CreateVolume: createDisk error, err is: %s", err.Error())
@@ -377,14 +377,17 @@ func (c *ControllerServer) ControllerExpandVolume(context.Context, *csi.Controll
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
-func createBlock(diskName string, diskSize int, azId string) (*api.CreateBlockResponse, error) {
+func createBlock(diskName string, diskSize int, azId, fs string) (*api.CreateBlockResponse, error) {
 	cpf := profile.NewClientProfileWithMethod(http.MethodPost)
 	client, _ := api.NewClient(eks_client.NewCredential(), "", cpf)
 	request := api.NewCreateBlockRequest()
 	request.DiskFeature = DiskFeatureSSD
 	request.DiskSize = diskSize
 	request.DiskName = diskName
-	request.AzId = azId
+	request.AvailableZoneCode = azId
+	request.CreateSource = "eks-csi"
+	request.FsType = fs
+
 	return client.CreateBlock(request)
 }
 

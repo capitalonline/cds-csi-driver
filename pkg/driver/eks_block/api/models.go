@@ -9,10 +9,12 @@ import (
 type CreateBlockRequest struct {
 	*cdshttp.BaseRequest
 	//DiskInfo CreateBlockRequestDiskInfo `json:"DiskInfo"`
-	DiskFeature string `json:"DiskFeature"`
-	DiskSize    int    `json:"DiskSize"`
-	DiskName    string `json:"DiskName"`
-	AzId        string `json:"AzId"`
+	DiskFeature       string `json:"DiskFeature"`
+	DiskSize          int    `json:"DiskSize"`
+	DiskName          string `json:"DiskName"`
+	FsType            string `json:"FsType"`
+	CreateSource      string `json:"CreateSource"`
+	AvailableZoneCode string `json:"AvailableZoneCode"`
 }
 
 // CreateBlockRequestDiskInfo 块存储磁盘信息

@@ -14,7 +14,7 @@ const (
 )
 
 const (
-	DiskFeatureSSD          = "SSD"
+	DiskFeatureSSD          = "ssd"
 	TaskStatusFinish        = "finish"
 	TaskStatusDoing         = "doing"
 	TaskStatusError         = "error"
