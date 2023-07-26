@@ -353,6 +353,9 @@ func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *c
 	}
 
 	log.Infof("Detach Disk Info %+v", res)
+	if res.Data.Status == DiskStatusWaiting {
+		return &csi.ControllerUnpublishVolumeResponse{}, nil
+	}
 	if res.Data.Status != DiskStatusRunning && res.Data.Status != DiskStatusUnmountFailed {
 		return nil, fmt.Errorf("unmount failed, disk status %v", res.Data.Status)
 	}
