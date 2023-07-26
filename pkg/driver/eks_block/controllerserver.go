@@ -157,8 +157,8 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 
 	createRes, err := createBlock(pvName, int(diskRequestGB), diskVol.AzId, diskVol.FsType)
 	if err != nil || createRes.Data == nil {
-		log.Errorf("CreateVolume: createDisk error, err is: %s", err.Error())
-		return nil, fmt.Errorf("CreateVolume: createDisk error, err is: %s", err.Error())
+		log.Errorf("CreateVolume: createDisk error, err is: %v", err)
+		return nil, fmt.Errorf("CreateVolume: createDisk error, err is: %v", err)
 	}
 
 	blockId := createRes.Data.BlockId
@@ -442,7 +442,7 @@ func deleteDisk(diskID string) (*api.DeleteBlockResponse, error) {
 	request.BlockId = diskID
 	deleteRes, err := client.DeleteBlock(request)
 	if err != nil || deleteRes.Code != "Success" {
-		log.Errorf("ControllerPublishVolume: attach disk:%s  err is: %s", diskID, err.Error())
+		log.Errorf("ControllerPublishVolume: attach disk:%s  err is: %v", diskID, err)
 		return nil, err
 	}
 	taskID := deleteRes.Data.TaskId
@@ -474,11 +474,11 @@ func attachDisk(diskID, nodeID string) (*api.AttachBlockResponse, error) {
 	request.NodeId = nodeID
 	resp, err := client.AttachBlock(request)
 	if err != nil || resp.Code != "Success" {
-		log.Errorf("ControllerPublishVolume: attach disk:%s processing to node: %s with error, err is: %s", diskID, nodeID, err.Error())
+		log.Errorf("ControllerPublishVolume: attach disk:%s processing to node: %s with error, err is: %v", diskID, nodeID, err)
 		return nil, err
 	}
 	if err = waitTaskFinish(resp.Data.TaskId); err != nil {
-		log.Errorf("ControllerPublishVolume: attach disk:%s processing to node: %s with error, err is: %s", diskID, nodeID, err.Error())
+		log.Errorf("ControllerPublishVolume: attach disk:%s processing to node: %s with error, err is: %v", diskID, nodeID, err)
 		return nil, err
 	}
 	return resp, err
@@ -533,7 +533,7 @@ func detachDisk(diskID string, nodeId string) (*api.DetachBlockResponse, error) 
 	// 锁disk
 	if _, ok := CacheLockMap.LoadOrStore(diskID, true); ok {
 		log.Errorf("The disk %s Has Another Event, Please wait", diskID)
-		return nil, status.Errorf(codes.InvalidArgument, "The Node %s Has Another Event, Please wait", nodeId)
+		return nil, status.Errorf(codes.InvalidArgument, "The disk %s Has Another Event, Please wait", diskID)
 	}
 	defer CacheLockMap.Delete(diskID)
 	cpf := profile.NewClientProfileWithMethod(http.MethodPost)
@@ -542,11 +542,11 @@ func detachDisk(diskID string, nodeId string) (*api.DetachBlockResponse, error) 
 	request.BlockId = diskID
 	resp, err := client.DetachBlock(request)
 	if err != nil || resp.Code != "Success" {
-		log.Errorf("ControllerPublishVolume: attach disk:%s, err is: %s", diskID, err.Error())
+		log.Errorf("ControllerPublishVolume: attach disk:%s, err is: %v", diskID, err)
 		return nil, err
 	}
 	if err = waitTaskFinish(resp.Data.TaskId); err != nil {
-		log.Errorf("ControllerPublishVolume: attach disk:%s processing to node: %s with error, err is: %s", diskID, nodeId, err.Error())
+		log.Errorf("ControllerPublishVolume: attach disk:%s processing to node: %s with error, err is: %v", diskID, nodeId, err)
 		return nil, err
 	}
 	return resp, err

@@ -3,10 +3,10 @@ package common
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/capitalonline/cds-csi-driver/pkg/driver/utils/eks_client/errors"
+	log "github.com/sirupsen/logrus"
 	"io/ioutil"
 	"net/http"
-
-	"github.com/capitalonline/cds-csi-driver/pkg/driver/utils/eks_client/errors"
 )
 
 type Response interface {
@@ -67,7 +67,7 @@ func ParseFromHttpResponse(hr *http.Response, response Response, r Request) (err
 		msg := fmt.Sprintf("Request fail with http status code: %s, with body: %s", hr.Status, body)
 		return errors.NewCdsSDKError("ClientError.HttpStatusCodeError", msg, "")
 	}
-	//log.Printf("[DEBUG] Response Body=%s", body)
+	log.Printf("[DEBUG] Response Body=%s", body)
 	err = response.ParseErrorFromHTTPResponse(body)
 	if err != nil {
 		return
