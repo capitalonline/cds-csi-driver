@@ -99,6 +99,10 @@ func (n *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 		log.Errorf("NodeStageVolume: find disk uuid failed, err is: %s", err)
 		return nil, err
 	}
+	if res.Data.BlockId == "" || res.Data.Order == 0 {
+		log.Errorf("NodeStageVolume: find disk order id failed")
+		return nil, fmt.Errorf("NodeStageVolume: find disk order id failed")
+	}
 	deviceName, err := findDeviceNameByOrderId(fmt.Sprintf("%s%d", OrderHead, res.Data.Order))
 	if err != nil {
 		log.Errorf("NodeStageVolume: findDeviceNameByUuid error, err is: %s", err.Error())
@@ -119,7 +123,6 @@ func (n *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 		}
 		err = n.SavePvFormat(diskID)
 		if err != nil {
-			err = nil
 			log.Infof("store pv %s format failed,err=%v", diskID, err)
 		}
 		log.Debugf("NodeStageVolume: Step 1: formatDiskDevice successfully!")

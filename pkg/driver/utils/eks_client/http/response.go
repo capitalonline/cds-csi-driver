@@ -62,12 +62,12 @@ func ParseFromHttpResponse(hr *http.Response, response Response, r Request) (err
 		msg := fmt.Sprintf("Fail to read response body because %s", err)
 		return errors.NewCdsSDKError("ClientError.IOError", msg, "")
 	}
+	log.Printf("[DEBUG] Response Body=%s", string(body))
 	if hr.StatusCode != 200 {
 		fmt.Println(r.GetAction())
 		msg := fmt.Sprintf("Request fail with http status code: %s, with body: %s", hr.Status, body)
 		return errors.NewCdsSDKError("ClientError.HttpStatusCodeError", msg, "")
 	}
-	log.Printf("[DEBUG] Response Body=%s", body)
 	err = response.ParseErrorFromHTTPResponse(body)
 	if err != nil {
 		return
