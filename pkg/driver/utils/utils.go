@@ -195,7 +195,7 @@ func FileExisted(filename string) bool {
 	if os.IsNotExist(err) {
 		return false
 	} else {
-		return true
+		return false
 	}
 }
 
