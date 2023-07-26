@@ -346,13 +346,10 @@ func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *c
 		log.Errorf("ControllerUnpublishVolume: findDiskByVolumeID error, err is: %s", err)
 		return nil, fmt.Errorf("ControllerUnpublishVolume: findDiskByVolumeID error, err is: %s", err)
 	}
-
-	if res == nil {
-		log.Errorf("ControllerUnpublishVolume: findDiskByVolumeID res is nil")
-		return nil, fmt.Errorf("ControllerUnpublishVolume: findDiskByVolumeID res is nil")
+	if res == nil || res.Data.BlockId == "" {
+		return &csi.ControllerUnpublishVolumeResponse{}, nil
 	}
 
-	log.Infof("Detach Disk Info %+v", res)
 	if res.Data.Status == DiskStatusWaiting {
 		return &csi.ControllerUnpublishVolumeResponse{}, nil
 	}
