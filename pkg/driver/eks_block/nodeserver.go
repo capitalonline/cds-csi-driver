@@ -128,14 +128,14 @@ func (n *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 		log.Infof("NodeStageVolume: Step 1: formatDiskDevice successfully!")
 	}
 	log.Infof("NodeStageVolume: targetGlobalPath exist flag: %v", utils.FileExisted(targetGlobalPath))
-	if !utils.FileExisted(targetGlobalPath) {
-		if err = utils.CreateDir(targetGlobalPath, mountPointMode); err != nil {
-			diskStagingMap.Store(targetGlobalPath, ErrorStatus)
-			log.Errorf("NodeStageVolume: Step 1, targetGlobalPath is not exist, but unable to create it, err is: %s", err.Error())
-			return nil, fmt.Errorf("NodeStageVolume: Step 1, targetGlobalPath is not exist, but unable to create it, err is: %s", err.Error())
-		}
-		log.Infof("NodeStageVolume: Step 1, targetGlobalPath: %s is not exist, and create succeed", targetGlobalPath)
+	//if !utils.FileExisted(targetGlobalPath) {
+	if err = utils.CreateDir(targetGlobalPath, mountPointMode); err != nil {
+		diskStagingMap.Store(targetGlobalPath, ErrorStatus)
+		log.Errorf("NodeStageVolume: Step 1, targetGlobalPath is not exist, but unable to create it, err is: %s", err.Error())
+		return nil, fmt.Errorf("NodeStageVolume: Step 1, targetGlobalPath is not exist, but unable to create it, err is: %s", err.Error())
 	}
+	log.Infof("NodeStageVolume: Step 1, targetGlobalPath: %s is not exist, and create succeed", targetGlobalPath)
+	//}
 	err = mountDiskDeviceToNodeGlobalPath(strings.TrimSuffix(deviceName, "\n"), strings.TrimSuffix(targetGlobalPath, "\n"), fsType)
 	if err != nil {
 		diskStagingMap.Store(targetGlobalPath, ErrorStatus)
