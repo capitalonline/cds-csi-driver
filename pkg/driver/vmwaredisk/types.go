@@ -1,6 +1,7 @@
 package vmwaredisk
 
 import (
+	"github.com/capitalonline/cds-csi-driver/pkg/driver/utils"
 	"github.com/kubernetes-csi/drivers/pkg/csi-common"
 	"k8s.io/client-go/kubernetes"
 )
@@ -15,6 +16,10 @@ type DiskDriver struct {
 
 type NodeServer struct {
 	*csicommon.DefaultNodeServer
+
+	// A map storing all volumes with ongoing operations so that additional operations
+	// for that same volume (as defined by VolumeID) return an Aborted error
+	VolumeLocks *utils.VolumeLocks
 }
 
 type ControllerServer struct {

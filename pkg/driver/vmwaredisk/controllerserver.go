@@ -526,18 +526,14 @@ func detachDisk(diskID string) (string, error) {
 }
 
 func findDiskByVolumeID(volumeID string) (*cdsDisk.FindDiskByVolumeIDResponse, error) {
-	log.Infof("findDiskByVolumeID: volumeID is: %s", volumeID)
-
 	res, err := cdsDisk.FindDiskByVolumeID(&cdsDisk.FindDiskByVolumeIDArgs{
 		VolumeID: volumeID,
 	})
 
 	if err != nil {
-		log.Errorf("findDiskByVolumeID: cdsDisk.FindDiskByVolumeID [api error], err is: %s", err)
+		log.Errorf("findDiskByVolumeID[%s]: cdsDisk.FindDiskByVolumeID [api error], err is: %s", volumeID, err)
 		return nil, err
 	}
-
-	log.Infof("findDiskByVolumeID: Successfully!")
 
 	return res, nil
 }
