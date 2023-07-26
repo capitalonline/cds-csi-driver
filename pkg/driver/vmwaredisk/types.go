@@ -20,6 +20,8 @@ type NodeServer struct {
 	// A map storing all volumes with ongoing operations so that additional operations
 	// for that same volume (as defined by VolumeID) return an Aborted error
 	VolumeLocks *utils.VolumeLocks
+
+	KubeClient *kubernetes.Clientset
 }
 
 type ControllerServer struct {
@@ -27,7 +29,6 @@ type ControllerServer struct {
 	Client *kubernetes.Clientset
 }
 
-// capitalonline disk parameters
 type DiskVolumeArgs struct {
 	StorageType string `json:"storageType"`
 	FsType      string `json:"fsType"`

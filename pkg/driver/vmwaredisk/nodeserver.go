@@ -9,21 +9,36 @@ import (
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/exec"
 	"strings"
 
-	cdsDisk "github.com/capitalonline/cck-sdk-go/pkg/cck/disk"
+	cdsDisk "github.com/capitalonline/cck-sdk-go/pkg/cck/vmwaredisk"
 )
 
 const (
-	diskFormattedState = "formatted"
-	reqSuccessState    = "Success"
+	globalMountName      = "globalmount"
+	mountedAnnotationKey = "pv.kubernetes.io/mounted-by-node"
 )
 
 func NewNodeServer(d *DiskDriver) *NodeServer {
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		log.Fatalf("Failed to create kubernetes config: %v", err)
+	}
+
+	kubeClient, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		log.Fatalf("Failed to create kubernetes client: %v", err)
+	}
+
 	return &NodeServer{
 		DefaultNodeServer: csicommon.NewDefaultNodeServer(d.csiDriver),
 		VolumeLocks:       utils.NewVolumeLocks(),
+		KubeClient:        kubeClient,
 	}
 }
 
@@ -44,7 +59,6 @@ func (n *NodeServer) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCa
 	}, nil
 }
 
-// bind mount node's global path to pod directory
 func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
 	log.Infof("NodePublishVolume: starting to mount bind stagingTargetPath to pod directory with req: %+v", req)
 
@@ -89,7 +103,7 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 	}
 	defer n.VolumeLocks.Release(volumeID)
 
-	res, err := cdsDisk.FindDiskByVolumeID(&cdsDisk.FindDiskByVolumeIDArgs{
+	res, err := cdsDisk.GetDiskInfo(&cdsDisk.DiskInfoArgs{
 		VolumeID: volumeID,
 	})
 	if err != nil {
@@ -110,12 +124,18 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 
 	existingFormat, err := GetDiskFormat(exec.New(), deviceName)
 	if err != nil {
-		log.Errorf("NodeStageVolume[%s]: failed to get disk format for path %s, error: %v", diskID, deviceName, err)
-		return nil, fmt.Errorf("NodeStageVolume[%s]: failed to get disk format for path %s, error: %v", diskID, deviceName, err)
+		log.Errorf("NodePublishVolume[%s]: failed to get disk format for path %s, error: %v", volumeID, deviceName, err)
+		return nil, fmt.Errorf("NodeStageVolume[%s]: failed to get disk format for path %s, error: %v", volumeID, deviceName, err)
+	}
+
+	formatted, err := n.isAlreadyFormatted(stagingTargetPath)
+	if err != nil {
+		log.Errorf("NodePublishVolume[%s]: failed to check format: %+v", volumeID, err)
+		return nil, err
 	}
 
 	// disk not format
-	if existingFormat == "" {
+	if existingFormat == "" && !formatted {
 		log.Errorf("NodePublishVolume: %s is not formatted, cant mount and bing mount", volumeID)
 		return nil, fmt.Errorf("NodePublishVolume: %s is not formatted, cant mount and bing mount", volumeID)
 	}
@@ -225,8 +245,14 @@ func (n *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 		return nil, fmt.Errorf("NodeStageVolume[%s]: failed to get disk format for path %s, error: %v", diskID, deviceName, err)
 	}
 
-	if existingFormat == "" {
-		if err = formatDiskDevice(diskID, deviceName, fsType); err != nil {
+	formatted, err := n.isAlreadyFormatted(targetGlobalPath)
+	if err != nil {
+		log.Errorf("NodeStageVolume[%s]: failed to check format: %+v", diskID, err)
+		return nil, err
+	}
+
+	if existingFormat == "" && !formatted {
+		if err = n.formatDiskDevice(targetGlobalPath, diskID, deviceName, fsType); err != nil {
 			return nil, fmt.Errorf("NodeStageVolume[%s]: format deviceName: %s failed, err is: %s", deviceName, err.Error())
 		}
 		log.Infof("NodeStageVolume[%s]: formatDiskDevice successfully!", diskID)
@@ -293,6 +319,107 @@ func (n *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstage
 
 func (n *NodeServer) NodeExpandVolume(context.Context, *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "")
+}
+
+func (n *NodeServer) formatDiskDevice(targetGlobalPath, diskId, deviceName, fsType string) error {
+	log.Infof("formatDiskDevice: deviceName is: %s, fsType is: %s", deviceName, fsType)
+
+	scanDeviceCmd := fmt.Sprintf("fdisk -l | grep %s | grep -v grep", deviceName)
+	if _, err := utils.RunCommand(scanDeviceCmd); err != nil {
+		return fmt.Errorf("formatDiskDevice: scanDeviceCmd: %s failed, err is: %s", scanDeviceCmd, err.Error())
+	}
+
+	var formatDeviceCmd string
+	switch fsType {
+	case DefaultFsTypeXfs:
+		formatDeviceCmd = fmt.Sprintf("mkfs.xfs %s", deviceName)
+	case FsTypeExt3:
+		formatDeviceCmd = fmt.Sprintf("mkfs.ext3 %s", deviceName)
+	case FsTypeExt4:
+		formatDeviceCmd = fmt.Sprintf("mkfs.ext4 %s", deviceName)
+	default:
+		return fmt.Errorf("formatDiskDevice: fsType not support, should be [ext4/ext3/xfs]")
+	}
+
+	if out, err := utils.RunCommand(formatDeviceCmd); err != nil {
+		if strings.Contains(out, "existing filesystem") {
+			log.Warnf("formatDiskDevice: deviceName: %s had been formatted, avoid multi formatting, return directly", deviceName)
+			return nil
+		}
+
+		return fmt.Errorf("formatDiskDevice: formatDeviceCmd: %s failed, err is: %s", formatDeviceCmd, err.Error())
+	}
+
+	// mark format completed
+	if err := n.updatePersistentVolumeAnnotation(targetGlobalPath, diskId); err != nil {
+		return err
+	}
+
+	log.Infof("formatDiskDevice[%s]: Successfully!", diskId)
+
+	return nil
+}
+
+func (n NodeServer) updatePersistentVolumeAnnotation(globalMountPath, volumeId string) error {
+	strList := strings.Split(globalMountPath, "/")
+
+	pvName := ""
+	for i := range strList {
+		if strList[i] != globalMountName {
+			continue
+		}
+
+		if i-1 < 0 {
+			return fmt.Errorf("not found pv name from %s", globalMountPath)
+		}
+
+		pvName = strList[i-1]
+	}
+
+	updateFunc := func() error {
+		pv, err := n.KubeClient.CoreV1().PersistentVolumes().Get(pvName, metav1.GetOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to fetch %s pv: %+v", pvName, err)
+		}
+
+		pv.Annotations[mountedAnnotationKey] = volumeId
+
+		return nil
+	}
+
+	if err := retry.RetryOnConflict(retry.DefaultRetry, updateFunc); err != nil {
+		return fmt.Errorf("failed to update pv %s: %+v", pvName, err)
+	}
+
+	return nil
+}
+
+func (n NodeServer) isAlreadyFormatted(globalMountPath string) (bool, error) {
+	strList := strings.Split(globalMountPath, "/")
+
+	pvName := ""
+	for i := range strList {
+		if strList[i] != globalMountName {
+			continue
+		}
+
+		if i-1 < 0 {
+			return false, fmt.Errorf("not found pv name from %s", globalMountPath)
+		}
+
+		pvName = strList[i-1]
+	}
+
+	pv, err := n.KubeClient.CoreV1().PersistentVolumes().Get(pvName, metav1.GetOptions{})
+	if err != nil {
+		return false, fmt.Errorf("failed to fetch %s pv: %+v", pvName, err)
+	}
+
+	if _, ok := pv.Annotations[mountedAnnotationKey]; ok {
+		return true, nil
+	}
+
+	return false, nil
 }
 
 func findDeviceNameByUuid(diskUuid string) (string, error) {
@@ -414,48 +541,6 @@ func unMountDiskDeviceFromNodeGlobalPath(volumeID, unStagingPath string) error {
 		return fmt.Errorf("unMountDiskDeviceFromNodeGlobalPath: unmount device from req.StagingTargetPath:%s failed, err is: %s", unStagingPath, err.Error())
 	}
 	log.Infof("unMountDiskDeviceFromNodeGlobalPath: Successfully!")
-
-	return nil
-}
-
-func formatDiskDevice(diskId, deviceName, fsType string) error {
-	log.Infof("formatDiskDevice: deviceName is: %s, fsType is: %s", deviceName, fsType)
-
-	scanDeviceCmd := fmt.Sprintf("fdisk -l | grep %s | grep -v grep", deviceName)
-	if _, err := utils.RunCommand(scanDeviceCmd); err != nil {
-		return fmt.Errorf("formatDiskDevice: scanDeviceCmd: %s failed, err is: %s", scanDeviceCmd, err.Error())
-	}
-
-	var formatDeviceCmd string
-	switch fsType {
-	case DefaultFsTypeXfs:
-		formatDeviceCmd = fmt.Sprintf("mkfs.xfs %s", deviceName)
-	case FsTypeExt3:
-		formatDeviceCmd = fmt.Sprintf("mkfs.ext3 %s", deviceName)
-	case FsTypeExt4:
-		formatDeviceCmd = fmt.Sprintf("mkfs.ext4 %s", deviceName)
-	default:
-		return fmt.Errorf("formatDiskDevice: fsType not support, should be [ext4/ext3/xfs]")
-	}
-
-	if out, err := utils.RunCommand(formatDeviceCmd); err != nil {
-		if strings.Contains(out, "existing filesystem") {
-			diskFormattedMap[diskId] = diskFormattedState
-			log.Warnf("formatDiskDevice: deviceName: %s had been formatted, avoid multi formatting, return directly", deviceName)
-			return nil
-		}
-
-		return fmt.Errorf("formatDiskDevice: formatDeviceCmd: %s failed, err is: %s", formatDeviceCmd, err.Error())
-	}
-
-	diskFormattedMap[diskId] = diskFormattedState
-	if res, err := cdsDisk.UpdateBlockFormatFlag(&cdsDisk.UpdateBlockFormatFlagArgs{
-		BlockID:  diskId,
-		IsFormat: 1,
-	}); err != nil || res.Code != reqSuccessState {
-		return fmt.Errorf("formatDiskDevice: update  database error, err is: %s", err)
-	}
-	log.Infof("formatDiskDevice: Successfully!")
 
 	return nil
 }

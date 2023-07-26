@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	cdsDisk "github.com/capitalonline/cck-sdk-go/pkg/cck/disk"
+	cdsDisk "github.com/capitalonline/cck-sdk-go/pkg/cck/vmwaredisk"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/kubernetes-csi/drivers/pkg/csi-common"
@@ -122,12 +122,11 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 	}
 
 	diskID := createRes.Data.VolumeID
-	taskID := createRes.TaskID
 
 	// store creating disk
 	diskProcessingMap[pvName] = "creating"
 
-	err = describeTaskStatus(taskID)
+	err = describeTaskStatus(diskID)
 	if err != nil {
 		log.Errorf("createDisk: describeTaskStatus task result failed, err is: %s", err.Error())
 		diskProcessingMap[pvName] = "error"
@@ -195,14 +194,8 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 		log.Errorf("DeleteVolume: findDiskByVolumeID error, err is: %s", err.Error())
 		return nil, err
 	}
-	if disk.Data.DiskSlice == nil {
-		log.Error("DeleteVolume: findDiskByVolumeID(cdsDisk.FindDiskByVolumeID) response is nil")
-		return nil, fmt.Errorf("DeleteVolume: findDiskByVolumeID(cdsDisk.FindDiskByVolumeID) response is nil")
-	}
 
-	// Step 3: check disk detached from node or not, detach it firstly if not
-	diskStatus := disk.Data.DiskSlice[0].Status
-	// log.Infof("DeleteVolume: findDiskByVolumeID succeed, diskID is: %s, diskStatus is: %s", diskID, diskStatus)
+	diskStatus := disk.Data.Status
 	if diskStatus == StatusInMounted {
 		log.Errorf("DeleteVolume: disk [mounted], cant delete volumeID: %s ", diskID)
 		return nil, fmt.Errorf("DeleteVolume: disk [mounted], cant delete volumeID: %s", diskID)
@@ -277,13 +270,8 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 		return nil, fmt.Errorf("ControllerPublishVolume: findDiskByVolumeID api error, err is: %s", err)
 	}
 
-	if res.Data.DiskSlice == nil {
-		log.Errorf("ControllerPublishVolume: findDiskByVolumeID res is nil")
-		return nil, fmt.Errorf("ControllerPublishVolume: findDiskByVolumeID res is nil")
-	}
-
-	diskStatus := res.Data.DiskSlice[0].Status
-	diskMountedNodeID := res.Data.DiskSlice[0].NodeID
+	diskStatus := res.Data.Status
+	diskMountedNodeID := res.Data.NodeID
 	if diskStatus == StatusInMounted {
 		if diskMountedNodeID == nodeID {
 			log.Warnf("ControllerPublishVolume: diskID: %s had been attached to nodeID: %s", diskID, nodeID)
@@ -379,7 +367,7 @@ func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *c
 		return nil, fmt.Errorf("ControllerUnpublishVolume: findDiskByVolumeID res is nil")
 	}
 
-	if res.Data.DiskSlice[0].NodeID != nodeID {
+	if res.Data.NodeID != nodeID {
 		log.Warnf("ControllerUnpublishVolume: diskID: %s had been detached from nodeID: %s", diskID, nodeID)
 		return &csi.ControllerUnpublishVolumeResponse{}, nil
 	}
@@ -455,12 +443,11 @@ func createDisk(diskName, diskType, diskSiteID, diskZoneID string, diskSize, dis
 
 	// create disk
 	res, err := cdsDisk.CreateDisk(&cdsDisk.CreateDiskArgs{
-		Name:     diskName,
-		RegionID: diskSiteID,
-		DiskType: diskType,
-		Size:     diskSize,
-		Iops:     diskIops,
-		ZoneID:   diskZoneID,
+		RegionID:    diskSiteID,
+		DiskType:    diskType,
+		Size:        diskSize,
+		Iops:        diskIops,
+		ClusterName: diskZoneID,
 	})
 
 	if err != nil {
@@ -525,8 +512,8 @@ func detachDisk(diskID string) (string, error) {
 	return res.TaskID, nil
 }
 
-func findDiskByVolumeID(volumeID string) (*cdsDisk.FindDiskByVolumeIDResponse, error) {
-	res, err := cdsDisk.FindDiskByVolumeID(&cdsDisk.FindDiskByVolumeIDArgs{
+func findDiskByVolumeID(volumeID string) (*cdsDisk.DiskInfoResponse, error) {
+	res, err := cdsDisk.GetDiskInfo(&cdsDisk.DiskInfoArgs{
 		VolumeID: volumeID,
 	})
 
@@ -538,14 +525,13 @@ func findDiskByVolumeID(volumeID string) (*cdsDisk.FindDiskByVolumeIDResponse, e
 	return res, nil
 }
 
-func describeTaskStatus(taskID string) error {
-	log.Infof("describeTaskStatus: taskID is: %s", taskID)
+func describeTaskStatus(diskId string) error {
+	log.Infof("describeTaskStatus: diskId is: %s", diskId)
 
 	for i := 1; i < 120; i++ {
-		res, err := cdsDisk.DescribeTaskStatus(taskID)
+		res, err := cdsDisk.GetDiskInfo(&cdsDisk.DiskInfoArgs{VolumeID: diskId})
 		if err != nil {
-			log.Errorf("task api error, err is: %s", err)
-			return fmt.Errorf("apiError")
+			return fmt.Errorf("[%s] task api error, err is: %s", diskId, err)
 		}
 
 		switch res.Data.Status {
@@ -553,7 +539,7 @@ func describeTaskStatus(taskID string) error {
 			log.Debugf("task succeed")
 			return nil
 		case common.DoingState:
-			log.Debugf("task:%s is running, sleep 10s", taskID)
+			log.Debugf("disk:%s is running, sleep 10s", diskId)
 			time.Sleep(10 * time.Second)
 		case common.ErrorState:
 			log.Debugf("task error")
