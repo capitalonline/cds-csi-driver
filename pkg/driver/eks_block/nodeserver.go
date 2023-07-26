@@ -108,7 +108,7 @@ func (n *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 		log.Errorf("NodeStageVolume: findDeviceNameByUuid error, err is: %s", err.Error())
 		return nil, err
 	}
-	log.Debugf("NodeStageVolume: findDeviceNameByVolumeID succeed, deviceName is: %s", deviceName)
+	log.Infof("NodeStageVolume: findDeviceNameByVolumeID succeed, deviceName is: %s", deviceName)
 	fsType := req.GetVolumeContext()["fsType"]
 	diskStagingMap.Store(targetGlobalPath, Staging)
 
@@ -125,16 +125,16 @@ func (n *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 		if err != nil {
 			log.Infof("store pv %s format failed,err=%v", diskID, err)
 		}
-		log.Debugf("NodeStageVolume: Step 1: formatDiskDevice successfully!")
+		log.Infof("NodeStageVolume: Step 1: formatDiskDevice successfully!")
 	}
-	log.Debugf("NodeStageVolume: targetGlobalPath exist flag: %t", utils.FileExisted(targetGlobalPath))
+	log.Infof("NodeStageVolume: targetGlobalPath exist flag: %v", utils.FileExisted(targetGlobalPath))
 	if !utils.FileExisted(targetGlobalPath) {
 		if err = utils.CreateDir(targetGlobalPath, mountPointMode); err != nil {
 			diskStagingMap.Store(targetGlobalPath, ErrorStatus)
 			log.Errorf("NodeStageVolume: Step 1, targetGlobalPath is not exist, but unable to create it, err is: %s", err.Error())
 			return nil, fmt.Errorf("NodeStageVolume: Step 1, targetGlobalPath is not exist, but unable to create it, err is: %s", err.Error())
 		}
-		log.Debugf("NodeStageVolume: Step 1, targetGlobalPath: %s is not exist, and create succeed", targetGlobalPath)
+		log.Infof("NodeStageVolume: Step 1, targetGlobalPath: %s is not exist, and create succeed", targetGlobalPath)
 	}
 	err = mountDiskDeviceToNodeGlobalPath(strings.TrimSuffix(deviceName, "\n"), strings.TrimSuffix(targetGlobalPath, "\n"), fsType)
 	if err != nil {
@@ -143,7 +143,7 @@ func (n *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 		return nil, fmt.Errorf("NodeStageVolume: Step 2, mountDeviceToNodeGlobalPath failed, err is: %s", err.Error())
 	}
 	diskStagingMap.Store(targetGlobalPath, targetGlobalPath)
-	log.Debugf("NodeStageVolume: Step 2, mountDiskDeviceToNodeGlobalPath: %s successfully!", targetGlobalPath)
+	log.Infof("NodeStageVolume: Step 2, mountDiskDeviceToNodeGlobalPath: %s successfully!", targetGlobalPath)
 
 	log.Infof("NodeStageVolume: Successfully!")
 	return &csi.NodeStageVolumeResponse{}, nil
@@ -180,7 +180,7 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 			return nil, fmt.Errorf("NodePublishVolume:: step 3, req.TargetPath(podPath): %s is not exist, but unable to create it, err is: %s", podPath, err.Error())
 		}
 
-		log.Debugf("NodePublishVolume:: req.TargetPath(podPath): %s is not exist, and create it succeed!", podPath)
+		log.Infof("NodePublishVolume:: req.TargetPath(podPath): %s is not exist, and create it succeed!", podPath)
 	}
 
 	if utils.Mounted(podPath) {
@@ -193,7 +193,7 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 		case Publishing:
 			log.Warnf("NodePublishVolume: volumeID: %s is in publishing, please wait", volumeID)
 			if _, ok := diskPublishedMap.Load(podPath); ok {
-				log.Debugf("NodePublishVolume: volumeID: %s publishing process succeed, return context", volumeID)
+				log.Infof("NodePublishVolume: volumeID: %s publishing process succeed, return context", volumeID)
 				return &csi.NodePublishVolumeResponse{}, nil
 			}
 			return nil, fmt.Errorf("NodePublishVolume: volumeID: %s publishing process error", volumeID)
