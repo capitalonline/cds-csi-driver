@@ -1,7 +1,7 @@
 package common
 
 const (
-	FinishState = "finish"
-	DoingState  = "doing"
-	ErrorState  = "error"
+	FinishState = "1"
+	DoingState  = "0"
+	ErrorState  = "-1"
 )

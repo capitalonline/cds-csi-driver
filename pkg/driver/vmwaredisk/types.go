@@ -26,7 +26,12 @@ type NodeServer struct {
 
 type ControllerServer struct {
 	*csicommon.DefaultControllerServer
-	Client *kubernetes.Clientset
+
+	// A map storing all volumes with ongoing operations so that additional operations
+	// for that same volume (as defined by VolumeID) return an Aborted error
+	VolumeLocks *utils.VolumeLocks
+
+	KubeClient *kubernetes.Clientset
 }
 
 type DiskVolumeArgs struct {
@@ -35,4 +40,5 @@ type DiskVolumeArgs struct {
 	SiteID      string `json:"siteId"`
 	ZoneID      string `json:"zoneId"`
 	Iops        string `json:"iops"`
+	DiskID      string `json:"diskId"`
 }

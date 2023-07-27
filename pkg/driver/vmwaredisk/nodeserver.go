@@ -62,8 +62,7 @@ func (n *NodeServer) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCa
 func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
 	log.Infof("NodePublishVolume: starting to mount bind stagingTargetPath to pod directory with req: %+v", req)
 
-	// Step 1: check necessary params
-	volumeID := req.VolumeId
+	volumeID := req.GetVolumeId()
 	stagingTargetPath := req.GetStagingTargetPath()
 	podPath := req.GetTargetPath()
 	diskVolume := req.GetVolumeContext()
@@ -88,12 +87,10 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 			log.Errorf("NodePublishVolume[%s]: req.TargetPath(podPath): %s is not exist, but unable to create it, err is: %s", volumeID, podPath, err.Error())
 			return nil, err
 		}
-
-		log.Debugf("NodePublishVolume[%s]: req.TargetPath(podPath): %s is not exist, and create it succeed!", volumeID, podPath)
 	}
 
 	if utils.Mounted(podPath) {
-		log.Warnf("NodePublishVolume[%s]: req.TargetPath(podPath): %s has been mounted, return directly", volumeID, podPath)
+		log.Warnf("NodePublishVolume[%s]: targetPath(podPath): %s has been mounted, skip this", volumeID, podPath)
 		return &csi.NodePublishVolumeResponse{}, nil
 	}
 
@@ -107,13 +104,13 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 		VolumeID: volumeID,
 	})
 	if err != nil {
-		log.Errorf("NodePublishVolume[%s]: cdsDisk.FindDiskByVolumeID error, err is: %s", volumeID, err)
+		log.Errorf("NodePublishVolume[%s]: cdsDisk.GetDiskInfo error, err is: %s", volumeID, err)
 		return nil, err
 	}
 
 	if res.Data.VolumeId == "" {
-		log.Errorf("NodePublishVolume[%s]: findDeviceNameByVolumeID res uuid is null", volumeID)
-		return nil, fmt.Errorf("NodePublishVolume[%s]: findDeviceNameByVolumeID res uuid is null", volumeID)
+		log.Errorf("NodePublishVolume[%s]: GetDiskInfo res uuid is null", volumeID)
+		return nil, fmt.Errorf("NodePublishVolume[%s]: GetDiskInfo res uuid is null", volumeID)
 	}
 
 	deviceName, err := findDeviceNameByUuid(res.Data.VolumeId)
@@ -122,10 +119,10 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 		return nil, err
 	}
 
-	existingFormat, err := GetDiskFormat(exec.New(), deviceName)
+	existingFormat, err := getDiskFormat(exec.New(), deviceName)
 	if err != nil {
 		log.Errorf("NodePublishVolume[%s]: failed to get disk format for path %s, error: %v", volumeID, deviceName, err)
-		return nil, fmt.Errorf("NodeStageVolume[%s]: failed to get disk format for path %s, error: %v", volumeID, deviceName, err)
+		return nil, err
 	}
 
 	formatted, err := n.isAlreadyFormatted(stagingTargetPath)
@@ -136,31 +133,17 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 
 	// disk not format
 	if existingFormat == "" && !formatted {
-		log.Errorf("NodePublishVolume: %s is not formatted, cant mount and bing mount", volumeID)
+		log.Errorf("NodePublishVolume: %s is not format, cant mount and bing mount", volumeID)
 		return nil, fmt.Errorf("NodePublishVolume: %s is not formatted, cant mount and bing mount", volumeID)
 	}
 
-	// staging record exist and record staging path is equal to new staging path
-	if ok := utils.Mounted(stagingTargetPath); ok {
-		log.Infof("NodePublishVolume: %s has been staged to stagingTargetPath: %s, direct to bind mount", volumeID, stagingTargetPath)
-		err = bindMountGlobalPathToPodPath(volumeID, stagingTargetPath, podPath)
+	if ok := utils.Mounted(stagingTargetPath); !ok {
+		log.Infof("NodePublishVolume: %s formatted, need staging and bind mount", volumeID)
+		err = mountDiskDeviceToNodeGlobalPath(strings.TrimSuffix(deviceName, "\n"), strings.TrimSuffix(stagingTargetPath, "\n"), diskVolume["fsType"])
 		if err != nil {
-			log.Errorf("NodePublishVolume[%s]: bindMountGlobalPathToPodPath failed, err is: %s", volumeID, err.Error())
+			log.Errorf("NodePublishVolume: mountDeviceToNodeGlobalPath failed, err is: %s", err.Error())
 			return nil, err
 		}
-		log.Infof("NodePublishVolume[%s]: successfully mounted stagingPath %s to targetPath %s", volumeID, stagingTargetPath, podPath)
-
-		return &csi.NodePublishVolumeResponse{}, nil
-	}
-
-	// staging record not exist or record staging path is different from new staging path
-	// need staging and bind mount two steps
-	log.Infof("NodePublishVolume: %s formatted, need staging and bind mount", volumeID)
-
-	err = mountDiskDeviceToNodeGlobalPath(strings.TrimSuffix(deviceName, "\n"), strings.TrimSuffix(stagingTargetPath, "\n"), diskVolume["fsType"])
-	if err != nil {
-		log.Errorf("NodePublishVolume: mountDeviceToNodeGlobalPath failed, err is: %s", err.Error())
-		return nil, err
 	}
 
 	err = bindMountGlobalPathToPodPath(volumeID, stagingTargetPath, podPath)
@@ -179,8 +162,8 @@ func (n *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpub
 
 	targetPath := req.GetTargetPath()
 	if !utils.FileExisted(targetPath) {
-		log.Errorf("NodeUnpublishVolume[%s]: req.TargetPath(podPath) is not exist", req.GetVolumeId())
-		return nil, fmt.Errorf("NodeUnpublishVolume[%s]: req.TargetPath(podPath) is not exist", req.GetVolumeId())
+		log.Warnf("NodeUnpublishVolume[%s]: targetPath(podPath) is not exist", req.GetVolumeId())
+		return nil, nil
 	}
 
 	if acquired := n.VolumeLocks.TryAcquire(req.GetVolumeId()); !acquired {
@@ -190,7 +173,7 @@ func (n *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpub
 	defer n.VolumeLocks.Release(req.VolumeId)
 
 	if err := unBindMountGlobalPathFromPodPath(targetPath); err != nil {
-		log.Errorf("NodeUnpublishVolume:: step 2, unmount req.TargetPath(podPath): %s failed, err is: %s", targetPath, err.Error())
+		log.Errorf("NodeUnpublishVolume[%s]: unmount req.TargetPath(podPath): %s failed, err is: %s", req.GetVolumeId(), targetPath, err.Error())
 		return nil, err
 	}
 
@@ -200,88 +183,89 @@ func (n *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpub
 }
 
 func (n *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
-	diskID := req.VolumeId
+	volumeID := req.GetVolumeId()
 	targetGlobalPath := req.GetStagingTargetPath()
 
-	if diskID == "" || targetGlobalPath == "" {
+	if volumeID == "" || targetGlobalPath == "" {
 		log.Errorf("NodeStageVolume: [diskID/NodeStageVolume] cant not be empty")
 		return nil, fmt.Errorf("NodeStageVolume: [diskID/NodeStageVolume] cant not be empty")
 	}
 
 	// volume lock
-	if acquired := n.VolumeLocks.TryAcquire(diskID); !acquired {
-		log.Errorf(utils.VolumeOperationAlreadyExistsFmt, diskID)
-		return nil, status.Errorf(codes.Aborted, utils.VolumeOperationAlreadyExistsFmt, diskID)
+	if acquired := n.VolumeLocks.TryAcquire(volumeID); !acquired {
+		log.Errorf(utils.VolumeOperationAlreadyExistsFmt, volumeID)
+		return nil, status.Errorf(codes.Aborted, utils.VolumeOperationAlreadyExistsFmt, volumeID)
 	}
-	defer n.VolumeLocks.Release(diskID)
+	defer n.VolumeLocks.Release(volumeID)
 
-	log.Infof("NodeStageVolume: starting to stage volumeID: %s, targetGlobalPath is: %s", diskID, targetGlobalPath)
+	log.Infof("NodeStageVolume: starting to stage volumeID: %s, targetGlobalPath is: %s", volumeID, targetGlobalPath)
 
-	res, err := findDiskByVolumeID(diskID)
+	res, err := findDiskByVolumeID(volumeID)
 	if err != nil {
-		log.Errorf("NodeStageVolume[%s]: find disk uuid failed, err is: %s", diskID, err)
+		log.Errorf("NodeStageVolume[%s]: find disk info failed, err is: %s", volumeID, err)
 		return nil, err
 	}
 
 	if res.Data.VolumeId == "" {
-		log.Errorf("NodeStageVolume[%s]: findDeviceNameByVolumeID res uuid is null", diskID)
-		return nil, fmt.Errorf("NodeStageVolume[%s]: findDeviceNameByVolumeID res uuid is null", diskID)
+		log.Errorf("NodeStageVolume[%s]: findDeviceNameByVolumeID res uuid is null", volumeID)
+		return nil, fmt.Errorf("NodeStageVolume[%s]: findDeviceNameByVolumeID res uuid is null", volumeID)
 	}
 
 	deviceName, err := findDeviceNameByUuid(res.Data.VolumeId)
 	if err != nil {
-		log.Errorf("NodeStageVolume[%s]: findDeviceNameByUuid error, err is: %s", diskID, err.Error())
-		return nil, fmt.Errorf("NodeStageVolume[%s]: findDeviceNameByUuid error, err is: %s", diskID, err.Error())
+		log.Errorf("NodeStageVolume[%s]: findDeviceNameByUuid error, err is: %s", volumeID, err.Error())
+		return nil, fmt.Errorf("NodeStageVolume[%s]: findDeviceNameByUuid error, err is: %s", volumeID, err.Error())
 	}
 
-	log.Debugf("NodeStageVolume[%s]: findDeviceNameByVolumeID succeed, deviceName is: %s", diskID, deviceName)
+	log.Debugf("NodeStageVolume[%s]: findDeviceNameByVolumeID succeed, deviceName is: %s", volumeID, deviceName)
 
 	diskVol := req.GetVolumeContext()
 	fsType := diskVol["fsType"]
 
-	existingFormat, err := GetDiskFormat(exec.New(), deviceName)
+	existingFormat, err := getDiskFormat(exec.New(), deviceName)
 	if err != nil {
-		log.Errorf("NodeStageVolume[%s]: failed to get disk format for path %s, error: %v", diskID, deviceName, err)
-		return nil, fmt.Errorf("NodeStageVolume[%s]: failed to get disk format for path %s, error: %v", diskID, deviceName, err)
+		log.Errorf("NodeStageVolume[%s]: failed to get disk format for path %s, error: %v", volumeID, deviceName, err)
+		return nil, err
 	}
 
 	formatted, err := n.isAlreadyFormatted(targetGlobalPath)
 	if err != nil {
-		log.Errorf("NodeStageVolume[%s]: failed to check format: %+v", diskID, err)
+		log.Errorf("NodeStageVolume[%s]: failed to check format: %+v", volumeID, err)
 		return nil, err
 	}
 
 	if existingFormat == "" && !formatted {
-		if err = n.formatDiskDevice(targetGlobalPath, diskID, deviceName, fsType); err != nil {
-			return nil, fmt.Errorf("NodeStageVolume[%s]: format deviceName: %s failed, err is: %s", deviceName, err.Error())
+		if err = n.formatDiskDevice(targetGlobalPath, volumeID, deviceName, fsType); err != nil {
+			log.Errorf("NodeStageVolume[%s]: format deviceName: %s failed, err is: %s", deviceName, err.Error())
+			return nil, err
 		}
-		log.Infof("NodeStageVolume[%s]: formatDiskDevice successfully!", diskID)
+
+		log.Infof("NodeStageVolume[%s]: formatDiskDevice successfully!", volumeID)
 	} else {
-		log.Infof("NodeStageVolume[%s]: diskID: %s had been formatted, ignore multi format", diskID, diskID)
+		log.Infof("NodeStageVolume[%s]: diskID: %s had been formatted, ignore multi format", volumeID, volumeID)
 	}
 
-	log.Debugf("NodeStageVolume[%s]: targetGlobalPath exist flag: %t", diskID, utils.FileExisted(targetGlobalPath))
 	if !utils.FileExisted(targetGlobalPath) {
 		if err = utils.CreateDir(targetGlobalPath, mountPointMode); err != nil {
-			log.Errorf("NodeStageVolume[%s]: targetGlobalPath is not exist, but unable to create it, err is: %s", diskID, err.Error())
-			return nil, fmt.Errorf("NodeStageVolume[%s]: targetGlobalPath is not exist, but unable to create it, err is: %s", diskID, err.Error())
+			log.Errorf("NodeStageVolume[%s]: targetGlobalPath is not exist, but unable to create it, err is: %s", volumeID, err.Error())
+			return nil, err
 		}
-		log.Infof("NodeStageVolume[%s]: targetGlobalPath: %s is not exist, and create succeed", diskID, targetGlobalPath)
+
+		log.Infof("NodeStageVolume[%s]: targetGlobalPath: %s is not exist, and create succeed", volumeID, targetGlobalPath)
 	}
 
-	err = mountDiskDeviceToNodeGlobalPath(strings.TrimSuffix(deviceName, "\n"), strings.TrimSuffix(targetGlobalPath, "\n"), fsType)
-	if err != nil {
-		log.Errorf("NodeStageVolume[%s]: mountDeviceToNodeGlobalPath failed, err is: %s", diskID, err.Error())
-		return nil, fmt.Errorf("NodeStageVolume[%s]: mountDeviceToNodeGlobalPath failed, err is: %s", diskID, err.Error())
+	if err = mountDiskDeviceToNodeGlobalPath(strings.TrimSuffix(deviceName, "\n"), strings.TrimSuffix(targetGlobalPath, "\n"), fsType); err != nil {
+		log.Errorf("NodeStageVolume[%s]: mountDeviceToNodeGlobalPath failed, err is: %s", volumeID, err.Error())
+		return nil, err
 	}
 
-	log.Infof("NodeStageVolume: successfully mounted volume %s to stagingTargetPath %s", diskID, targetGlobalPath)
+	log.Infof("NodeStageVolume: successfully mounted volume %s to stagingTargetPath %s", volumeID, targetGlobalPath)
 
 	return &csi.NodeStageVolumeResponse{}, nil
 }
 
 func (n *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
-	volumeID := req.VolumeId
+	volumeID := req.GetVolumeId()
 	unStagingPath := req.GetStagingTargetPath()
 
 	if volumeID == "" {
@@ -290,7 +274,7 @@ func (n *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstage
 	}
 
 	if unStagingPath == "" {
-		log.Errorf("NodeUnstageVolume, req.StagingTargetPath cant not be empty")
+		log.Errorf("NodeUnstageVolume[%s], req.StagingTargetPath cant not be empty", volumeID)
 		return nil, status.Error(codes.InvalidArgument, "NodeUnstageVolume, req.StagingTargetPath cant not be empty")
 	}
 
@@ -304,15 +288,16 @@ func (n *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstage
 	log.Infof("NodeUnstageVolume[%s]: starting to unstage with req: %+v", volumeID, req)
 
 	if !utils.FileExisted(unStagingPath) {
-		log.Warnf("NodeUnstageVolume[%s]: unStagingPath is not exist, should must be already unmount, retrun directly", volumeID)
+		log.Warnf("NodeUnstageVolume[%s]: unStagingPath is not exist, should must be already unmount, skip this", volumeID)
 		return &csi.NodeUnstageVolumeResponse{}, nil
 	}
 
-	if err := unMountDiskDeviceFromNodeGlobalPath(volumeID, unStagingPath); err != nil {
-		return nil, fmt.Errorf("NodeUnstageVolume: unMountDiskDeviceFromNodeGlobalPath failed, err is: %s", err)
+	if err := unMountDiskDeviceFromNodeGlobalPath(unStagingPath); err != nil {
+		log.Errorf("NodeUnstageVolume[%s]: unMountDiskDeviceFromNodeGlobalPath failed, err is: %s", volumeID, err)
+		return nil, err
 	}
 
-	log.Infof("NodeUnstageVolume: successfully unmounted volume (%s) from staging path (%s)", req.GetVolumeId(), unStagingPath)
+	log.Infof("NodeUnstageVolume: successfully unmounted volume (%s) from staging path (%s)", volumeID, unStagingPath)
 
 	return &csi.NodeUnstageVolumeResponse{}, nil
 }
@@ -383,6 +368,11 @@ func (n NodeServer) updatePersistentVolumeAnnotation(globalMountPath, volumeId s
 		}
 
 		pv.Annotations[mountedAnnotationKey] = volumeId
+
+		if _, err := n.KubeClient.CoreV1().PersistentVolumes().Update(pv); err != nil {
+			log.Errorf("failed to update pv %s: %+v", pvName, err)
+			return err
+		}
 
 		return nil
 	}
@@ -471,7 +461,6 @@ func bindMountGlobalPathToPodPath(volumeID, stagingTargetPath, podPath string) e
 	if _, err := utils.RunCommand(cmd); err != nil {
 		return fmt.Errorf("bindMountGlobalPathToPodPath[%s]: bind mount stagingTargetPath: %s to podPath: %s failed, err is: %s", volumeID, stagingTargetPath, podPath, err.Error())
 	}
-	log.Infof("bindMountGlobalPathToPodPath[%s]: Successfully!", volumeID)
 
 	return nil
 }
@@ -516,31 +505,29 @@ func mountDiskDeviceToNodeGlobalPath(deviceName, targetGlobalPath, fsType string
 	return nil
 }
 
-func unMountDiskDeviceFromNodeGlobalPath(volumeID, unStagingPath string) error {
-	log.Infof("unMountDeviceFromNodeGlobalPath: volumeID is: %s, unStagingPath: %s", volumeID, unStagingPath)
-
+func unMountDiskDeviceFromNodeGlobalPath(unStagingPath string) error {
 	cmdUnstagingPath := fmt.Sprintf("umount %s", unStagingPath)
-	if _, err := utils.RunCommand(cmdUnstagingPath); err != nil {
-		if strings.Contains(err.Error(), "target is busy") || strings.Contains(err.Error(), "device is busy") {
-			log.Warnf("unMountDiskDeviceFromNodeGlobalPath: unStagingPath is busy(occupied by another process)")
-
-			cmdKillProcess := fmt.Sprintf("fuser -m -k %s", unStagingPath)
-			if _, err = utils.RunCommand(cmdKillProcess); err != nil {
-				return fmt.Errorf("unMountDiskDeviceFromNodeGlobalPath: unStagingPath is busy, but kill occupied process failed, err is: %s", err.Error())
-			}
-			log.Warnf("unMountDiskDeviceFromNodeGlobalPath: unStagingPath is busy and kill occupied process succeed!")
-
-			if _, err = utils.RunCommand(cmdUnstagingPath); err != nil {
-				return fmt.Errorf("unMountDiskDeviceFromNodeGlobalPath: unmount device from req.StagingTargetPath:%s failed(again), err is: %s", unStagingPath, err.Error())
-			}
-			log.Infof("unMountDiskDeviceFromNodeGlobalPath: Successfully!")
-
-			return nil
-		}
-
-		return fmt.Errorf("unMountDiskDeviceFromNodeGlobalPath: unmount device from req.StagingTargetPath:%s failed, err is: %s", unStagingPath, err.Error())
+	_, err := utils.RunCommand(cmdUnstagingPath)
+	if err == nil {
+		return nil
 	}
-	log.Infof("unMountDiskDeviceFromNodeGlobalPath: Successfully!")
 
-	return nil
+	if strings.Contains(err.Error(), "target is busy") || strings.Contains(err.Error(), "device is busy") {
+		log.Warnf("unMountDiskDeviceFromNodeGlobalPath: unStagingPath is busy(occupied by another process)")
+
+		cmdKillProcess := fmt.Sprintf("fuser -m -k %s", unStagingPath)
+		if _, err = utils.RunCommand(cmdKillProcess); err != nil {
+			return fmt.Errorf("unMountDiskDeviceFromNodeGlobalPath: unStagingPath is busy, but kill occupied process failed, err is: %s", err.Error())
+		}
+		log.Warnf("unMountDiskDeviceFromNodeGlobalPath: unStagingPath is busy and kill occupied process succeed!")
+
+		if _, err = utils.RunCommand(cmdUnstagingPath); err != nil {
+			return fmt.Errorf("unMountDiskDeviceFromNodeGlobalPath: unmount device from req.StagingTargetPath:%s failed(again), err is: %s", unStagingPath, err.Error())
+		}
+		log.Infof("unMountDiskDeviceFromNodeGlobalPath: Successfully!")
+
+		return nil
+	}
+
+	return fmt.Errorf("unMountDiskDeviceFromNodeGlobalPath: unmount device from req.StagingTargetPath:%s failed, err is: %s", unStagingPath, err.Error())
 }

@@ -5,6 +5,8 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/sirupsen/logrus"
 	"github.com/wxnacy/wgo/arrays"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"strconv"
 	"strings"
 
@@ -15,6 +17,16 @@ func parseDiskVolumeOptions(req *csi.CreateVolumeRequest) (*DiskVolumeArgs, erro
 	var ok bool
 	diskVolArgs := &DiskVolumeArgs{}
 	volOptions := req.GetParameters()
+
+	if req.Name == "" {
+		return nil, status.Error(codes.InvalidArgument, "pv Name (req.Name) cannot be empty")
+	}
+	if req.VolumeCapabilities == nil {
+		return nil, status.Error(codes.InvalidArgument, "req.VolumeCapabilities cannot be empty")
+	}
+	if req.GetCapacityRange() == nil {
+		return nil, status.Errorf(codes.InvalidArgument, "CreateVolume: Capacity cannot be empty", req.Name)
+	}
 
 	// regionID
 	diskVolArgs.SiteID, ok = volOptions["siteId"]
@@ -93,7 +105,7 @@ func pickZone(requirement *csi.TopologyRequirement) string {
 	return ""
 }
 
-func GetDiskFormat(exec utilexec.Interface, disk string) (string, error) {
+func getDiskFormat(exec utilexec.Interface, disk string) (string, error) {
 	args := []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", disk}
 	logrus.Infof("Attempting to determine if disk %q is formatted using blkid with args: (%v)", disk, args)
 	dataOut, err := exec.Command("blkid", args...).CombinedOutput()
