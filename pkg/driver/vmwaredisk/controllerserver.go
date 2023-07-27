@@ -373,6 +373,7 @@ func getDiskInfo(diskId string) (*cdsDisk.DiskInfoResponse, error) {
 	if err != nil {
 		return nil, fmt.Errorf("[%s] task api error, err is: %s", diskId, err)
 	}
+	log.Infof("[%s] disk info: %+v", diskId, diskInfo)
 
 	return diskInfo, nil
 }
