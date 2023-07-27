@@ -1,9 +1,9 @@
 package vmwaredisk
 
 import (
-	"cck-sdk-go/pkg/common"
 	"encoding/json"
 	"fmt"
+	"github.com/capitalonline/cck-sdk-go/pkg/common"
 	"io/ioutil"
 	"net/http"
 )
