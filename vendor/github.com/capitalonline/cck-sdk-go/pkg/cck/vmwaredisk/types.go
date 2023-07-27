@@ -33,7 +33,7 @@ type DeleteDiskResponse struct {
 }
 
 type DiskInfoArgs struct {
-	VolumeID string `json:"block_id"`
+	VolumeID string `json:"UUID"`
 }
 
 type DiskInfoResponse struct {

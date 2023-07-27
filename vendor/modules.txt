@@ -1,4 +1,4 @@
-# github.com/capitalonline/cck-sdk-go v2.2.10+incompatible
+# github.com/capitalonline/cck-sdk-go v2.2.11+incompatible
 ## explicit
 github.com/capitalonline/cck-sdk-go/pkg/cck
 github.com/capitalonline/cck-sdk-go/pkg/cck/disk
