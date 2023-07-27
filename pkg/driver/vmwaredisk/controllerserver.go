@@ -171,7 +171,7 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 
 		// node is not exist or NotReady status, detach force
 		log.Warnf("ControllerPublishVolume: diskMountedNodeID: %s is in [NotRead|Not Exist], detach forcely", diskMountedNodeID)
-		if _, err := detachDisk(diskID); err != nil {
+		if _, err := detachDisk(diskID, nodeID); err != nil {
 			log.Errorf("ControllerPublishVolume: detach diskID: %s from nodeID: %s error,  err is: %s", diskID, diskMountedNodeID, err.Error())
 			return nil, err
 		}
@@ -230,7 +230,7 @@ func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *c
 		return &csi.ControllerUnpublishVolumeResponse{}, nil
 	}
 
-	if _, err = detachDisk(diskID); err != nil {
+	if _, err = detachDisk(diskID, nodeID); err != nil {
 		log.Errorf("ControllerUnpublishVolume: create detach task failed, err is: %s", err.Error())
 		return nil, err
 	}
@@ -348,11 +348,12 @@ func attachDisk(diskID, nodeID string) (string, error) {
 	return res.TaskID, nil
 }
 
-func detachDisk(diskID string) (string, error) {
-	log.Infof("detachDisk: diskID: %s", diskID)
+func detachDisk(diskID, nodeID string) (string, error) {
+	log.Infof("detachDisk: diskID=%s, nodeID=%s", diskID, nodeID)
 
 	res, err := cdsDisk.DetachDisk(&cdsDisk.DetachDiskArgs{
 		VolumeID: diskID,
+		NodeID:   nodeID,
 	})
 
 	if err != nil {
