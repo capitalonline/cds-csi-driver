@@ -200,7 +200,7 @@ func (n *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 
 	log.Infof("NodeStageVolume: starting to stage volumeID: %s, targetGlobalPath is: %s", volumeID, targetGlobalPath)
 
-	res, err := findDiskByVolumeID(volumeID)
+	res, err := getDiskInfo(volumeID)
 	if err != nil {
 		log.Errorf("NodeStageVolume[%s]: find disk info failed, err is: %s", volumeID, err)
 		return nil, err
