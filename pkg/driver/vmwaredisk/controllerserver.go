@@ -3,7 +3,6 @@ package vmwaredisk
 import (
 	"context"
 	"fmt"
-	"github.com/capitalonline/cds-csi-driver/pkg/common"
 	"github.com/capitalonline/cds-csi-driver/pkg/driver/utils"
 	v12 "k8s.io/api/core/v1"
 	"strconv"
@@ -20,6 +19,13 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+const (
+	diskProcessingState = "processing"
+	diskOKState         = "ok"
+	diskErrorState      = "error"
+	diskDeletedState    = "deleted"
 )
 
 func NewControllerServer(d *DiskDriver) *ControllerServer {
@@ -64,7 +70,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 	diskID := createRes.Data.VolumeID
 	diskVolume.DiskID = diskID
 
-	if _, err = getDiskInfo(diskID); err != nil {
+	if err = checkCreateDiskState(diskID); err != nil {
 		log.Errorf("createDisk: getDiskInfo result failed, err is: %s", err.Error())
 		return nil, err
 	}
@@ -362,38 +368,46 @@ func detachDisk(diskID string) (string, error) {
 func getDiskInfo(diskId string) (*cdsDisk.DiskInfoResponse, error) {
 	log.Infof("getDiskInfo: diskId is: %s", diskId)
 
+	diskInfo, err := cdsDisk.GetDiskInfo(&cdsDisk.DiskInfoArgs{VolumeID: diskId})
+	if err != nil {
+		return nil, fmt.Errorf("[%s] task api error, err is: %s", diskId, err)
+	}
+
+	return diskInfo, nil
+}
+
+func checkCreateDiskState(diskId string) error {
+	log.Infof("checkCreateDiskState: diskId is: %s", diskId)
+
 	for i := 1; i < 120; i++ {
-		res, err := cdsDisk.GetDiskInfo(&cdsDisk.DiskInfoArgs{VolumeID: diskId})
+		diskInfo, err := cdsDisk.GetDiskInfo(&cdsDisk.DiskInfoArgs{VolumeID: diskId})
 		if err != nil {
-			return nil, fmt.Errorf("[%s] task api error, err is: %s", diskId, err)
+			return fmt.Errorf("[%s] task api error, err is: %s", diskId, err)
 		}
 
-		switch res.Data.Status {
-		case common.FinishState:
-			log.Debugf("task succeed")
-			return res, nil
-		case common.DoingState:
-			log.Debugf("disk:%s is running, sleep 10s", diskId)
+		switch diskInfo.Data.Status {
+		case diskOKState:
+			return nil
+		case diskProcessingState:
 			time.Sleep(10 * time.Second)
-		case common.ErrorState:
-			log.Debugf("task error")
-			return nil, fmt.Errorf("taskError")
+		case diskErrorState:
+			return fmt.Errorf("taskError")
 		}
 	}
 
-	return nil, fmt.Errorf("task time out, running more than 20 minutes")
+	return fmt.Errorf("task time out, running more than 20 minutes")
 }
 
 func checkDeleteDiskState(diskId string) error {
 	log.Infof("checkDeleteDiskState: diskId is: %s", diskId)
 
 	for i := 1; i < 120; i++ {
-		res, err := cdsDisk.GetDiskInfo(&cdsDisk.DiskInfoArgs{VolumeID: diskId})
+		diskInfo, err := cdsDisk.GetDiskInfo(&cdsDisk.DiskInfoArgs{VolumeID: diskId})
 		if err != nil {
 			return fmt.Errorf("[%s] task api error, err is: %s", diskId, err)
 		}
 
-		if !res.Data.IsValid {
+		if !diskInfo.Data.IsValid && diskInfo.Data.Status == diskDeletedState {
 			return nil
 		}
 
@@ -408,12 +422,12 @@ func checkAttachDiskState(diskId string) error {
 	log.Infof("checkDeleteDiskState: diskId is: %s", diskId)
 
 	for i := 1; i < 120; i++ {
-		res, err := cdsDisk.GetDiskInfo(&cdsDisk.DiskInfoArgs{VolumeID: diskId})
+		diskInfo, err := cdsDisk.GetDiskInfo(&cdsDisk.DiskInfoArgs{VolumeID: diskId})
 		if err != nil {
 			return fmt.Errorf("[%s] task api error, err is: %s", diskId, err)
 		}
 
-		if res.Data.IsValid {
+		if diskInfo.Data.IsValid && diskInfo.Data.Mounted {
 			return nil
 		}
 
