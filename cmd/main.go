@@ -22,6 +22,8 @@ const (
 	DriverDiskTypeName       = "disk.csi.cds.net"
 	DriverVmwareDiskTypeName = "vmware.disk.csi.cds.net"
 	DriverEbsDiskTypeName    = "ebs-disk.csi.cds.net"
+
+	uuidPath = "/sys/devices/virtual/dmi/id/product_uuid"
 )
 
 var (
@@ -57,8 +59,19 @@ func main() {
 
 	log.Infof("CSI Driver Version: %+v", common.GetVersion())
 	if nodeID == "" {
-		nodeID = utils.GetNodeMetadata().GetNodeID()
+		if driverName == DriverVmwareDiskTypeName {
+			// fetch vm uuid
+			uuid, err := os.ReadFile(uuidPath)
+			if err != nil {
+				log.Fatal("failed to read product_uuid file: %+v", err)
+			}
+
+			nodeID = string(uuid)
+		} else {
+			nodeID = utils.GetNodeMetadata().GetNodeID()
+		}
 	}
+
 	log.Debugf("CSI Driver Name: %s", driverName)
 	log.Debugf("CSI endpoint: %s", endpoint)
 	log.Debugf("CSI node ID: %s", nodeID)
@@ -85,7 +98,7 @@ func main() {
 		diskDriver := disk.NewDriver(DriverDiskTypeName, nodeID, endpoint)
 		diskDriver.Run()
 	case DriverVmwareDiskTypeName:
-		diskDriver := vmwaredisk.NewDriver(DriverVmwareDiskTypeName, endpoint)
+		diskDriver := vmwaredisk.NewDriver(DriverVmwareDiskTypeName, nodeID, endpoint)
 		diskDriver.Run()
 	case DriverEbsDiskTypeName:
 		diskDriver := ebs_disk.NewDriver(DriverEbsDiskTypeName, nodeID, endpoint)
