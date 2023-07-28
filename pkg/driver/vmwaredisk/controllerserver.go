@@ -28,6 +28,8 @@ const (
 	diskDeletedState    = "deleted"
 )
 
+var pvcCreatedMap = map[string]bool{}
+
 func NewControllerServer(d *DiskDriver) *ControllerServer {
 	config, err := rest.InClusterConfig()
 	if err != nil {
@@ -54,6 +56,12 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 		log.Errorf("CreateVolume: error parameters from input, err is: %s", err.Error())
 		return nil, err
 	}
+
+	if _, ok := pvcCreatedMap[req.GetName()]; ok {
+		log.Infof("%s already being created. skip this", req.GetName())
+		return nil, nil
+	}
+	pvcCreatedMap[req.GetName()] = true
 
 	if acquired := c.VolumeLocks.TryAcquire(req.GetName()); !acquired {
 		log.Errorf(utils.VolumeOperationAlreadyExistsFmt, req.GetName())
@@ -391,9 +399,13 @@ func checkCreateDiskState(diskId string) error {
 		case diskOKState:
 			return nil
 		case diskProcessingState:
+			log.Infof("disk:%s is cteating, sleep 10s", diskId)
 			time.Sleep(10 * time.Second)
 		case diskErrorState:
 			return fmt.Errorf("taskError")
+		default:
+			log.Infof("disk:%s is cteating, sleep 3s", diskId)
+			time.Sleep(3 * time.Second)
 		}
 	}
 
