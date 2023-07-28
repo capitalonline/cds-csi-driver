@@ -4,6 +4,7 @@ import (
 	"github.com/capitalonline/cds-csi-driver/pkg/driver/utils"
 	"github.com/kubernetes-csi/drivers/pkg/csi-common"
 	"k8s.io/client-go/kubernetes"
+	"sync"
 )
 
 const (
@@ -36,6 +37,8 @@ type ControllerServer struct {
 	VolumeLocks *utils.VolumeLocks
 
 	KubeClient *kubernetes.Clientset
+
+	DataLock *sync.Mutex
 }
 
 type DiskVolumeArgs struct {

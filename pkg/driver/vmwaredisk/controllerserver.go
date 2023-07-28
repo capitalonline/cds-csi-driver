@@ -8,6 +8,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/util/retry"
 	"strconv"
+	"sync"
 	"time"
 
 	"encoding/json"
@@ -47,6 +48,7 @@ func NewControllerServer(d *DiskDriver) *ControllerServer {
 		KubeClient:              client,
 		DefaultControllerServer: csicommon.NewDefaultControllerServer(d.csiDriver),
 		VolumeLocks:             utils.NewVolumeLocks(),
+		DataLock:                &sync.Mutex{},
 	}
 }
 
@@ -86,7 +88,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 
 	// record volume info
 	if err := c.saveVolumeInfo(req.GetName(), volumeInfo); err != nil {
-		log.Errorf("failed to record %s to %s: %+v", diskID, defaultVolumeRecordConfigMap, err)
+		log.Errorf("failed to record %s to %s: %+v", req.GetName(), defaultVolumeRecordConfigMap, err)
 		return nil, err
 	}
 
@@ -138,6 +140,12 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 
 	if err := checkDeleteDiskState(diskID); err != nil {
 		log.Errorf("deleteDisk: cdsDisk.DeleteDisk task result failed, err is: %s", err)
+		return nil, err
+	}
+
+	// delete volume record info
+	if err := c.deleteVolumeInfo(diskID); err != nil {
+		log.Errorf("failed to delete record %s to %s: %+v", diskID, defaultVolumeRecordConfigMap, err)
 		return nil, err
 	}
 
@@ -493,6 +501,9 @@ func buildCreateVolumeResponse(req *csi.CreateVolumeRequest, diskVolume *DiskVol
 }
 
 func (c *ControllerServer) saveVolumeInfo(pvName string, volumeInfo *csi.Volume) error {
+	c.DataLock.Lock()
+	defer c.DataLock.Unlock()
+
 	updateFunc := func() error {
 		cm, err := c.KubeClient.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(defaultVolumeRecordConfigMap, metav1.GetOptions{})
 		if err != nil {
@@ -523,6 +534,48 @@ func (c *ControllerServer) saveVolumeInfo(pvName string, volumeInfo *csi.Volume)
 
 	if err := retry.RetryOnConflict(retry.DefaultRetry, updateFunc); err != nil {
 		return fmt.Errorf("failed tp update %s config map by %s : %+v", defaultVolumeRecordConfigMap, pvName, err)
+	}
+
+	return nil
+}
+
+func (c *ControllerServer) deleteVolumeInfo(diskId string) error {
+	c.DataLock.Lock()
+	defer c.DataLock.Unlock()
+
+	updateFunc := func() error {
+		cm, err := c.KubeClient.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(defaultVolumeRecordConfigMap, metav1.GetOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to fetch %s config map: %+v", defaultVolumeRecordConfigMap, err)
+		}
+
+		if cm.Annotations == nil {
+			cm.Annotations = make(map[string]string)
+
+			return nil
+		}
+
+		for k, volumeInfoStr := range cm.Annotations {
+			volumeInfo := &csi.Volume{}
+			if err = json.Unmarshal([]byte(volumeInfoStr), volumeInfo); err != nil {
+				return fmt.Errorf("failed to unmarshal by %s: %+v", volumeInfoStr, err)
+			}
+
+			if volumeInfo.VolumeId != diskId {
+				continue
+			}
+
+			delete(cm.Annotations, k)
+			if _, err = c.KubeClient.CoreV1().ConfigMaps(metav1.NamespaceSystem).Update(cm); err != nil {
+				return fmt.Errorf("failed tp update %s config map by %s : %+v", defaultVolumeRecordConfigMap, diskId, err)
+			}
+		}
+
+		return nil
+	}
+
+	if err := retry.RetryOnConflict(retry.DefaultRetry, updateFunc); err != nil {
+		return fmt.Errorf("failed tp update %s config map by %s : %+v", defaultVolumeRecordConfigMap, diskId, err)
 	}
 
 	return nil
