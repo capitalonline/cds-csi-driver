@@ -32,10 +32,6 @@ const (
 	diskDeletedState    = "deleted"
 )
 
-const (
-	defaultVolumeRecordConfigMap = "record-volume-info"
-)
-
 func NewControllerServer(d *DiskDriver) *ControllerServer {
 	config, err := rest.InClusterConfig()
 	if err != nil {
@@ -451,7 +447,7 @@ func checkDeleteDiskState(diskId string) error {
 }
 
 func checkAttachDiskState(diskId string) error {
-	log.Infof("checkDeleteDiskState: diskId is: %s", diskId)
+	log.Infof("checkAttachDiskState: diskId is: %s", diskId)
 
 	for i := 1; i < 120; i++ {
 		diskInfo, err := cdsDisk.GetDiskInfo(&cdsDisk.DiskInfoArgs{VolumeID: diskId})
@@ -463,11 +459,11 @@ func checkAttachDiskState(diskId string) error {
 			return nil
 		}
 
-		log.Debugf("disk:%s is attaching, sleep 10s", diskId)
-		time.Sleep(10 * time.Second)
+		log.Debugf("disk:%s is attaching, sleep 3s", diskId)
+		time.Sleep(3 * time.Second)
 	}
 
-	return fmt.Errorf("task time out, running more than 20 minutes")
+	return fmt.Errorf("task time out, running more than 6 minutes")
 }
 
 func buildCreateVolumeResponse(req *csi.CreateVolumeRequest, diskVolume *DiskVolumeArgs) *csi.Volume {
@@ -497,27 +493,6 @@ func buildCreateVolumeResponse(req *csi.CreateVolumeRequest, diskVolume *DiskVol
 }
 
 func (c *ControllerServer) saveVolumeInfo(pvName string, volumeInfo *csi.Volume) error {
-	if _, err := c.KubeClient.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(defaultVolumeRecordConfigMap, metav1.GetOptions{}); err != nil {
-		if errors.IsNotFound(err) {
-			cmData := &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: defaultVolumeRecordConfigMap,
-				},
-			}
-
-			updateFunc := func() error {
-				_, err := c.KubeClient.CoreV1().ConfigMaps(metav1.NamespaceSystem).Create(cmData)
-				return err
-			}
-
-			if err := retry.RetryOnConflict(retry.DefaultRetry, updateFunc); err != nil {
-				return fmt.Errorf("failed to create config map %s: %+v", defaultVolumeRecordConfigMap, err)
-			}
-		} else {
-			return fmt.Errorf("failed to found %s config map: %+v", defaultVolumeRecordConfigMap, err)
-		}
-	}
-
 	updateFunc := func() error {
 		cm, err := c.KubeClient.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(defaultVolumeRecordConfigMap, metav1.GetOptions{})
 		if err != nil {
@@ -531,6 +506,10 @@ func (c *ControllerServer) saveVolumeInfo(pvName string, volumeInfo *csi.Volume)
 		volumeInfoStr, err := json.Marshal(volumeInfo)
 		if err != nil {
 			return fmt.Errorf("failed to marshal %+v: %+v", volumeInfo, err)
+		}
+
+		if cm.Annotations == nil {
+			cm.Annotations = make(map[string]string)
 		}
 
 		cm.Annotations[pvName] = string(volumeInfoStr)
@@ -552,7 +531,32 @@ func (c *ControllerServer) saveVolumeInfo(pvName string, volumeInfo *csi.Volume)
 func (c *ControllerServer) checkVolumeInfo(pvName string) (*csi.Volume, bool, error) {
 	cm, err := c.KubeClient.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(defaultVolumeRecordConfigMap, metav1.GetOptions{})
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to fetch %s config map: %+v", defaultVolumeRecordConfigMap, err)
+		if errors.IsNotFound(err) {
+			cmData := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        defaultVolumeRecordConfigMap,
+					Annotations: make(map[string]string),
+				},
+			}
+
+			updateFunc := func() error {
+				_, err := c.KubeClient.CoreV1().ConfigMaps(metav1.NamespaceSystem).Create(cmData)
+				return err
+			}
+
+			if err := retry.RetryOnConflict(retry.DefaultRetry, updateFunc); err != nil {
+				return nil, false, fmt.Errorf("failed to create config map %s: %+v", defaultVolumeRecordConfigMap, err)
+			}
+
+			// not found, new create config map
+			return nil, false, nil
+		} else {
+			return nil, false, fmt.Errorf("failed to found %s config map: %+v", defaultVolumeRecordConfigMap, err)
+		}
+	}
+
+	if cm.Annotations == nil {
+		return nil, false, nil
 	}
 
 	if volumeInfoStr, ok := cm.Annotations[pvName]; ok {

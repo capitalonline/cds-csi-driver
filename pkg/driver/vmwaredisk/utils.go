@@ -8,9 +8,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"strconv"
-	"strings"
-
-	utilexec "k8s.io/utils/exec"
 )
 
 func parseDiskVolumeOptions(req *csi.CreateVolumeRequest) (*DiskVolumeArgs, error) {
@@ -103,56 +100,4 @@ func pickZone(requirement *csi.TopologyRequirement) string {
 	logrus.Infof("pickZone: return null")
 
 	return ""
-}
-
-func getDiskFormat(exec utilexec.Interface, disk string) (string, error) {
-	args := []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", disk}
-	logrus.Infof("Attempting to determine if disk %q is formatted using blkid with args: (%v)", disk, args)
-	dataOut, err := exec.Command("blkid", args...).CombinedOutput()
-	output := string(dataOut)
-	logrus.Infof("Output: %q", output)
-
-	if err != nil {
-		if exit, ok := err.(utilexec.ExitError); ok {
-			if exit.ExitStatus() == 2 {
-				// Disk device is unformatted.
-				// For `blkid`, if the specified token (TYPE/PTTYPE, etc) was
-				// not found, or no (specified) devices could be identified, an
-				// exit code of 2 is returned.
-				return "", nil
-			}
-		}
-		logrus.Errorf("Could not determine if disk %q is formatted (%v)", disk, err)
-		return "", err
-	}
-
-	var fstype, pttype string
-
-	lines := strings.Split(output, "\n")
-	for _, l := range lines {
-		if len(l) <= 0 {
-			// Ignore empty line.
-			continue
-		}
-		cs := strings.Split(l, "=")
-		if len(cs) != 2 {
-			return "", fmt.Errorf("blkid returns invalid output: %s", output)
-		}
-		// TYPE is filesystem type, and PTTYPE is partition table type, according
-		// to https://www.kernel.org/pub/linux/utils/util-linux/v2.21/libblkid-docs/.
-		if cs[0] == "TYPE" {
-			fstype = cs[1]
-		} else if cs[0] == "PTTYPE" {
-			pttype = cs[1]
-		}
-	}
-
-	if len(pttype) > 0 {
-		logrus.Infof("Disk %s detected partition table type: %s", disk, pttype)
-		// Returns a special non-empty string as filesystem type, then kubelet
-		// will not format it.
-		return "unknown data, probably partitions", nil
-	}
-
-	return fstype, nil
 }

@@ -13,7 +13,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
-	"k8s.io/utils/exec"
 	"strings"
 
 	cdsDisk "github.com/capitalonline/cck-sdk-go/pkg/cck/vmwaredisk"
@@ -119,12 +118,6 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 		return nil, err
 	}
 
-	existingFormat, err := getDiskFormat(exec.New(), deviceName)
-	if err != nil {
-		log.Errorf("NodePublishVolume[%s]: failed to get disk format for path %s, error: %v", volumeID, deviceName, err)
-		return nil, err
-	}
-
 	formatted, err := n.isAlreadyFormatted(stagingTargetPath)
 	if err != nil {
 		log.Errorf("NodePublishVolume[%s]: failed to check format: %+v", volumeID, err)
@@ -132,7 +125,7 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 	}
 
 	// disk not format
-	if existingFormat == "" && !formatted {
+	if !formatted {
 		log.Errorf("NodePublishVolume: %s is not format, cant mount and bing mount", volumeID)
 		return nil, fmt.Errorf("NodePublishVolume: %s is not formatted, cant mount and bing mount", volumeID)
 	}
@@ -222,19 +215,13 @@ func (n *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 	diskVol := req.GetVolumeContext()
 	fsType := diskVol["fsType"]
 
-	existingFormat, err := getDiskFormat(exec.New(), deviceName)
-	if err != nil {
-		log.Errorf("NodeStageVolume[%s]: failed to get disk format for path %s, error: %v", volumeID, deviceName, err)
-		return nil, err
-	}
-
 	formatted, err := n.isAlreadyFormatted(targetGlobalPath)
 	if err != nil {
 		log.Errorf("NodeStageVolume[%s]: failed to check format: %+v", volumeID, err)
 		return nil, err
 	}
 
-	if existingFormat == "" && !formatted {
+	if !formatted {
 		if err = n.formatDiskDevice(targetGlobalPath, volumeID, deviceName, fsType); err != nil {
 			log.Errorf("NodeStageVolume[%s]: format deviceName: %s failed, err is: %s", deviceName, err.Error())
 			return nil, err
@@ -430,7 +417,7 @@ func findDeviceNameByUuid(diskUuid string) (string, error) {
 			continue
 		}
 
-		cmdGetUid := fmt.Sprintf("/usr/lib/udev/scsi_id -g -u %s", deviceName)
+		cmdGetUid := fmt.Sprintf("/lib/udev/scsi_id -g -u %s", deviceName)
 		uuidStr, err := utils.RunCommand(cmdGetUid)
 		if err != nil {
 			return "", fmt.Errorf("findDeviceNameByUuid: get deviceName: %s uuid failed, err is: %s", deviceName, err)

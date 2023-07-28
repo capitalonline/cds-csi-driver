@@ -6,6 +6,10 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+const (
+	defaultVolumeRecordConfigMap = "record-volume-info"
+)
+
 type DiskDriver struct {
 	csiDriver        *csicommon.CSIDriver
 	endpoint         string
