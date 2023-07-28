@@ -126,8 +126,6 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 	if disk.Data.IsValid == 1 && disk.Data.Mounted == 1 {
 		log.Errorf("DeleteVolume: disk [mounted], cant delete volumeID: %s ", diskID)
 		return nil, fmt.Errorf("DeleteVolume: disk [mounted], cant delete volumeID: %s", diskID)
-	} else if disk.Data.IsValid == 1 && disk.Data.Mounted == 0 {
-		log.Debugf("DeleteVolume[%s]: disk is in [idle], then to delete directly!", diskID)
 	} else if disk.Data.IsValid == 0 {
 		log.Infof("DeleteVolume[%s]: disk had been deleted", diskID)
 		return &csi.DeleteVolumeResponse{}, nil
@@ -200,7 +198,6 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 		}
 
 		// node is not exist or NotReady status, detach force
-		log.Warnf("ControllerPublishVolume: diskMountedNodeID: %s is in [NotRead|Not Exist], detach forcely", diskMountedNodeID)
 		if _, err := detachDisk(diskID, nodeID); err != nil {
 			log.Errorf("ControllerPublishVolume: detach diskID: %s from nodeID: %s error,  err is: %s", diskID, diskMountedNodeID, err.Error())
 			return nil, err
@@ -447,11 +444,11 @@ func checkDeleteDiskState(diskId string) error {
 			return nil
 		}
 
-		log.Debugf("disk:%s is deleting, sleep 10s", diskId)
-		time.Sleep(10 * time.Second)
+		log.Debugf("disk:%s is deleting, sleep 3s", diskId)
+		time.Sleep(3 * time.Second)
 	}
 
-	return fmt.Errorf("task time out, running more than 20 minutes")
+	return fmt.Errorf("task time out, running more than 6 minutes")
 }
 
 func checkAttachDiskState(diskId string) error {
