@@ -42,8 +42,8 @@ type DiskInfoResponse struct {
 		NodeID   string `json:"vm_id"`
 		Status   string `json:"status"`
 		VolumeId string `json:"disk_id"`
-		Mounted  bool   `json:"is_load"`
-		IsValid  bool   `json:"is_valid"`
+		Mounted  int    `json:"is_load"`
+		IsValid  int    `json:"is_valid"`
 	} `json:"data"`
 }
 

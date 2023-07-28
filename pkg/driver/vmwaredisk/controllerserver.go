@@ -99,12 +99,12 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 		return nil, err
 	}
 
-	if disk.Data.IsValid && disk.Data.Mounted {
+	if disk.Data.IsValid == 1 && disk.Data.Mounted == 1 {
 		log.Errorf("DeleteVolume: disk [mounted], cant delete volumeID: %s ", diskID)
 		return nil, fmt.Errorf("DeleteVolume: disk [mounted], cant delete volumeID: %s", diskID)
-	} else if disk.Data.IsValid && !disk.Data.Mounted {
+	} else if disk.Data.IsValid == 1 && disk.Data.Mounted == 0 {
 		log.Debugf("DeleteVolume[%s]: disk is in [idle], then to delete directly!", diskID)
-	} else if !disk.Data.IsValid {
+	} else if disk.Data.IsValid == 0 {
 		log.Infof("DeleteVolume[%s]: disk had been deleted", diskID)
 		return &csi.DeleteVolumeResponse{}, nil
 	}
@@ -147,7 +147,7 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 		return nil, err
 	}
 
-	if diskInfo.Data.IsValid && diskInfo.Data.Mounted {
+	if diskInfo.Data.IsValid == 1 && diskInfo.Data.Mounted == 1 {
 		diskMountedNodeID := diskInfo.Data.NodeID
 
 		if diskMountedNodeID == nodeID {
@@ -182,7 +182,7 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 		}
 
 		log.Warnf("ControllerPublishVolume: detach diskID: %s from nodeID: %s successfully", diskID, diskMountedNodeID)
-	} else if !diskInfo.Data.IsValid {
+	} else if diskInfo.Data.IsValid == 0 {
 		log.Errorf("ControllerPublishVolume: diskID: %s was in [deleted|error], cant attach to nodeID", diskID)
 		return nil, fmt.Errorf("ControllerPublishVolume: diskID: %s was in [deleted|error], cant attach to nodeID", diskID)
 	}
@@ -409,7 +409,7 @@ func checkDeleteDiskState(diskId string) error {
 			return fmt.Errorf("[%s] task api error, err is: %s", diskId, err)
 		}
 
-		if !diskInfo.Data.IsValid && diskInfo.Data.Status == diskDeletedState {
+		if diskInfo.Data.IsValid == 0 && diskInfo.Data.Status == diskDeletedState {
 			return nil
 		}
 
@@ -429,7 +429,7 @@ func checkAttachDiskState(diskId string) error {
 			return fmt.Errorf("[%s] task api error, err is: %s", diskId, err)
 		}
 
-		if diskInfo.Data.IsValid && diskInfo.Data.Mounted {
+		if diskInfo.Data.IsValid == 1 && diskInfo.Data.Mounted == 1 {
 			return nil
 		}
 
