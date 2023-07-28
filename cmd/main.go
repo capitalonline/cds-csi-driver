@@ -20,7 +20,7 @@ const (
 	DriverNasTypeName        = "nas.csi.cds.net"
 	DriverOssTypeName        = "oss.csi.cds.net"
 	DriverDiskTypeName       = "disk.csi.cds.net"
-	DriverVmwareDiskTypeName = "vmware.disk.csi.cds.net"
+	DriverVmwareDiskTypeName = "ccs-disk.csi.cds.net"
 	DriverEbsDiskTypeName    = "ebs-disk.csi.cds.net"
 
 	uuidPath = "/sys/devices/virtual/dmi/id/product_uuid"
