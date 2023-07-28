@@ -64,10 +64,10 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 	}
 
 	// check pvName
-	if volumeInfo, err := c.checkVolumeInfo(req.GetName()); err != nil {
+	if volumeInfo, isExist, err := c.checkVolumeInfo(req.GetName()); err != nil {
 		log.Errorf("CreateVolume: failed to fetch %s from config map: %+v", req.GetName(), err)
 		return nil, err
-	} else if volumeInfo != nil {
+	} else if volumeInfo != nil && isExist {
 		log.Infof("CreateVolume: %s has been created, skip this", req.GetName())
 		return &csi.CreateVolumeResponse{Volume: volumeInfo}, nil
 	}
@@ -549,20 +549,20 @@ func (c *ControllerServer) saveVolumeInfo(pvName string, volumeInfo *csi.Volume)
 	return nil
 }
 
-func (c *ControllerServer) checkVolumeInfo(pvName string) (*csi.Volume, error) {
+func (c *ControllerServer) checkVolumeInfo(pvName string) (*csi.Volume, bool, error) {
 	cm, err := c.KubeClient.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(defaultVolumeRecordConfigMap, metav1.GetOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch %s config map: %+v", defaultVolumeRecordConfigMap, err)
+		return nil, false, fmt.Errorf("failed to fetch %s config map: %+v", defaultVolumeRecordConfigMap, err)
 	}
 
 	if volumeInfoStr, ok := cm.Annotations[pvName]; ok {
 		volumeInfo := &csi.Volume{}
 		if err = json.Unmarshal([]byte(volumeInfoStr), volumeInfo); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal by %s: %+v", volumeInfoStr, err)
+			return nil, false, fmt.Errorf("failed to unmarshal by %s: %+v", volumeInfoStr, err)
 		}
 
-		return volumeInfo, nil
+		return volumeInfo, true, nil
 	}
 
-	return nil, fmt.Errorf("not found %s by %s config map", pvName, defaultVolumeRecordConfigMap)
+	return nil, false, nil
 }
