@@ -2,18 +2,13 @@ package vmwaredisk
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/capitalonline/cds-csi-driver/pkg/driver/utils"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/util/retry"
-	"strconv"
-	"sync"
-	"time"
-
-	"encoding/json"
-
-	cdsDisk "github.com/capitalonline/cck-sdk-go/pkg/cck/vmwaredisk"
+	"strings"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/kubernetes-csi/drivers/pkg/csi-common"
@@ -48,7 +43,6 @@ func NewControllerServer(d *DiskDriver) *ControllerServer {
 		KubeClient:              client,
 		DefaultControllerServer: csicommon.NewDefaultControllerServer(d.csiDriver),
 		VolumeLocks:             utils.NewVolumeLocks(),
-		DataLock:                &sync.Mutex{},
 	}
 }
 
@@ -127,7 +121,7 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 		log.Errorf("DeleteVolume: disk [mounted], cant delete volumeID: %s ", diskID)
 		return nil, fmt.Errorf("DeleteVolume: disk [mounted], cant delete volumeID: %s", diskID)
 	} else if disk.Data.IsValid == 0 {
-		log.Infof("DeleteVolume[%s]: disk had been deleted", diskID)
+		log.Infof("DeleteVolume[%s]: disk had been deleted, skip this", diskID)
 		return &csi.DeleteVolumeResponse{}, nil
 	}
 
@@ -155,6 +149,8 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
 	diskID := req.GetVolumeId()
 	nodeID := req.GetNodeId()
+
+	nodeID = strings.Replace(nodeID, "\n", "", -1)
 
 	log.Infof("ControllerPublishVolume: pvName: %s, starting attach diskID: %s to node: %s", req.VolumeId, diskID, nodeID)
 
@@ -203,8 +199,8 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 			return nil, err
 		}
 
-		if err := checkDeleteDiskState(diskID); err != nil {
-			log.Errorf("ControllerPublishVolume: failed to delete disk %s, err is: %s", diskID, err)
+		if err := checkDetachDiskState(diskID); err != nil {
+			log.Errorf("ControllerPublishVolume: failed to detach disk %s, err is: %s", diskID, err)
 			return nil, err
 		}
 
@@ -233,6 +229,8 @@ func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *c
 	diskID := req.GetVolumeId()
 	nodeID := req.GetNodeId()
 
+	nodeID = strings.Replace(nodeID, "\n", "", -1)
+
 	log.Infof("ControllerUnpublishVolume: starting detach disk: %s from node: %s", diskID, nodeID)
 
 	if diskID == "" || nodeID == "" {
@@ -246,14 +244,19 @@ func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *c
 	}
 	defer c.VolumeLocks.Release(diskID)
 
-	res, err := getDiskInfo(diskID)
+	diskInfo, err := getDiskInfo(diskID)
 	if err != nil {
 		log.Errorf("ControllerUnpublishVolume: findDiskByVolumeID error, err is: %s", err)
 		return nil, err
 	}
 
-	if res.Data.NodeID != nodeID {
-		log.Warnf("ControllerUnpublishVolume: diskID: %s had been detached from nodeID: %s", diskID, nodeID)
+	if diskInfo.Data.Mounted == 0 {
+		log.Infof("ControllerUnpublishVolume[%s]: disk has been unmounted by %s, skip this", diskID, nodeID)
+		return &csi.ControllerUnpublishVolumeResponse{}, nil
+	}
+
+	if diskInfo.Data.NodeID != nodeID {
+		log.Warnf("ControllerUnpublishVolume: diskID: %s had been detached from nodeID: %s, current node: %s", diskID, nodeID, diskInfo.Data.NodeID)
 		return &csi.ControllerUnpublishVolumeResponse{}, nil
 	}
 
@@ -262,8 +265,8 @@ func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *c
 		return nil, err
 	}
 
-	if err = checkDeleteDiskState(diskID); err != nil {
-		log.Errorf("ControllerUnpublishVolume: failed to delete %s, err is: %s", diskID, err)
+	if err = checkDetachDiskState(diskID); err != nil {
+		log.Errorf("ControllerUnpublishVolume: failed to detach %s, err is: %s", diskID, err)
 		return nil, err
 	}
 
@@ -295,180 +298,45 @@ func (c *ControllerServer) ControllerExpandVolume(context.Context, *csi.Controll
 func describeNodeStatus(ctx context.Context, c *ControllerServer, nodeId string) (corev1.ConditionStatus, error) {
 	var nodeStatus corev1.ConditionStatus = ""
 
-	res, err := c.KubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
+	csiNodeList, err := c.KubeClient.StorageV1().CSINodes().List(metav1.ListOptions{})
 	if err != nil {
-		log.Errorf("describeNodeStatus: get node list failed, err is: %s", err)
+		log.Errorf("describeNodeStatus: get csi node list failed, err is: %s", err)
 		return "", err
 	}
 
-OuterLoop:
-	for _, node := range res.Items {
-		if node.Spec.ProviderID == nodeId {
-			for _, value := range node.Status.Conditions {
-				if value.Type == "Ready" {
-					nodeStatus = value.Status
-					break OuterLoop
-				}
+	for i := range csiNodeList.Items {
+		csiNode := csiNodeList.Items[i]
+
+		if len(csiNode.Spec.Drivers) == 0 {
+			log.Warnf("describeNodeStatus: not found csi driver by %s", nodeId)
+			continue
+		}
+
+		if csiNode.Spec.Drivers[0].NodeID != nodeId {
+			continue
+		}
+
+		ownerReferenceList := csiNode.GetOwnerReferences()
+		if len(ownerReferenceList) == 0 {
+			return "", fmt.Errorf("describeNodeStatus: not found %s ownerReference", nodeId)
+		}
+
+		node, err := c.KubeClient.CoreV1().Nodes().Get(ownerReferenceList[0].Name, metav1.GetOptions{})
+		if err != nil {
+			log.Errorf("describeNodeStatus: get node list failed, err is: %s", err)
+			return "", err
+		}
+
+		for _, value := range node.Status.Conditions {
+			if value.Type == "Ready" {
+				log.Infof("describeNodeStatus: nodeStatus is: %s", nodeStatus)
+
+				return value.Status, nil
 			}
 		}
 	}
 
-	log.Infof("describeNodeStatus: nodeStatus is: %s", nodeStatus)
-	return nodeStatus, nil
-}
-
-func createDisk(req *csi.CreateVolumeRequest, diskVolume *DiskVolumeArgs) (*cdsDisk.CreateDiskResponse, error) {
-	log.Infof("createDisk[%s]: diskInfo=%+v", req.GetName(), diskVolume)
-
-	diskIops, _ := strconv.Atoi(diskVolume.Iops)
-	diskSize := int(req.CapacityRange.RequiredBytes / (1024 * 1024 * 1024))
-
-	// create disk
-	res, err := cdsDisk.CreateDisk(&cdsDisk.CreateDiskArgs{
-		RegionID:    diskVolume.SiteID,
-		DiskType:    diskVolume.StorageType,
-		Size:        diskSize,
-		Iops:        diskIops,
-		ClusterName: diskVolume.ZoneID,
-	})
-
-	if err != nil {
-		log.Errorf("createDisk: cdsDisk.CreateDisk api error, err is: %s", err.Error())
-		return nil, err
-	}
-
-	return res, nil
-}
-
-func deleteDisk(diskID string) (*cdsDisk.DeleteDiskResponse, error) {
-	log.Infof("deleteDisk: diskID is:%s", diskID)
-
-	res, err := cdsDisk.DeleteDisk(&cdsDisk.DeleteDiskArgs{
-		VolumeID: diskID,
-	})
-
-	if err != nil {
-		log.Errorf("deleteDisk: cdsDisk.DeleteDisk api error, err is: %s", err)
-		return nil, err
-	}
-
-	log.Infof("deleteDisk: cdsDisk.DeleteDisk task creation succeed, taskID is: %s", res.TaskID)
-
-	return res, nil
-}
-
-func attachDisk(diskID, nodeID string) (string, error) {
-	log.Infof("attachDisk: diskID: %s, nodeID: %s", diskID, nodeID)
-
-	res, err := cdsDisk.AttachDisk(&cdsDisk.AttachDiskArgs{
-		VolumeID: diskID,
-		NodeID:   nodeID,
-	})
-
-	if err != nil {
-		log.Errorf("attachDisk: cdsDisk.attachDisk api error, err is: %s", err)
-		return "", err
-	}
-
-	log.Infof("attachDisk: cdsDisk.attachDisk task creation succeed, taskID is: %s", res.TaskID)
-
-	return res.TaskID, nil
-}
-
-func detachDisk(diskID, nodeID string) (string, error) {
-	log.Infof("detachDisk: diskID=%s, nodeID=%s", diskID, nodeID)
-
-	res, err := cdsDisk.DetachDisk(&cdsDisk.DetachDiskArgs{
-		VolumeID: diskID,
-		NodeID:   nodeID,
-	})
-
-	if err != nil {
-		log.Errorf("detachDisk: cdsDisk.detachDisk api error, err is: %s", err)
-		return "", err
-	}
-
-	log.Infof("detachDisk: cdsDisk.detachDisk task creation succeed, taskID is: %s", res.TaskID)
-
-	return res.TaskID, nil
-}
-
-func getDiskInfo(diskId string) (*cdsDisk.DiskInfoResponse, error) {
-	log.Infof("getDiskInfo: diskId is: %s", diskId)
-
-	diskInfo, err := cdsDisk.GetDiskInfo(&cdsDisk.DiskInfoArgs{VolumeID: diskId})
-	if err != nil {
-		return nil, fmt.Errorf("[%s] task api error, err is: %s", diskId, err)
-	}
-	log.Infof("[%s] disk info: %+v", diskId, diskInfo)
-
-	return diskInfo, nil
-}
-
-func checkCreateDiskState(diskId string) error {
-	log.Infof("checkCreateDiskState: diskId is: %s", diskId)
-
-	for i := 1; i < 120; i++ {
-		diskInfo, err := cdsDisk.GetDiskInfo(&cdsDisk.DiskInfoArgs{VolumeID: diskId})
-		if err != nil {
-			return fmt.Errorf("[%s] task api error, err is: %s", diskId, err)
-		}
-
-		switch diskInfo.Data.Status {
-		case diskOKState:
-			return nil
-		case diskProcessingState:
-			log.Infof("disk:%s is cteating, sleep 3s", diskId)
-			time.Sleep(3 * time.Second)
-		case diskErrorState:
-			return fmt.Errorf("taskError")
-		default:
-			log.Infof("disk:%s is cteating, sleep 3s", diskId)
-			time.Sleep(3 * time.Second)
-		}
-	}
-
-	return fmt.Errorf("task time out, running more than 6 minutes")
-}
-
-func checkDeleteDiskState(diskId string) error {
-	log.Infof("checkDeleteDiskState: diskId is: %s", diskId)
-
-	for i := 1; i < 120; i++ {
-		diskInfo, err := cdsDisk.GetDiskInfo(&cdsDisk.DiskInfoArgs{VolumeID: diskId})
-		if err != nil {
-			return fmt.Errorf("[%s] task api error, err is: %s", diskId, err)
-		}
-
-		if diskInfo.Data.IsValid == 0 && diskInfo.Data.Status == diskDeletedState {
-			return nil
-		}
-
-		log.Debugf("disk:%s is deleting, sleep 3s", diskId)
-		time.Sleep(3 * time.Second)
-	}
-
-	return fmt.Errorf("task time out, running more than 6 minutes")
-}
-
-func checkAttachDiskState(diskId string) error {
-	log.Infof("checkAttachDiskState: diskId is: %s", diskId)
-
-	for i := 1; i < 120; i++ {
-		diskInfo, err := cdsDisk.GetDiskInfo(&cdsDisk.DiskInfoArgs{VolumeID: diskId})
-		if err != nil {
-			return fmt.Errorf("[%s] task api error, err is: %s", diskId, err)
-		}
-
-		if diskInfo.Data.IsValid == 1 && diskInfo.Data.Mounted == 1 {
-			return nil
-		}
-
-		log.Debugf("disk:%s is attaching, sleep 3s", diskId)
-		time.Sleep(3 * time.Second)
-	}
-
-	return fmt.Errorf("task time out, running more than 6 minutes")
+	return "", nil
 }
 
 func buildCreateVolumeResponse(req *csi.CreateVolumeRequest, diskVolume *DiskVolumeArgs) *csi.Volume {
@@ -498,13 +366,14 @@ func buildCreateVolumeResponse(req *csi.CreateVolumeRequest, diskVolume *DiskVol
 }
 
 func (c *ControllerServer) saveVolumeInfo(pvName string, volumeInfo *csi.Volume) error {
-	c.DataLock.Lock()
-	defer c.DataLock.Unlock()
-
 	updateFunc := func() error {
 		cm, err := c.KubeClient.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(defaultVolumeRecordConfigMap, metav1.GetOptions{})
 		if err != nil {
 			return fmt.Errorf("failed to fetch %s config map: %+v", defaultVolumeRecordConfigMap, err)
+		}
+
+		if cm.Annotations == nil {
+			cm.Annotations = make(map[string]string)
 		}
 
 		if _, ok := cm.Annotations[pvName]; ok {
@@ -514,10 +383,6 @@ func (c *ControllerServer) saveVolumeInfo(pvName string, volumeInfo *csi.Volume)
 		volumeInfoStr, err := json.Marshal(volumeInfo)
 		if err != nil {
 			return fmt.Errorf("failed to marshal %+v: %+v", volumeInfo, err)
-		}
-
-		if cm.Annotations == nil {
-			cm.Annotations = make(map[string]string)
 		}
 
 		cm.Annotations[pvName] = string(volumeInfoStr)
@@ -537,10 +402,7 @@ func (c *ControllerServer) saveVolumeInfo(pvName string, volumeInfo *csi.Volume)
 }
 
 func (c *ControllerServer) deleteVolumeInfo(diskId string) error {
-	c.DataLock.Lock()
-	defer c.DataLock.Unlock()
-
-	updateFunc := func() error {
+	deleteFunc := func() error {
 		cm, err := c.KubeClient.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(defaultVolumeRecordConfigMap, metav1.GetOptions{})
 		if err != nil {
 			return fmt.Errorf("failed to fetch %s config map: %+v", defaultVolumeRecordConfigMap, err)
@@ -553,6 +415,10 @@ func (c *ControllerServer) deleteVolumeInfo(diskId string) error {
 		}
 
 		for k, volumeInfoStr := range cm.Annotations {
+			if volumeInfoStr == "" {
+				continue
+			}
+
 			volumeInfo := &csi.Volume{}
 			if err = json.Unmarshal([]byte(volumeInfoStr), volumeInfo); err != nil {
 				return fmt.Errorf("failed to unmarshal by %s: %+v", volumeInfoStr, err)
@@ -563,16 +429,18 @@ func (c *ControllerServer) deleteVolumeInfo(diskId string) error {
 			}
 
 			delete(cm.Annotations, k)
+			delete(cm.Annotations, volumeInfo.VolumeId)
+
 			if _, err = c.KubeClient.CoreV1().ConfigMaps(metav1.NamespaceSystem).Update(cm); err != nil {
-				return fmt.Errorf("failed tp update %s config map by %s : %+v", defaultVolumeRecordConfigMap, diskId, err)
+				return fmt.Errorf("failed to update %s config map by %s : %+v", defaultVolumeRecordConfigMap, diskId, err)
 			}
 		}
 
 		return nil
 	}
 
-	if err := retry.RetryOnConflict(retry.DefaultRetry, updateFunc); err != nil {
-		return fmt.Errorf("failed tp update %s config map by %s : %+v", defaultVolumeRecordConfigMap, diskId, err)
+	if err := retry.RetryOnConflict(retry.DefaultRetry, deleteFunc); err != nil {
+		return fmt.Errorf("failed tp delete %s config map by %s : %+v", defaultVolumeRecordConfigMap, diskId, err)
 	}
 
 	return nil
@@ -589,12 +457,12 @@ func (c *ControllerServer) checkVolumeInfo(pvName string) (*csi.Volume, bool, er
 				},
 			}
 
-			updateFunc := func() error {
+			createFunc := func() error {
 				_, err := c.KubeClient.CoreV1().ConfigMaps(metav1.NamespaceSystem).Create(cmData)
 				return err
 			}
 
-			if err := retry.RetryOnConflict(retry.DefaultRetry, updateFunc); err != nil {
+			if err := retry.RetryOnConflict(retry.DefaultRetry, createFunc); err != nil {
 				return nil, false, fmt.Errorf("failed to create config map %s: %+v", defaultVolumeRecordConfigMap, err)
 			}
 

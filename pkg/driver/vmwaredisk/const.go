@@ -7,10 +7,8 @@ const (
 	DefaultFsTypeXfs = "xfs"
 	FsTypeExt4       = "ext4"
 	FsTypeExt3       = "ext3"
-	StatusInMounted  = "mounted"
-	StatusInOK       = "ok"
-	StatusInDeleted  = "deleted"
-	StatusInError    = "error"
+
+	defaultVolumeRecordConfigMap = "record-volume-info"
 )
 
 var IopsArrayInt64 = []int64{3000, 5000, 7500, 10000}
