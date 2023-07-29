@@ -3,7 +3,7 @@ module github.com/capitalonline/cds-csi-driver
 go 1.18
 
 require (
-	github.com/capitalonline/cck-sdk-go v2.2.12+incompatible
+	github.com/capitalonline/cck-sdk-go v2.2.13+incompatible
 	github.com/container-storage-interface/spec v1.2.0
 	github.com/getsentry/sentry-go v0.22.0
 	github.com/kubernetes-csi/drivers v1.0.2
@@ -15,7 +15,6 @@ require (
 	k8s.io/api v0.17.0
 	k8s.io/apimachinery v0.17.1-beta.0
 	k8s.io/client-go v0.17.0
-	k8s.io/utils v0.0.0-20191114184206-e782cd3c129f
 )
 
 require (
@@ -40,5 +39,6 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	k8s.io/klog v1.0.0 // indirect
+	k8s.io/utils v0.0.0-20191114184206-e782cd3c129f // indirect
 	sigs.k8s.io/yaml v1.1.0 // indirect
 )

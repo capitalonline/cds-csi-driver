@@ -29,7 +29,7 @@ type DeleteDiskArgs struct {
 }
 type DeleteDiskResponse struct {
 	Response
-	TaskID string `json:"TaskId"`
+	VolumeID string `json:"disk_id"`
 }
 
 type DiskInfoArgs struct {
