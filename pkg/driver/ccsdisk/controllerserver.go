@@ -162,7 +162,7 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 	}
 
 	if err := c.checkDiskCount(req); err != nil {
-		log.Errorf("ControllerPublishVolume: failed to fetch disk count: %+v", err)
+		log.Errorf("ControllerPublishVolume: %+v", err)
 		return nil, err
 	}
 
