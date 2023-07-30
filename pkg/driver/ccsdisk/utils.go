@@ -7,7 +7,13 @@ import (
 	"github.com/wxnacy/wgo/arrays"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"io/ioutil"
+	"os"
 	"strconv"
+)
+
+const (
+	scsiHostPath = "/sys/class/scsi_host/"
 )
 
 func parseDiskVolumeOptions(req *csi.CreateVolumeRequest) (*DiskVolumeArgs, error) {
@@ -100,4 +106,29 @@ func pickZone(requirement *csi.TopologyRequirement) string {
 	logrus.Infof("pickZone: return null")
 
 	return ""
+}
+
+func scanNodeDiskList() error {
+	flushFileFunc := func(filePath string) error {
+		f, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE, 0666)
+		if err != nil {
+			return fmt.Errorf("failed to open %s: %+v", filePath, err)
+		}
+		defer f.Close()
+
+		if _, err = f.WriteString("- - -"); err != nil {
+			return fmt.Errorf("failed to write %s file: %+v", filePath, err)
+		}
+
+		return nil
+	}
+
+	scsiHostList, _ := ioutil.ReadDir(scsiHostPath)
+	for _, f := range scsiHostList {
+		if err := flushFileFunc(fmt.Sprintf("%s%s/scan", scsiHostPath, f.Name())); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

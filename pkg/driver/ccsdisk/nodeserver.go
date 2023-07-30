@@ -171,6 +171,11 @@ func (n *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 
 	log.Infof("NodeStageVolume: starting to stage diskId: %s, targetGlobalPath is: %s", diskId, targetGlobalPath)
 
+	if err := scanNodeDiskList(); err != nil {
+		log.Errorf("failed to scan node disk list: %+v", err)
+		return nil, err
+	}
+
 	res, err := getDiskInfo(diskId)
 	if err != nil {
 		log.Errorf("NodeStageVolume[%s]: find disk info failed, err is: %s", diskId, err)
@@ -199,8 +204,6 @@ func (n *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 			log.Errorf("NodeStageVolume[%s]: format deviceName: %s failed, err is: %s", deviceName, err.Error())
 			return nil, err
 		}
-
-		log.Infof("NodeStageVolume[%s]: formatDiskDevice successfully!", diskId)
 	}
 
 	if !utils.FileExisted(targetGlobalPath) {
@@ -268,6 +271,13 @@ func (n *NodeServer) formatDiskDevice(diskId, deviceName, fsType string) error {
 		return fmt.Errorf("formatDiskDevice: scanDeviceCmd: %s failed, err is: %s", scanDeviceCmd, err.Error())
 	}
 
+	if out, err := utils.RunCommand(fmt.Sprintf("blkid %s", deviceName)); err == nil {
+		if strings.Contains(out, "TYPE") {
+			log.Warnf("formatDiskDevice: deviceName: %s had been formatted, avoid multi formatting, return directly", deviceName)
+			return nil
+		}
+	}
+
 	var formatDeviceCmd string
 	switch fsType {
 	case DefaultFsTypeXfs:
@@ -288,6 +298,8 @@ func (n *NodeServer) formatDiskDevice(diskId, deviceName, fsType string) error {
 
 		return fmt.Errorf("formatDiskDevice: formatDeviceCmd: %s failed, err is: %s", formatDeviceCmd, err.Error())
 	}
+
+	log.Infof("%s disk formatted successfully", diskId)
 
 	if err := n.saveVolumeInfo(diskId); err != nil {
 		return err
