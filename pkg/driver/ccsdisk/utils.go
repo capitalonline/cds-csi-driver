@@ -31,6 +31,16 @@ func parseDiskVolumeOptions(req *csi.CreateVolumeRequest) (*DiskVolumeArgs, erro
 		return nil, status.Errorf(codes.InvalidArgument, "CreateVolume: Capacity cannot be empty", req.Name)
 	}
 
+	if IsBlockSingleWriter(req.VolumeCapabilities) {
+		return nil, status.Error(codes.InvalidArgument, "single node access modes are only supported on block")
+	}
+
+	diskRequestGB := req.GetCapacityRange().GetRequiredBytes() / (1024 * 1024 * 1024)
+	if diskRequestGB < MinDiskSize || diskRequestGB > MaxDiskSize {
+		msg := fmt.Sprintf("reqName: %s, disk capacity must be between %dG and %dG, request size: %d", req.GetName(), MinDiskSize, MaxDiskSize, diskRequestGB)
+		return nil, status.Errorf(codes.InvalidArgument, msg)
+	}
+
 	// regionID
 	diskVolArgs.SiteID, ok = volOptions["siteId"]
 	if !ok {
@@ -131,4 +141,25 @@ func scanNodeDiskList() error {
 	}
 
 	return nil
+}
+
+// IsBlockSingleWriter validates the volume capability slice against the access modes and access type.
+// if the capability is of multi write the first return value will be set to true and if the request
+// is of type block, the second return value will be set to true.
+func IsBlockSingleWriter(caps []*csi.VolumeCapability) bool {
+	// multiWriter has been set and returned after validating multi writer caps regardless of
+	// single or multi node access mode. The caps check is agnostic to whether it is a filesystem or block
+	// mode volume.
+	singleWriter := false
+
+	for _, cap := range caps {
+		if cap.AccessMode != nil {
+			switch cap.AccessMode.Mode { //nolint:exhaustive // only check what we want
+			case csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER:
+				singleWriter = true
+			}
+		}
+	}
+
+	return singleWriter
 }
