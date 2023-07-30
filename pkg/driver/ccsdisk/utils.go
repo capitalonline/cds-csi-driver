@@ -31,7 +31,7 @@ func parseDiskVolumeOptions(req *csi.CreateVolumeRequest) (*DiskVolumeArgs, erro
 		return nil, status.Errorf(codes.InvalidArgument, "CreateVolume: Capacity cannot be empty", req.Name)
 	}
 
-	if IsBlockSingleWriter(req.VolumeCapabilities) {
+	if !IsBlockSingleWriter(req.VolumeCapabilities) {
 		return nil, status.Error(codes.InvalidArgument, "single node access modes are only supported on block")
 	}
 

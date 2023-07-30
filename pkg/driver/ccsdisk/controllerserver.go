@@ -127,6 +127,12 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 		return &csi.DeleteVolumeResponse{}, nil
 	}
 
+	// delete volume record info
+	if err := c.deleteVolumeInfo(diskID); err != nil {
+		log.Errorf("failed to delete record %s to %s: %+v", diskID, defaultVolumeRecordConfigMap, err)
+		return nil, err
+	}
+
 	if _, err := deleteDisk(diskID); err != nil {
 		log.Errorf("DeleteVolume: delete disk error, err is: %s", err)
 		return nil, err
@@ -137,13 +143,7 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 		return nil, err
 	}
 
-	// delete volume record info
-	if err := c.deleteVolumeInfo(diskID); err != nil {
-		log.Errorf("failed to delete record %s to %s: %+v", diskID, defaultVolumeRecordConfigMap, err)
-		return nil, err
-	}
-
-	log.Infof("DeleteVolume: Successfully delete diskID: %s !", diskID)
+	log.Infof("DeleteVolume: Successfully delete diskID: %s", diskID)
 
 	return &csi.DeleteVolumeResponse{}, nil
 }

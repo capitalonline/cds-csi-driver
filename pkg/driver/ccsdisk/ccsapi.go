@@ -42,7 +42,7 @@ func deleteDisk(diskID string) (*cdsDisk.DeleteDiskResponse, error) {
 		return nil, err
 	}
 
-	log.Infof("deleteDisk: cdsDisk.DeleteDisk task creation succeed, taskID is: %s", res.VolumeID)
+	log.Infof("deleteDisk: cdsDisk.DeleteDisk task creation succeed, diskID is: %s", diskID)
 
 	return res, nil
 }
