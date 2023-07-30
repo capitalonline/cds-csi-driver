@@ -1,0 +1,44 @@
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: demo-sc
+parameters:
+  fsType: xfs
+  iops: "3000"
+  siteId: aae6922c-25e5-11ee-8783-be2af23df048
+  storageType: high_disk
+  zoneId: POD501-CLU01
+provisioner: ccs-disk.csi.cds.net
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
+
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: demo-pvc
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: demo-sc
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: csi-pod-1
+spec:
+  containers:
+  - name: "hello-world"
+    image: "tutum/hello-world:latest"
+    imagePullPolicy: IfNotPresent
+    volumeMounts:
+    - name: pvc-disk
+      mountPath: "/data"
+  volumes:
+  - name: pvc-disk
+    persistentVolumeClaim:
+      claimName: demo-pvc
