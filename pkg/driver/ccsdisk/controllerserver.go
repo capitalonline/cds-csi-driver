@@ -9,6 +9,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/util/retry"
 	"strings"
+	"sync"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/kubernetes-csi/drivers/pkg/csi-common"
@@ -43,6 +44,7 @@ func NewControllerServer(d *DiskDriver) *ControllerServer {
 		KubeClient:              client,
 		DefaultControllerServer: csicommon.NewDefaultControllerServer(d.csiDriver),
 		VolumeLocks:             utils.NewVolumeLocks(),
+		DiskCountLock:           &sync.Mutex{},
 	}
 }
 
@@ -152,11 +154,18 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 
 	nodeID = strings.Replace(nodeID, "\n", "", -1)
 
-	log.Infof("ControllerPublishVolume: pvName: %s, starting attach diskID: %s to node: %s", req.VolumeId, diskID, nodeID)
+	log.Infof("ControllerPublishVolume: volumeId: %s, starting attach diskID: %s to node: %s", req.VolumeId, diskID, nodeID)
 
 	if diskID == "" || nodeID == "" {
 		log.Errorf("ControllerPublishVolume: missing [VolumeId/NodeId] in request")
 		return nil, status.Error(codes.InvalidArgument, "ControllerPublishVolume missing [VolumeId/NodeId] in request")
+	}
+
+	if isContinue, err := c.checkDiskCount(req); err != nil {
+		log.Errorf("ControllerPublishVolume: failed to fetch disk count: %+v", err)
+		return nil, err
+	} else if !isContinue {
+		return &csi.ControllerPublishVolumeResponse{}, nil
 	}
 
 	if acquired := c.VolumeLocks.TryAcquire(diskID); !acquired {
@@ -487,4 +496,23 @@ func (c *ControllerServer) checkVolumeInfo(pvName string) (*csi.Volume, bool, er
 	}
 
 	return nil, false, nil
+}
+
+// check disk count on node
+func (c *ControllerServer) checkDiskCount(req *csi.ControllerPublishVolumeRequest) (bool, error) {
+	c.DiskCountLock.Lock()
+	defer c.DiskCountLock.Unlock()
+
+	diskCount, err := getDiskCountByNodeId(req.NodeId)
+	if err != nil {
+		return false, fmt.Errorf("volumeId=%s, nodeId=%s, failed to get disk count: %+v", req.VolumeId, req.NodeId, err)
+	}
+
+	if diskCount.Data.DiskCount > MaxDiskCount {
+		log.Warnf("volumeId=%s, nodeId=%s, the maximum number of disks supported by node is %d, The current disk capacity is %d",
+			req.VolumeId, req.NodeId, MaxDiskCount, diskCount.Data.DiskCount)
+		return false, nil
+	}
+
+	return true, nil
 }

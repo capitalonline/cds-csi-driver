@@ -12,6 +12,8 @@ const (
 
 	MinDiskSize = 10
 	MaxDiskSize = 4000
+
+	MaxDiskCount = 15
 )
 
 var IopsArrayInt64 = []int64{3000, 5000, 7500, 10000}

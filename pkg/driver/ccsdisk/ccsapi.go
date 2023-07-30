@@ -93,6 +93,16 @@ func getDiskInfo(diskId string) (*cdsDisk.DiskInfoResponse, error) {
 	return diskInfo, nil
 }
 
+func getDiskCountByNodeId(nodeId string) (*cdsDisk.DiskCountResponse, error) {
+	diskCount, err := cdsDisk.GetDiskCount(&cdsDisk.DiskCountArgs{NodeID: nodeId})
+	if err != nil {
+		return nil, fmt.Errorf("[%s] task api error, err is: %s", nodeId, err)
+	}
+	log.Infof("[%s] disk count: %+v", nodeId, diskCount)
+
+	return diskCount, nil
+}
+
 func checkCreateDiskState(diskId string) error {
 	for i := 1; i < 120; i++ {
 		diskInfo, err := cdsDisk.GetDiskInfo(&cdsDisk.DiskInfoArgs{VolumeID: diskId})
