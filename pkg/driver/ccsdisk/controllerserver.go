@@ -410,6 +410,17 @@ func (c *ControllerServer) saveVolumeInfo(pvName string, volumeInfo *csi.Volume)
 
 func (c *ControllerServer) deleteVolumeInfo(diskId string) error {
 	deleteFunc := func() error {
+		pvList, err := c.KubeClient.CoreV1().PersistentVolumes().List(metav1.ListOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to list pv: %+v", err)
+		}
+
+		currentPV := make(map[string]bool)
+		for i := range pvList.Items {
+			pv := pvList.Items[i]
+			currentPV[pv.Name] = true
+		}
+
 		cm, err := c.KubeClient.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(defaultVolumeRecordConfigMap, metav1.GetOptions{})
 		if err != nil {
 			return fmt.Errorf("failed to fetch %s config map: %+v", defaultVolumeRecordConfigMap, err)
@@ -421,7 +432,9 @@ func (c *ControllerServer) deleteVolumeInfo(diskId string) error {
 			return nil
 		}
 
-		for k, volumeInfoStr := range cm.Annotations {
+		for pvName, volumeInfoStr := range cm.Annotations {
+			foundPV := false
+
 			if volumeInfoStr == "" {
 				continue
 			}
@@ -431,12 +444,23 @@ func (c *ControllerServer) deleteVolumeInfo(diskId string) error {
 				return fmt.Errorf("failed to unmarshal by %s: %+v", volumeInfoStr, err)
 			}
 
-			if volumeInfo.VolumeId != diskId {
+			if volumeInfo.VolumeId == diskId {
+				foundPV = true
+			}
+
+			// maintain residual configuration
+			if _, ok := currentPV[pvName]; !ok {
+				foundPV = true
+			}
+
+			if !foundPV {
 				continue
 			}
 
-			delete(cm.Annotations, k)
-			delete(cm.Annotations, volumeInfo.VolumeId)
+			if _, ok := cm.Annotations[volumeInfo.VolumeId]; ok {
+				delete(cm.Annotations, volumeInfo.VolumeId)
+			}
+			delete(cm.Annotations, pvName)
 
 			if _, err = c.KubeClient.CoreV1().ConfigMaps(metav1.NamespaceSystem).Update(cm); err != nil {
 				return fmt.Errorf("failed to update %s config map by %s : %+v", defaultVolumeRecordConfigMap, diskId, err)
