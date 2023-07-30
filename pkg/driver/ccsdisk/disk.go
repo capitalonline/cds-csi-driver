@@ -1,4 +1,4 @@
-package vmwaredisk
+package ccsdisk
 
 import (
 	"github.com/capitalonline/cds-csi-driver/pkg/common"

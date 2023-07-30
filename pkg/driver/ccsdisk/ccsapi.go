@@ -1,8 +1,8 @@
-package vmwaredisk
+package ccsdisk
 
 import (
 	"fmt"
-	cdsDisk "github.com/capitalonline/cck-sdk-go/pkg/cck/vmwaredisk"
+	cdsDisk "github.com/capitalonline/cck-sdk-go/pkg/cck/ccsdisk"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	log "github.com/sirupsen/logrus"
 	"strconv"

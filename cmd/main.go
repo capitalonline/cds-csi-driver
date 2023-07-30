@@ -3,10 +3,10 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/capitalonline/cds-csi-driver/pkg/driver/ccsdisk"
 	"github.com/capitalonline/cds-csi-driver/pkg/driver/disk"
 	"github.com/capitalonline/cds-csi-driver/pkg/driver/ebs_disk"
 	"github.com/capitalonline/cds-csi-driver/pkg/driver/oss"
-	"github.com/capitalonline/cds-csi-driver/pkg/driver/vmwaredisk"
 	"os"
 	"path"
 
@@ -17,11 +17,11 @@ import (
 )
 
 const (
-	DriverNasTypeName        = "nas.csi.cds.net"
-	DriverOssTypeName        = "oss.csi.cds.net"
-	DriverDiskTypeName       = "disk.csi.cds.net"
-	DriverVmwareDiskTypeName = "ccs-disk.csi.cds.net"
-	DriverEbsDiskTypeName    = "ebs-disk.csi.cds.net"
+	DriverNasTypeName     = "nas.csi.cds.net"
+	DriverOssTypeName     = "oss.csi.cds.net"
+	DriverDiskTypeName    = "disk.csi.cds.net"
+	DriverCCSDiskTypeName = "ccs-disk.csi.cds.net"
+	DriverEbsDiskTypeName = "ebs-disk.csi.cds.net"
 
 	uuidPath = "/sys/devices/virtual/dmi/id/product_uuid"
 )
@@ -59,7 +59,7 @@ func main() {
 
 	log.Infof("CSI Driver Version: %+v", common.GetVersion())
 	if nodeID == "" {
-		if driverName == DriverVmwareDiskTypeName {
+		if driverName == DriverCCSDiskTypeName {
 			// fetch vm uuid
 			uuid, err := os.ReadFile(uuidPath)
 			if err != nil {
@@ -97,8 +97,8 @@ func main() {
 	case DriverDiskTypeName:
 		diskDriver := disk.NewDriver(DriverDiskTypeName, nodeID, endpoint)
 		diskDriver.Run()
-	case DriverVmwareDiskTypeName:
-		diskDriver := vmwaredisk.NewDriver(DriverVmwareDiskTypeName, nodeID, endpoint)
+	case DriverCCSDiskTypeName:
+		diskDriver := ccsdisk.NewDriver(DriverCCSDiskTypeName, nodeID, endpoint)
 		diskDriver.Run()
 	case DriverEbsDiskTypeName:
 		diskDriver := ebs_disk.NewDriver(DriverEbsDiskTypeName, nodeID, endpoint)

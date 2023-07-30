@@ -1,4 +1,4 @@
-package vmwaredisk
+package ccsdisk
 
 import (
 	"fmt"
