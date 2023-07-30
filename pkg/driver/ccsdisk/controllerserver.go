@@ -525,14 +525,16 @@ func (c *ControllerServer) checkDiskCount(req *csi.ControllerPublishVolumeReques
 	c.DiskCountLock.Lock()
 	defer c.DiskCountLock.Unlock()
 
+	nodeId := strings.Replace(req.NodeId, "\n", "", -1)
+
 	diskCount, err := getDiskCountByNodeId(req.NodeId)
 	if err != nil {
-		return fmt.Errorf("volumeId=%s, nodeId=%s, failed to get disk count: %+v", req.VolumeId, req.NodeId, err)
+		return fmt.Errorf("volumeId=%s, nodeId=%s, failed to get disk count: %+v", req.VolumeId, nodeId, err)
 	}
 
 	if diskCount.Data.DiskCount >= MaxDiskCount {
 		msg := fmt.Sprintf("volumeId=%s, nodeId=%s, the maximum number of disks supported by node is %d, The current disk capacity is %d",
-			req.VolumeId, req.NodeId, MaxDiskCount, diskCount.Data.DiskCount)
+			req.VolumeId, nodeId, MaxDiskCount, diskCount.Data.DiskCount)
 		log.Errorf(msg)
 		return fmt.Errorf(msg)
 	}
