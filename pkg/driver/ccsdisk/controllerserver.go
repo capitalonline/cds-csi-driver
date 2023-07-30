@@ -161,11 +161,9 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 		return nil, status.Error(codes.InvalidArgument, "ControllerPublishVolume missing [VolumeId/NodeId] in request")
 	}
 
-	if isContinue, err := c.checkDiskCount(req); err != nil {
+	if err := c.checkDiskCount(req); err != nil {
 		log.Errorf("ControllerPublishVolume: failed to fetch disk count: %+v", err)
 		return nil, err
-	} else if !isContinue {
-		return &csi.ControllerPublishVolumeResponse{}, nil
 	}
 
 	if acquired := c.VolumeLocks.TryAcquire(diskID); !acquired {
@@ -499,20 +497,21 @@ func (c *ControllerServer) checkVolumeInfo(pvName string) (*csi.Volume, bool, er
 }
 
 // check disk count on node
-func (c *ControllerServer) checkDiskCount(req *csi.ControllerPublishVolumeRequest) (bool, error) {
+func (c *ControllerServer) checkDiskCount(req *csi.ControllerPublishVolumeRequest) error {
 	c.DiskCountLock.Lock()
 	defer c.DiskCountLock.Unlock()
 
 	diskCount, err := getDiskCountByNodeId(req.NodeId)
 	if err != nil {
-		return false, fmt.Errorf("volumeId=%s, nodeId=%s, failed to get disk count: %+v", req.VolumeId, req.NodeId, err)
+		return fmt.Errorf("volumeId=%s, nodeId=%s, failed to get disk count: %+v", req.VolumeId, req.NodeId, err)
 	}
 
-	if diskCount.Data.DiskCount > MaxDiskCount {
-		log.Warnf("volumeId=%s, nodeId=%s, the maximum number of disks supported by node is %d, The current disk capacity is %d",
+	if diskCount.Data.DiskCount >= MaxDiskCount {
+		msg := fmt.Sprintf("volumeId=%s, nodeId=%s, the maximum number of disks supported by node is %d, The current disk capacity is %d",
 			req.VolumeId, req.NodeId, MaxDiskCount, diskCount.Data.DiskCount)
-		return false, nil
+		log.Errorf(msg)
+		return fmt.Errorf(msg)
 	}
 
-	return true, nil
+	return nil
 }
