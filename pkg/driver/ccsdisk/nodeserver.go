@@ -13,6 +13,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
+	"os"
 	"strings"
 )
 
@@ -321,6 +322,13 @@ func findDeviceNameByUuid(diskUuid string) (string, error) {
 	deviceNameUuid := map[string]string{}
 	for _, deviceName := range strings.Split(deviceNameStr, " ") {
 		if deviceName == "" {
+			continue
+		}
+
+		// check device
+		_, diskErr := os.Stat(deviceName)
+		if os.IsNotExist(diskErr) {
+			log.Warnf("findDeviceNameByUuid: %s not found, skip this", deviceName)
 			continue
 		}
 
