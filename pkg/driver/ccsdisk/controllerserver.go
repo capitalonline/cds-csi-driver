@@ -544,7 +544,7 @@ func (c *ControllerServer) checkDiskCount(req *csi.ControllerPublishVolumeReques
 	}
 
 	if diskCount.Data.DiskCount >= MaxDiskCount {
-		msg := fmt.Sprintf("volumeId=%s, nodeId=%s, the maximum number of disks supported by node is %d, The current disk capacity is %d",
+		msg := fmt.Sprintf("volumeId=%s, nodeId=%s, the maximum number of disks supported by node is %d, but the current disk number is geater than %d",
 			req.VolumeId, nodeId, MaxDiskCount, diskCount.Data.DiskCount)
 		log.Errorf(msg)
 		return fmt.Errorf(msg)
