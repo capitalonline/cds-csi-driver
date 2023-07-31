@@ -62,12 +62,12 @@ To deploy the CSI CCS-DISK driver to your k8s, simply run:
 kubectl create -f https://raw.githubusercontent.com/capitalonline/cds-csi-driver/master/deploy/ccs_disk/base.yaml
 ```
 
-- set base64 access_key_id/access_key_secret into secret cck-secrets
+- set base64 access_key_id/access_key_secret into secret ccs-secrets
 ```yaml
 apiVersion: v1
 kind: Secret
 metadata:
-  name: cck-secrets
+  name: ccs-secrets
   namespace: kube-system
 type: Opaque
 data:
