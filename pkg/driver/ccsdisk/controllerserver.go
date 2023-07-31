@@ -412,7 +412,7 @@ func (c *ControllerServer) saveVolumeInfo(pvName string, volumeInfo *csi.Volume)
 		return nil
 	}
 
-	if err := retry.RetryOnConflict(retry.DefaultRetry, updateFunc); err != nil {
+	if err := retry.RetryOnConflict(DefaultRetry, updateFunc); err != nil {
 		return fmt.Errorf("failed tp update %s config map by %s : %+v", defaultVolumeRecordConfigMap, pvName, err)
 	}
 
@@ -481,7 +481,7 @@ func (c *ControllerServer) deleteVolumeInfo(diskId string) error {
 		return nil
 	}
 
-	if err := retry.RetryOnConflict(retry.DefaultRetry, deleteFunc); err != nil {
+	if err := retry.RetryOnConflict(DefaultRetry, deleteFunc); err != nil {
 		return fmt.Errorf("failed tp delete %s config map by %s : %+v", defaultVolumeRecordConfigMap, diskId, err)
 	}
 
@@ -504,7 +504,7 @@ func (c *ControllerServer) checkVolumeInfo(pvName string) (*csi.Volume, bool, er
 				return err
 			}
 
-			if err := retry.RetryOnConflict(retry.DefaultRetry, createFunc); err != nil {
+			if err := retry.RetryOnConflict(DefaultRetry, createFunc); err != nil {
 				return nil, false, fmt.Errorf("failed to create config map %s: %+v", defaultVolumeRecordConfigMap, err)
 			}
 

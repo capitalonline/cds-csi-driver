@@ -202,7 +202,7 @@ func (n *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 
 	if !formatted {
 		if err = n.formatDiskDevice(diskId, deviceName, fsType); err != nil {
-			log.Errorf("NodeStageVolume[%s]: format deviceName: %s failed, err is: %s", deviceName, err.Error())
+			log.Errorf("NodeStageVolume[%s]: format deviceName: %s failed, err is: %s", diskId, deviceName, err.Error())
 			return nil, err
 		}
 	}
@@ -446,7 +446,7 @@ func (n *NodeServer) saveVolumeInfo(diskId string) error {
 		return nil
 	}
 
-	if err := retry.RetryOnConflict(retry.DefaultRetry, updateFunc); err != nil {
+	if err := retry.RetryOnConflict(DefaultRetry, updateFunc); err != nil {
 		return fmt.Errorf("failed tp update %s config map by %s : %+v", defaultVolumeRecordConfigMap, diskId, err)
 	}
 
@@ -471,7 +471,7 @@ func (n *NodeServer) deleteVolumeInfo(diskId string) error {
 		return nil
 	}
 
-	if err := retry.RetryOnConflict(retry.DefaultRetry, deleteFunc); err != nil {
+	if err := retry.RetryOnConflict(DefaultRetry, deleteFunc); err != nil {
 		return fmt.Errorf("failed tp delete %s config map by %s : %+v", defaultVolumeRecordConfigMap, diskId, err)
 	}
 

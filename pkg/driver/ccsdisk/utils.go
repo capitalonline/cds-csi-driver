@@ -8,13 +8,22 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"io/ioutil"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"os"
 	"strconv"
+	"time"
 )
 
 const (
 	scsiHostPath = "/sys/class/scsi_host/"
 )
+
+var DefaultRetry = wait.Backoff{
+	Steps:    15,
+	Duration: 500 * time.Millisecond,
+	Factor:   0,
+	Jitter:   0,
+}
 
 func parseDiskVolumeOptions(req *csi.CreateVolumeRequest) (*DiskVolumeArgs, error) {
 	var ok bool
