@@ -174,12 +174,6 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 		return nil, fmt.Errorf("ControllerPublishVolume: diskID %s is attaching, skip this", diskID)
 	}
 
-	// check disk count
-	if err := c.checkDiskCount(req); err != nil {
-		log.Errorf("ControllerPublishVolume: %+v", err)
-		return nil, err
-	}
-
 	if diskInfo.Data.IsValid == 1 && diskInfo.Data.Mounted == 1 {
 		diskMountedNodeID := diskInfo.Data.NodeID
 
@@ -217,6 +211,12 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 	} else if diskInfo.Data.IsValid == 0 {
 		log.Errorf("ControllerPublishVolume: diskID: %s was in [deleted|error], cant attach to nodeID", diskID)
 		return nil, fmt.Errorf("ControllerPublishVolume: diskID: %s was in [deleted|error], cant attach to nodeID", diskID)
+	}
+
+	// check disk count
+	if err := c.checkDiskCount(req); err != nil {
+		log.Errorf("ControllerPublishVolume: %+v", err)
+		return nil, err
 	}
 
 	if _, err = attachDisk(diskID, nodeID); err != nil {
