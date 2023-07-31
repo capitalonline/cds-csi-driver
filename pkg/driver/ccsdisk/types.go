@@ -1,0 +1,47 @@
+package ccsdisk
+
+import (
+	"github.com/capitalonline/cds-csi-driver/pkg/driver/utils"
+	"github.com/kubernetes-csi/drivers/pkg/csi-common"
+	"k8s.io/client-go/kubernetes"
+	"sync"
+)
+
+type DiskDriver struct {
+	csiDriver        *csicommon.CSIDriver
+	endpoint         string
+	idServer         *IdentityServer
+	nodeServer       *NodeServer
+	controllerServer *ControllerServer
+}
+
+type NodeServer struct {
+	*csicommon.DefaultNodeServer
+
+	// A map storing all volumes with ongoing operations so that additional operations
+	// for that same volume (as defined by VolumeID) return an Aborted error
+	VolumeLocks *utils.VolumeLocks
+
+	KubeClient *kubernetes.Clientset
+}
+
+type ControllerServer struct {
+	*csicommon.DefaultControllerServer
+
+	// A map storing all volumes with ongoing operations so that additional operations
+	// for that same volume (as defined by VolumeID) return an Aborted error
+	VolumeLocks *utils.VolumeLocks
+
+	KubeClient *kubernetes.Clientset
+
+	DiskCountLock *sync.Mutex
+}
+
+type DiskVolumeArgs struct {
+	StorageType string `json:"storageType"`
+	FsType      string `json:"fsType"`
+	SiteID      string `json:"siteId"`
+	ZoneID      string `json:"zoneId"`
+	Iops        string `json:"iops"`
+	DiskID      string `json:"diskId"`
+}
