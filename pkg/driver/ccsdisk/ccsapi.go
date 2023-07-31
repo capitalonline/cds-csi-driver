@@ -136,7 +136,7 @@ func checkDeleteDiskState(diskId string) error {
 			return fmt.Errorf("[%s] task api error, err is: %s", diskId, err)
 		}
 
-		if diskInfo.Data.IsValid == 0 && diskInfo.Data.Status == diskOKState {
+		if diskInfo.Data.IsValid == 0 && diskInfo.Data.Status == diskDeletedState {
 			return nil
 		}
 
