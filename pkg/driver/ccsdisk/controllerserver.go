@@ -169,9 +169,13 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 		return nil, err
 	}
 
+	// check task state
 	if diskInfo.Data.TaskStatus == diskProcessingStateByTask {
 		log.Warnf("ControllerPublishVolume: diskID %s is attaching, skip this", diskID)
 		return nil, fmt.Errorf("ControllerPublishVolume: diskID %s is attaching, skip this", diskID)
+	} else if diskInfo.Data.TaskStatus == diskErrorStateByTask {
+		log.Errorf("ControllerPublishVolume: diskID %s attach failed, err :%+v", diskID, err)
+		return nil, fmt.Errorf("ControllerPublishVolume: diskID %s attach failed, err :%+v", diskID, err)
 	}
 
 	if diskInfo.Data.IsValid == 1 && diskInfo.Data.Mounted == 1 {
