@@ -24,6 +24,7 @@ import (
 
 const (
 	diskProcessingState = "processing"
+	diskAttachingState  = "attaching"
 	diskOKState         = "ok"
 	diskErrorState      = "error"
 	diskDeletedState    = "deleted"
@@ -161,11 +162,6 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 		return nil, status.Error(codes.InvalidArgument, "ControllerPublishVolume missing [VolumeId/NodeId] in request")
 	}
 
-	if err := c.checkDiskCount(req); err != nil {
-		log.Errorf("ControllerPublishVolume: %+v", err)
-		return nil, err
-	}
-
 	if acquired := c.VolumeLocks.TryAcquire(diskID); !acquired {
 		log.Errorf(utils.VolumeOperationAlreadyExistsFmt, diskID)
 		return nil, status.Errorf(codes.Aborted, utils.VolumeOperationAlreadyExistsFmt, diskID)
@@ -175,6 +171,17 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 	diskInfo, err := getDiskInfo(diskID)
 	if err != nil {
 		log.Errorf("ControllerPublishVolume: findDiskByVolumeID api error, err is: %s", err)
+		return nil, err
+	}
+
+	if diskInfo.Data.Status == diskAttachingState {
+		log.Errorf("ControllerPublishVolume: diskID %s is attaching, skip this", diskID)
+		return nil, fmt.Errorf("ControllerPublishVolume: diskID %s is attaching, skip this", diskID)
+	}
+
+	// check disk count
+	if err := c.checkDiskCount(req); err != nil {
+		log.Errorf("ControllerPublishVolume: %+v", err)
 		return nil, err
 	}
 
