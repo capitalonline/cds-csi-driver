@@ -56,6 +56,44 @@ print('access_key_secret:\n', access_key_secret)
 kubectl create -f https://raw.githubusercontent.com/capitalonline/cds-csi-driver/master/deploy/ebs_disk/deploy.yaml
 ```
 
+To deploy the CSI CCS-DISK driver to your k8s, simply run:
+- deploy and update the driver settings
+```bash
+kubectl create -f https://raw.githubusercontent.com/capitalonline/cds-csi-driver/master/deploy/ccs_disk/base.yaml
+```
+
+- set base64 access_key_id/access_key_secret into secret ccs-secrets
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ccs-secrets
+  namespace: kube-system
+type: Opaque
+data:
+  access_key_id: ''
+  access_key_secret: ''
+```
+
+PS: generate base64 ak/sk
+```python
+import base64
+
+# write here
+ak = ''
+sk = ''
+access_key_id = str(base64.b64encode(str.encode(ak)), encoding="utf-8")
+print('access_key_id:\n', access_key_id)
+access_key_secret = str(base64.b64encode(str.encode(sk)), encoding="utf-8")
+print('access_key_secret:\n', access_key_secret)
+
+```
+
+- deploy driver service
+```bash
+kubectl create -f https://raw.githubusercontent.com/capitalonline/cds-csi-driver/master/deploy/ccs_disk/deploy.yaml
+```
+
 ## To run tests
 
 **NAS:**
