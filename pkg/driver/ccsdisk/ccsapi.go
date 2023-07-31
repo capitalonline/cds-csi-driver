@@ -110,14 +110,16 @@ func checkCreateDiskState(diskId string) error {
 			return fmt.Errorf("[%s] task api error, err is: %s", diskId, err)
 		}
 
-		switch diskInfo.Data.Status {
-		case diskOKState:
+		if diskInfo.Data.IsValid == 1 && diskInfo.Data.Status == diskOKState {
 			return nil
-		case diskProcessingState:
+		}
+
+		switch diskInfo.Data.TaskStatus {
+		case diskProcessingStateByTask:
 			log.Infof("disk:%s is cteating, sleep 3s", diskId)
 			time.Sleep(3 * time.Second)
-		case diskErrorState:
-			return fmt.Errorf("taskError")
+		case diskErrorStateByTask:
+			return fmt.Errorf("[%s] task failed, disk info: %+v", diskId, diskInfo)
 		default:
 			log.Infof("disk:%s is cteating, sleep 3s, disk info: %+v", diskId, diskInfo)
 			time.Sleep(3 * time.Second)
@@ -134,12 +136,20 @@ func checkDeleteDiskState(diskId string) error {
 			return fmt.Errorf("[%s] task api error, err is: %s", diskId, err)
 		}
 
-		if diskInfo.Data.IsValid == 0 && diskInfo.Data.Status == diskDeletedState {
+		if diskInfo.Data.IsValid == 0 && diskInfo.Data.Status == diskOKState {
 			return nil
 		}
 
-		log.Infof("disk:%s is deleting, sleep 3s, disk info: %+v", diskId, diskInfo)
-		time.Sleep(3 * time.Second)
+		switch diskInfo.Data.TaskStatus {
+		case diskProcessingStateByTask:
+			log.Infof("disk:%s is deleting, sleep 3s", diskId)
+			time.Sleep(3 * time.Second)
+		case diskErrorStateByTask:
+			return fmt.Errorf("[%s] task failed, disk info: %+v", diskId, diskInfo)
+		default:
+			log.Infof("disk:%s is deleting, sleep 3s, disk info: %+v", diskId, diskInfo)
+			time.Sleep(3 * time.Second)
+		}
 	}
 
 	return fmt.Errorf("task time out, running more than 6 minutes")
@@ -156,8 +166,16 @@ func checkAttachDiskState(diskId string) error {
 			return nil
 		}
 
-		log.Infof("disk:%s is attaching, sleep 3s, disk info: %+v", diskId, diskInfo)
-		time.Sleep(3 * time.Second)
+		switch diskInfo.Data.TaskStatus {
+		case diskProcessingStateByTask:
+			log.Infof("disk:%s is attaching, sleep 3s", diskId)
+			time.Sleep(3 * time.Second)
+		case diskErrorStateByTask:
+			return fmt.Errorf("[%s] task failed, disk info: %+v", diskId, diskInfo)
+		default:
+			log.Infof("disk:%s is attaching, sleep 3s, disk info: %+v", diskId, diskInfo)
+			time.Sleep(3 * time.Second)
+		}
 	}
 
 	return fmt.Errorf("task time out, running more than 6 minutes")
@@ -174,8 +192,16 @@ func checkDetachDiskState(diskId string) error {
 			return nil
 		}
 
-		log.Infof("disk:%s is detaching, sleep 3s, disk info: %+v", diskId, diskInfo)
-		time.Sleep(3 * time.Second)
+		switch diskInfo.Data.TaskStatus {
+		case diskProcessingStateByTask:
+			log.Infof("disk:%s is detaching, sleep 3s", diskId)
+			time.Sleep(3 * time.Second)
+		case diskErrorStateByTask:
+			return fmt.Errorf("[%s] task failed, disk info: %+v", diskId, diskInfo)
+		default:
+			log.Infof("disk:%s is detaching, sleep 3s, disk info: %+v", diskId, diskInfo)
+			time.Sleep(3 * time.Second)
+		}
 	}
 
 	return fmt.Errorf("task time out, running more than 6 minutes")

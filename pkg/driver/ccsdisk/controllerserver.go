@@ -22,14 +22,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const (
-	diskProcessingState = "processing"
-	diskAttachingState  = "attaching"
-	diskOKState         = "ok"
-	diskErrorState      = "error"
-	diskDeletedState    = "deleted"
-)
-
 func NewControllerServer(d *DiskDriver) *ControllerServer {
 	config, err := rest.InClusterConfig()
 	if err != nil {
@@ -114,18 +106,21 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 	}
 	defer c.VolumeLocks.Release(diskID)
 
-	disk, err := getDiskInfo(diskID)
+	diskInfo, err := getDiskInfo(diskID)
 	if err != nil {
 		log.Errorf("DeleteVolume[%s]: findDiskByVolumeID error, err is: %s", diskID, err.Error())
 		return nil, err
 	}
 
-	if disk.Data.IsValid == 1 && disk.Data.Mounted == 1 {
+	if diskInfo.Data.IsValid == 1 && diskInfo.Data.Mounted == 1 {
 		log.Errorf("DeleteVolume: disk [mounted], cant delete volumeID: %s ", diskID)
 		return nil, fmt.Errorf("DeleteVolume: disk [mounted], cant delete volumeID: %s", diskID)
-	} else if disk.Data.IsValid == 0 {
+	} else if diskInfo.Data.IsValid == 0 {
 		log.Infof("DeleteVolume[%s]: disk had been deleted, skip this", diskID)
 		return &csi.DeleteVolumeResponse{}, nil
+	} else if diskInfo.Data.TaskStatus == diskProcessingStateByTask {
+		log.Warnf("DeleteVolume[%s]: disk is being deleted, skip this", diskID)
+		return nil, fmt.Errorf("DeleteVolume[%s]: disk is being deleted, skip this", diskID)
 	}
 
 	// delete volume record info
@@ -174,8 +169,8 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 		return nil, err
 	}
 
-	if diskInfo.Data.Status == diskAttachingState || diskInfo.Data.Status == diskProcessingState {
-		log.Errorf("ControllerPublishVolume: diskID %s is attaching, skip this", diskID)
+	if diskInfo.Data.TaskStatus == diskProcessingStateByTask {
+		log.Warnf("ControllerPublishVolume: diskID %s is attaching, skip this", diskID)
 		return nil, fmt.Errorf("ControllerPublishVolume: diskID %s is attaching, skip this", diskID)
 	}
 
@@ -262,6 +257,11 @@ func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *c
 	if err != nil {
 		log.Errorf("ControllerUnpublishVolume: findDiskByVolumeID error, err is: %s", err)
 		return nil, err
+	}
+
+	if diskInfo.Data.TaskStatus == diskProcessingStateByTask {
+		log.Warnf("ControllerPublishVolume: diskID %s is detaching, skip this", diskID)
+		return nil, fmt.Errorf("ControllerPublishVolume: diskID %s is detaching, skip this", diskID)
 	}
 
 	if diskInfo.Data.Mounted == 0 {
