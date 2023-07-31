@@ -116,7 +116,7 @@ func checkCreateDiskState(diskId string) error {
 
 		switch diskInfo.Data.TaskStatus {
 		case diskProcessingStateByTask:
-			log.Infof("disk:%s is cteating, sleep 3s", diskId)
+			log.Infof("disk:%s is cteating, sleep 3s, disk info: %+v", diskId, diskInfo)
 			time.Sleep(3 * time.Second)
 		case diskErrorStateByTask:
 			return fmt.Errorf("[%s] task failed, disk info: %+v", diskId, diskInfo)
@@ -142,7 +142,7 @@ func checkDeleteDiskState(diskId string) error {
 
 		switch diskInfo.Data.TaskStatus {
 		case diskProcessingStateByTask:
-			log.Infof("disk:%s is deleting, sleep 3s", diskId)
+			log.Infof("disk:%s is deleting, sleep 3s, disk info: %+v", diskId, diskInfo)
 			time.Sleep(3 * time.Second)
 		case diskErrorStateByTask:
 			return fmt.Errorf("[%s] task failed, disk info: %+v", diskId, diskInfo)
@@ -168,7 +168,7 @@ func checkAttachDiskState(diskId string) error {
 
 		switch diskInfo.Data.TaskStatus {
 		case diskProcessingStateByTask:
-			log.Infof("disk:%s is attaching, sleep 3s", diskId)
+			log.Infof("disk:%s is attaching, sleep 3s, disk info: %+v", diskId, diskInfo)
 			time.Sleep(3 * time.Second)
 		case diskErrorStateByTask:
 			return fmt.Errorf("[%s] task failed, disk info: %+v", diskId, diskInfo)
@@ -194,7 +194,7 @@ func checkDetachDiskState(diskId string) error {
 
 		switch diskInfo.Data.TaskStatus {
 		case diskProcessingStateByTask:
-			log.Infof("disk:%s is detaching, sleep 3s", diskId)
+			log.Infof("disk:%s is detaching, sleep 3s, disk info: %+v", diskId, diskInfo)
 			time.Sleep(3 * time.Second)
 		case diskErrorStateByTask:
 			return fmt.Errorf("[%s] task failed, disk info: %+v", diskId, diskInfo)
