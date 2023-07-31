@@ -1,24 +1,4 @@
 ---
-apiVersion: v1
-data:
-  access_key_id: ZmUyMGU2NDAyYzQ4MTFlZWE2NzljMjEzZGIyMDgxNDM=
-  access_key_secret: ZTBmYzQ3ZDZiOGYyMTlhMjgxN2RiNmE5YmQ0YzlkZWQ=
-kind: Secret
-metadata:
-  name: cck-secrets
-  namespace: kube-system
-type: Opaque
----
-apiVersion: v1
-data:
-  oversea: "True"
-  site_id: "xxxx"
-  site_name: "xxx"
-kind: ConfigMap
-metadata:
-  name: cds-properties
-  namespace: kube-system
----
 apiVersion: storage.k8s.io/v1
 kind: CSIDriver
 metadata:
@@ -275,6 +255,17 @@ spec:
               name: cds-properties
         image: capitalonline/cds-csi-driver:v2.1.0
         imagePullPolicy: IfNotPresent
+        livenessProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - ps -ef | grep cds-csi-driver | grep ccs-disk.csi.cds.net | grep -v grep
+          failureThreshold: 8
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 15
         name: csi-controller-server
         resources:
           limits:

@@ -348,8 +348,8 @@ parameters:
   fsType: ext4
   iops: "3000"
   siteId: "xxx"
-  zoneId: SR_SaoPaulo_A
-  storageType: SSD
+  zoneId: Cluster_Name1
+  storageType: "high_disk"
 provisioner: ccs-disk.csi.cds.net
 reclaimPolicy: Delete
 volumeBindingMode: WaitForFirstConsumer
@@ -362,7 +362,7 @@ Description:
 |-------------------|---------------------------|----------|--------------------------------------------------------------------------------------------------------------------|
 | fsType            | [ xfs\|ext4\|ext3 ]       | yes      | Linux filesystem type                                        |
 | storageType       | [ high_disk\|ssd_disk ]   | yes      | Only support `high_disk` and `ssd_disk`.<br />`high_disk` shoud be with iops `3000`.<br />`ssd_disk` should be with iops `[5000|7500|10000]`. |
-| iops              | [3000\|5000\|7500\|10000] | yes      | Only support `3000` `5000` `7500` and `1000`.<br />Should combined with `storageType`. |
+| iops              | [3000\|5000\|7500\|10000] | yes      | Only support `3000` `5000` `7500` and `10000`.<br />Should combined with `storageType`. |
 | siteId            | Eg. "Beijing001"          | yes      | Cluster's site_id.                                           |
 | zoneId            | Eg. "Beijing-POD10-CLU02" | yes      | Cluster's id.                                                |
 | provisioner       | ccs-disk.csi.cds.net      | yes      | Disk driver which installed default.                                                                               |
