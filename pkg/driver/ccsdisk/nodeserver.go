@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/capitalonline/cds-csi-driver/pkg/driver/utils"
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/kubernetes-csi/drivers/pkg/csi-common"
+	csicommon "github.com/kubernetes-csi/drivers/pkg/csi-common"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -335,7 +335,8 @@ func findDeviceNameByUuid(diskUuid string) (string, error) {
 		cmdGetUid := fmt.Sprintf("/lib/udev/scsi_id -g -u %s", deviceName)
 		uuidStr, err := utils.RunCommand(cmdGetUid)
 		if err != nil {
-			return "", fmt.Errorf("findDeviceNameByUuid: get deviceName: %s uuid failed, err is: %s", deviceName, err)
+			log.Warnf("findDeviceNameByUuid: get deviceName: %s uuid failed, err is: %s", deviceName, err)
+			continue
 		}
 
 		deviceNameUuid[strings.TrimSpace(strings.TrimPrefix(uuidStr, "3"))] = deviceName
