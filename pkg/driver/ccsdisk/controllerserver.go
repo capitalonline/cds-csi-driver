@@ -174,7 +174,7 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 		return nil, err
 	}
 
-	if diskInfo.Data.Status == diskAttachingState {
+	if diskInfo.Data.Status == diskAttachingState || diskInfo.Data.Status == diskProcessingState {
 		log.Errorf("ControllerPublishVolume: diskID %s is attaching, skip this", diskID)
 		return nil, fmt.Errorf("ControllerPublishVolume: diskID %s is attaching, skip this", diskID)
 	}
