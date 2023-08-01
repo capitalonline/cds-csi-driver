@@ -243,11 +243,6 @@ spec:
             secretKeyRef:
               key: access_key_secret
               name: ccs-secrets
-        - name: API_HOST
-          valueFrom:
-            configMapKeyRef:
-              key: api_host
-              name: cds-properties
         - name: CDS_OVERSEA
           valueFrom:
             configMapKeyRef:
@@ -396,11 +391,6 @@ spec:
             secretKeyRef:
               key: access_key_secret
               name: ccs-secrets
-        - name: API_HOST
-          valueFrom:
-            configMapKeyRef:
-              key: api_host
-              name: cds-properties
         - name: CDS_OVERSEA
           valueFrom:
             configMapKeyRef:
