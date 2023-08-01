@@ -399,8 +399,8 @@ Description:
 | Key               | Value                     | Required | Description                                                                                                        |
 |-------------------|---------------------------|----------|--------------------------------------------------------------------------------------------------------------------|
 | fsType            | [ xfs\|ext4\|ext3 ]       | yes      | Linux filesystem type                                                                                              |
-| storageType       | [    ssd_disk     ]       | yes      | Only support `ssd_disk`.<br />`ssd_disk` should be with iops `[5000|7500|10000]`.                                  |
-| iops              | [3000\|5000\|7500\|10000] | yes      | Only support `3000` `5000` `7500` and `10000`.<br />Should combined with `storageType`.                            |
+| storageType       | [    ssd_disk     ]       | yes      | Only support `ssd_disk`                                  |
+| iops              | [5000\|7500\|10000]       | yes      | Only support `5000` `7500` and `10000`.<br />Should combined with `storageType`.                            |
 | siteId            | Eg. "Beijing001"          | yes      | Cluster's site_id.                                                                                                 |
 | zoneId            | Eg. "Beijing-POD10-CLU02" | yes      | Cluster's id.                                                                                                      |
 | provisioner       | ccs-disk.csi.cds.net      | yes      | Disk driver which installed default.                                                                               |
