@@ -398,11 +398,11 @@ Description:
 
 | Key               | Value                     | Required | Description                                                                                                        |
 |-------------------|---------------------------|----------|--------------------------------------------------------------------------------------------------------------------|
-| fsType            | [ xfs\|ext4\|ext3 ]       | yes      | Linux filesystem type                                        |
-| storageType       | [    ssd_disk     ]       | yes      | Only support `ssd_disk`.<br />`ssd_disk` should be with iops `[5000|7500|10000]`.    |
-| iops              | [3000\|5000\|7500\|10000] | yes      | Only support `3000` `5000` `7500` and `10000`.<br />Should combined with `storageType`. |
-| siteId            | Eg. "Beijing001"          | yes      | Cluster's site_id.                                           |
-| zoneId            | Eg. "Beijing-POD10-CLU02" | yes      | Cluster's id.                                                |
+| fsType            | [ xfs\|ext4\|ext3 ]       | yes      | Linux filesystem type                                                                                              |
+| storageType       | [    ssd_disk     ]       | yes      | Only support `ssd_disk`.<br />`ssd_disk` should be with iops `[5000|7500|10000]`.                                  |
+| iops              | [3000\|5000\|7500\|10000] | yes      | Only support `3000` `5000` `7500` and `10000`.<br />Should combined with `storageType`.                            |
+| siteId            | Eg. "Beijing001"          | yes      | Cluster's site_id.                                                                                                 |
+| zoneId            | Eg. "Beijing-POD10-CLU02" | yes      | Cluster's id.                                                                                                      |
 | provisioner       | ccs-disk.csi.cds.net      | yes      | Disk driver which installed default.                                                                               |
 | reclaimPolicy     | [ Delete\|Retain ]        | yes      | `Delete` means that PV will be deleted with PVC delete<br/>`Retain` means that PV will be retained when PVC delete |
 | volumeBindingMode | WaitForFirstConsumer      | yes      | Only suport `WaitForFirstConsumer` pollicy for disk.csi.cds.net driver.                                            |
