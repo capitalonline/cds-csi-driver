@@ -5,7 +5,7 @@ data:
   access_key_secret: "***" 
 kind: Secret
 metadata:
-  name: cck-secrets
+  name: ccs-secrets
   namespace: kube-system
 type: Opaque
 ---
