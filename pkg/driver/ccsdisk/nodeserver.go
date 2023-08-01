@@ -394,12 +394,32 @@ func unBindMountGlobalPathFromPodPath(targetPath string) error {
 	return fmt.Errorf("unBindMountGlobalPathFromPodPath: unmount req.TargetPath:%s failed, err is: %s", targetPath, err.Error())
 }
 
-func mountDiskDeviceToNodeGlobalPath(deviceName, targetGlobalPath, fsType string) error {
-	cmd := fmt.Sprintf("mount -t %s %s %s", fsType, deviceName, targetGlobalPath)
-	if _, err := utils.RunCommand(cmd); err != nil {
-		return fmt.Errorf("mountDiskDeviceToNodeGlobalPath: err is: %s", err)
+func mountDiskDeviceToNodeGlobalPath(deviceName, targetGlobalPath, fstype string) error {
+	uuid := ""
+	cmd := fmt.Sprintf("blkid %s", deviceName)
+	if out, err := utils.RunCommand(cmd); err != nil {
+		log.Errorf("mountDiskDeviceToNodeGlobalPath: err is: %s", err)
+		return err
+	} else {
+		l := strings.Split(out, " ")
+		for _, v := range l {
+			if strings.Contains(v, "UUID=") {
+				uuid = strings.ReplaceAll(v, "\"", "")
+			}
+		}
 	}
-	log.Infof("mountDiskDeviceToNodeGlobalPath[%s]: Successfully!", targetGlobalPath)
+	log.Infof("%s uuid: %s", deviceName, uuid)
+	if uuid == "" {
+		cmd = fmt.Sprintf("mount -t %s %s %s", fstype, deviceName, targetGlobalPath)
+	} else {
+		cmd = fmt.Sprintf("mount -t %s %s %s", fstype, uuid, targetGlobalPath)
+	}
+
+	if _, err := utils.RunCommand(cmd); err != nil {
+		log.Errorf("failed to mount cmd: %s, err is: %s", cmd, err)
+		return err
+	}
+	log.Infof("successfully mount %s to %s, cmd: %s", deviceName, targetGlobalPath, cmd)
 
 	return nil
 }
