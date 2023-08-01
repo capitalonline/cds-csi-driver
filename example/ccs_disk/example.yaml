@@ -5,9 +5,9 @@ metadata:
   name: demo-sc
 parameters:
   fsType: xfs
-  iops: "3000"
+  iops: "5000"
   siteId: aae6922c-25e5-11ee-8783-be2af23df048
-  storageType: high_disk
+  storageType: ssd_disk 
   zoneId: POD501-CLU01
 provisioner: ccs-disk.csi.cds.net
 reclaimPolicy: Delete
