@@ -315,7 +315,7 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 	}
 
 	if describeRes.Data.BlockNum+1 > DiskMountLimit {
-		msg := fmt.Sprintf("ControllerPublishVolume: node %s's data disk number is %d,supported max number is 16", nodeID, describeRes.Data.BlockNum)
+		msg := fmt.Sprintf("ControllerPublishVolume: node %s's data disk number is %d,supported max number is %d", nodeID, describeRes.Data.BlockNum, DiskMountLimit)
 		log.Errorf(msg)
 		return nil, fmt.Errorf(msg)
 	}
