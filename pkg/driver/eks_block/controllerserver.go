@@ -204,21 +204,20 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 		log.Error("DeleteVolume: req.VolumeID cannot be empty")
 		return nil, fmt.Errorf("DeleteVolume: req.VolumeID cannot be empty")
 	}
-
 	// 直接为openapi查询
 	disk, err := describeBlockInfo(req.VolumeId, "")
 	if err != nil {
 		log.Errorf("DeleteVolume: findDiskByVolumeID error, err is: %s", err.Error())
 		return nil, err
 	}
+	// 已经删除
+	if disk.Data.BlockId == "" {
+		return &csi.DeleteVolumeResponse{}, nil
+	}
 	// 非终态，不允许删除
 	if disk.Data.Status != DiskStatusError && disk.Data.Status != DiskStatusWaiting && disk.Data.Status != DiskStatusUnmountFailed {
 		msg := fmt.Sprintf("block status is %s ,not allowed to delete", disk.Data.Status)
 		return nil, fmt.Errorf(msg)
-	}
-	// 已经删除
-	if disk.Data.BlockId == "" {
-		return &csi.DeleteVolumeResponse{}, nil
 	}
 
 	// Step 4: delete disk
