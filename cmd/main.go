@@ -3,14 +3,8 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/capitalonline/cds-csi-driver/pkg/driver/ccsdisk"
-	"github.com/capitalonline/cds-csi-driver/pkg/driver/disk"
-	"github.com/capitalonline/cds-csi-driver/pkg/driver/ebs_disk"
-	"github.com/capitalonline/cds-csi-driver/pkg/driver/oss"
-	"os"
-	"path"
-
 	"github.com/capitalonline/cds-csi-driver/pkg/common"
+	"github.com/capitalonline/cds-csi-driver/pkg/driver/ccsdisk"
 	"github.com/capitalonline/cds-csi-driver/pkg/driver/disk"
 	"github.com/capitalonline/cds-csi-driver/pkg/driver/ebs_disk"
 	"github.com/capitalonline/cds-csi-driver/pkg/driver/eks_block"
@@ -18,6 +12,8 @@ import (
 	"github.com/capitalonline/cds-csi-driver/pkg/driver/oss"
 	"github.com/capitalonline/cds-csi-driver/pkg/driver/utils"
 	log "github.com/sirupsen/logrus"
+	"os"
+	"path"
 )
 
 const (
@@ -26,8 +22,7 @@ const (
 	DriverDiskTypeName    = "disk.csi.cds.net"
 	DriverCCSDiskTypeName = "ccs-disk.csi.cds.net"
 	DriverEbsDiskTypeName = "ebs-disk.csi.cds.net"
-
-	uuidPath = "/sys/devices/virtual/dmi/id/product_uuid"
+	uuidPath              = "/sys/devices/virtual/dmi/id/product_uuid"
 	DriverEksDiskTypeName = "eks-disk.csi.cds.net"
 )
 
