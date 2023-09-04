@@ -43,7 +43,7 @@ var diskAttachingMap = new(sync.Map)
 // storing detaching disk
 var diskDetachingMap = new(sync.Map)
 
-var diskEventIdMap = new(sync.Map) // todo 干啥用的
+var diskEventIdMap = new(sync.Map)
 
 var AttachDetachMap = new(sync.Map)
 
@@ -341,7 +341,6 @@ func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 			defer func() {
 				DiskMultiTaskMap.Delete(diskID)
 			}()
-			// todo 不做事件查询么？
 			taskID, err := detachDisk(diskID)
 			if err != nil {
 				log.Errorf("ControllerPublishVolume: detach diskID: %s from nodeID: %s error,  err is: %s", diskID, diskMountedNodeID, err.Error())
