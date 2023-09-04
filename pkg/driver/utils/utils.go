@@ -188,8 +188,15 @@ func CreateDir(target string, mode int) error {
 
 // FileExisted checks if a file  or directory exists
 func FileExisted(filename string) bool {
-	_, err := os.Stat(filename)
+	f, err := os.Stat(filename)
 	if err == nil {
+		if f == nil {
+			return false
+		} else {
+			if f.Name() == "" {
+				return false
+			}
+		}
 		return true
 	}
 	if os.IsNotExist(err) {

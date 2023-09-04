@@ -4,6 +4,7 @@ RUN apk update && apk add git make
 #COPY cds-csi-driver /go/src/github.com/capitalonline/cds-csi-driver
 
 COPY . /go/src/github.com/capitalonline/cds-csi-driver
+RUN go env -w GO111MODULE=on && go env -w GOPROXY=https://goproxy.cn,direct
 RUN cd /go/src/github.com/capitalonline/cds-csi-driver && go mod tidy && make container-binary
 
 
