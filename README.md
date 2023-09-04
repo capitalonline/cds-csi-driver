@@ -56,6 +56,44 @@ print('access_key_secret:\n', access_key_secret)
 kubectl create -f https://raw.githubusercontent.com/capitalonline/cds-csi-driver/master/deploy/ebs_disk/deploy.yaml
 ```
 
+To deploy the CSI CCS-DISK driver to your k8s, simply run:
+- deploy and update the driver settings
+```bash
+kubectl create -f https://raw.githubusercontent.com/capitalonline/cds-csi-driver/master/deploy/ccs_disk/base.yaml
+```
+
+- set base64 access_key_id/access_key_secret into secret ccs-secrets
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ccs-secrets
+  namespace: kube-system
+type: Opaque
+data:
+  access_key_id: ''
+  access_key_secret: ''
+```
+
+PS: generate base64 ak/sk
+```python
+import base64
+
+# write here
+ak = ''
+sk = ''
+access_key_id = str(base64.b64encode(str.encode(ak)), encoding="utf-8")
+print('access_key_id:\n', access_key_id)
+access_key_secret = str(base64.b64encode(str.encode(sk)), encoding="utf-8")
+print('access_key_secret:\n', access_key_secret)
+
+```
+
+- deploy driver service
+```bash
+kubectl create -f https://raw.githubusercontent.com/capitalonline/cds-csi-driver/master/deploy/ccs_disk/deploy.yaml
+```
+
 ## To run tests
 
 **NAS:**
@@ -330,5 +368,49 @@ allowedTopologies:				# using allowedTopologies in sc
     - WuxiA-POD10-CLU02
 ```
 
+
+
+## To use the CCS-DISK driver
+Examples can be found [here](!https://github.com/capitalonline/cds-csi-driver/tree/master/example/ccs_disk)
+
+### Dynamic Pv
+
+sc.yaml
+
+```yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: ccs-disk-csi-cds-sc
+parameters:
+  fsType: ext4
+  iops: "3000"
+  siteId: "xxx"
+  zoneId: Cluster_Name1
+  storageType: "ssd_disk"
+provisioner: ccs-disk.csi.cds.net
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+```
+
+Description:
+
+| Key               | Value                     | Required | Description                                                                                                        |
+|-------------------|---------------------------|----------|--------------------------------------------------------------------------------------------------------------------|
+| fsType            | [ xfs\|ext4\|ext3 ]       | yes      | Linux filesystem type                                                                                              |
+| storageType       | [    ssd_disk     ]       | yes      | Only support `ssd_disk`                                  |
+| iops              | [5000\|7500\|10000]       | yes      | Only support `5000` `7500` and `10000`.<br />Should combined with `storageType`.                            |
+| siteId            | Eg. "Beijing001"          | yes      | Cluster's site_id.                                                                                                 |
+| zoneId            | Eg. "Beijing-POD10-CLU02" | yes      | Cluster's id.                                                                                                      |
+| provisioner       | ccs-disk.csi.cds.net      | yes      | Disk driver which installed default.                                                                               |
+| reclaimPolicy     | [ Delete\|Retain ]        | yes      | `Delete` means that PV will be deleted with PVC delete<br/>`Retain` means that PV will be retained when PVC delete |
+| volumeBindingMode | WaitForFirstConsumer      | yes      | Only suport `WaitForFirstConsumer` pollicy for disk.csi.cds.net driver.                                            |
+
+Kindly Remind:
+
+​	For disk storage, recommending using `volumeBindingMode:` `WaitForFirstConsumer ` in SC.yaml.
+
+​	If not, please apply your `ccs-disk.csi.cds.net` csi driver's `csi-provisioner` in k8s with following:
 
 
