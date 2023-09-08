@@ -1,0 +1,147 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: eks-disk-csi-cds-controller
+  namespace: kube-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: eks-disk-csi-cds-controller
+  serviceName: eks-disk-csi-provisioner
+  template:
+    metadata:
+      labels:
+        app: eks-disk-csi-cds-controller
+        type: csi-provisioner
+    spec:
+      containers:
+        - args:
+            - --endpoint=$(CSI_ENDPOINT)
+            - --v=5
+            - --driver=eks-disk.csi.cds.net
+          env:
+            - name: CSI_ENDPOINT
+              value: unix://socketDir/csi.sock
+            #            - name: API_HOST
+            #              value: http://api.capitalonline.net
+            - name: CDS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  key: access_key_id
+                  name: eks-secrets
+            - name: CDS_ACCESS_KEY_SECRET
+              valueFrom:
+                secretKeyRef:
+                  key: access_key_secret
+                  name: eks-secrets
+            - name: CDS_OVERSEA
+              valueFrom:
+                configMapKeyRef:
+                  key: oversea
+                  name: cds-properties
+            - name: CDS_CLUSTER_ID
+              valueFrom:
+                configMapKeyRef:
+                  key: k8s_cluster_id
+                  name: cds-properties
+            - name: CDS_API_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: cds-properties
+                  key: openapi_host
+          image: registry-bj.capitalonline.net/eks/cds-csi-driver-eks:v1.0.1
+          imagePullPolicy: Always
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - ps -ef | grep cds-csi-driver | grep eks-disk.csi.cds.net | grep -v grep
+            failureThreshold: 8
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 15
+          name: csi-controller-server
+          resources:
+            limits:
+              cpu: 100m
+              memory: 100Mi
+            requests:
+              cpu: 100m
+              memory: 100Mi
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - mountPath: /var/log/
+              name: host-log
+            - mountPath: /socketDir/
+              name: socket-dir
+            - mountPath: /host/etc
+              name: etc
+        - args:
+            - --csi-address=$(ADDRESS)
+            - --v=5
+          env:
+            - name: ADDRESS
+              value: /socketDir/csi.sock
+          image: registry-bj.capitalonline.net/cck/csi-provisioner:v3.1.0
+          name: csi-provisioner
+          volumeMounts:
+            - mountPath: /socketDir
+              name: socket-dir
+        - args:
+            - --csi-address=/csi/csi.sock
+            - --health-port=9811
+          image: registry-bj.capitalonline.net/cck/csi-livenessprobe:v2.0.0
+          name: liveness-probe
+          volumeMounts:
+            - mountPath: /csi
+              name: socket-dir
+        - args:
+            - --csi-address=$(ADDRESS)
+            - --v=5
+            - --leader-election=true
+          env:
+            - name: ADDRESS
+              value: /var/lib/csi/sockets/pluginproxy/csi.sock
+          image: registry-bj.capitalonline.net/cck/csi-attacher:v4.3.0
+          name: csi-attacher
+          volumeMounts:
+            - mountPath: /var/lib/csi/sockets/pluginproxy/
+              name: socket-dir
+      hostNetwork: true
+      hostPID: true
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: Exists
+      nodeSelector:
+        node-role.kubernetes.io/control-plane: ''
+      priorityClassName: system-cluster-critical
+      serviceAccount: eks-disk-cds-csi-sa
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.eks.net/infra
+          operator: Exists
+
+      volumes:
+        - emptyDir: {}
+          name: socket-dir
+        - hostPath:
+            path: /var/log/
+          name: host-log
+        - hostPath:
+            path: /etc
+          name: etc
+  updateStrategy:
+    type: RollingUpdate

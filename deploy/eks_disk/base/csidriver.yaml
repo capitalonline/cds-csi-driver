@@ -1,0 +1,7 @@
+apiVersion: storage.k8s.io/v1
+kind: CSIDriver
+metadata:
+  name: eks-disk.csi.cds.net
+spec:
+  attachRequired: true
+  podInfoOnMount: true
