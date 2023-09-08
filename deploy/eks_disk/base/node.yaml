@@ -1,0 +1,127 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: eks-disk-csi-cds-node
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      app: eks-disk-csi-cds-node
+  template:
+    metadata:
+      labels:
+        app: eks-disk-csi-cds-node
+    spec:
+      containers:
+        - args:
+            - --endpoint=$(CSI_ENDPOINT)
+            - --v=5
+            - --driver=eks-disk.csi.cds.net
+          env:
+            - name: CSI_ENDPOINT
+              value: unix://var/lib/kubelet/plugins/eks-disk.csi.cds.net/csi.sock
+            - name: CDS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  key: access_key_id
+                  name: eks-secrets
+            - name: CDS_ACCESS_KEY_SECRET
+              valueFrom:
+                secretKeyRef:
+                  key: access_key_secret
+                  name: eks-secrets
+            - name: CDS_OVERSEA
+              valueFrom:
+                configMapKeyRef:
+                  key: oversea
+                  name: cds-properties
+            - name: CDS_CLUSTER_ID
+              valueFrom:
+                configMapKeyRef:
+                  key: k8s_cluster_id
+                  name: cds-properties
+            - name: CDS_API_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: cds-properties
+                  key: openapi_host
+          image: registry-bj.capitalonline.net/eks/cds-csi-driver-eks:v1.0.1
+          imagePullPolicy: Always
+          name: eks-disk-csi-node-server
+          securityContext:
+            allowPrivilegeEscalation: true
+            capabilities:
+              add:
+                - SYS_ADMIN
+            privileged: true
+          volumeMounts:
+            - mountPath: /var/lib/kubelet/
+              mountPropagation: Bidirectional
+              name: kubelet-dir
+            - mountPath: /var/log/
+              name: host-log
+            - mountPath: /host/etc
+              name: etc
+            - mountPath: /dev
+              name: host-dev
+        - args:
+            - --v=5
+            - --csi-address=$(ADDRESS)
+            - --kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)
+          env:
+            - name: ADDRESS
+              value: /var/lib/kubelet/plugins/eks-disk.csi.cds.net/csi.sock
+            - name: DRIVER_REG_SOCK_PATH
+              value: /var/lib/kubelet/plugins/eks-disk.csi.cds.net/csi.sock
+          image: registry-bj.capitalonline.net/cck/csi-node-driver-registrar:v1.2.0
+          imagePullPolicy: Always
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - rm -rf /registration/eks-disk.csi.cds.net /registration/eks-disk.csi.cds.net-reg.sock
+          name: eks-disk-driver-registrar
+          volumeMounts:
+            - mountPath: /var/lib/kubelet/
+              name: kubelet-dir
+            - mountPath: /registration/
+              name: registration-dir
+        - args:
+            - --csi-address=/var/lib/kubelet/plugins/eks-disk.csi.cds.net/csi.sock
+            - --health-port=9812
+          image: registry-bj.capitalonline.net/cck/csi-livenessprobe:v2.0.0
+          name: eks-disk-liveness-probe
+          volumeMounts:
+            - mountPath: /var/lib/kubelet/
+              name: kubelet-dir
+
+      hostNetwork: true
+      hostPID: true
+      priorityClassName: system-node-critical
+      serviceAccount: eks-disk-cds-csi-sa
+      tolerations:
+        - operator: Exists
+      volumes:
+        - emptyDir: {}
+          name: socket-dir
+        - hostPath:
+            path: /var/lib/kubelet
+            type: Directory
+          name: kubelet-dir
+        - hostPath:
+            path: /var/lib/kubelet/plugins_registry
+            type: DirectoryOrCreate
+          name: registration-dir
+        - hostPath:
+            path: /var/log/
+          name: host-log
+        - hostPath:
+            path: /etc
+          name: etc
+        - hostPath:
+            path: /dev
+          name: host-dev
+  updateStrategy:
+    type: RollingUpdate
