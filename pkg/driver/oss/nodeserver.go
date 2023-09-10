@@ -79,7 +79,7 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 
 	var mntCmd string
 	log.Debugf("NodePublishVolume:: Start mount source [%s:%s] to [%s]", opts.Bucket, opts.Path, opts.NodePublishPath)
-	mntCmd = fmt.Sprintf("sh -c \"s3fs %s:%s %s -o passwd_file=%s -o url=%s %s\"", opts.Bucket, opts.Path, opts.NodePublishPath, CredentialFile, opts.URL, defaultOtherOpts)
+	mntCmd = fmt.Sprintf("s3fs %s:%s %s -o passwd_file=%s -o url=%s %s", opts.Bucket, opts.Path, opts.NodePublishPath, CredentialFile, opts.URL, defaultOtherOpts)
 	log.Debugf("mntCmd is: %s", mntCmd)
 	//if _, err := utils.RunCommand(mntCmd); err != nil {
 	//	log.Errorf("Mount oss bucket to mountPath failed, error is: %s", err)
