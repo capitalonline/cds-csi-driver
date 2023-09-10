@@ -10,7 +10,9 @@ import (
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"os/exec"
 	"strings"
+	"syscall"
 )
 
 func NewNodeServer(d *OssDriver) *NodeServer {
@@ -70,7 +72,7 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 		utils.SentrySendError(fmt.Errorf("AuthType verify error, AuthType is only support %s", AuthTypeDefault))
 		return nil, errors.New("AuthType verify error, not support, it should to be saveAkFile")
 	}
-	
+
 	if err := utils.CreateDir(opts.NodePublishPath, 0777); err != nil {
 		return nil, fmt.Errorf("NodePublishVolume:: oss, unable to create directory: %s", opts.NodePublishPath)
 	}
@@ -85,19 +87,19 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 	//	return nil, err
 	//}
 
-    parts := strings.Fields(mntCmd)
-    if len(parts) < 1 {
-        log.Errorf("Invalid command line: %+v", mntCmd)
-        return nil, fmt.Errorf("Invalid command line: %+v", mntCmd)
-    }
+	parts := strings.Fields(mntCmd)
+	if len(parts) < 1 {
+		log.Errorf("Invalid command line: %+v", mntCmd)
+		return nil, fmt.Errorf("invalid command line: %+v", mntCmd)
+	}
 
-    cmd := exec.Command(parts[0], parts[1:]...)
-    cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-    err := cmd.Run()
-    if err != nil {
-        log.Errorf("Command failed: %v", err)
-        return nil, fmt.Errorf("Command failed: %v", err)
-    }
+	cmd := exec.Command(parts[0], parts[1:]...)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	err := cmd.Run()
+	if err != nil {
+		log.Errorf("Command failed: %v", err)
+		return nil, fmt.Errorf("command failed: %v", err)
+	}
 
 	// recheck oss mount result
 	if !utils.Mounted(opts.NodePublishPath) {
