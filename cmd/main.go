@@ -63,7 +63,7 @@ func main() {
 			// fetch vm uuid
 			uuid, err := os.ReadFile(uuidPath)
 			if err != nil {
-				log.Fatal("failed to read product_uuid file: %+v", err)
+				log.Fatalf("failed to read product_uuid file: %+v", err)
 			}
 
 			nodeID = string(uuid)
