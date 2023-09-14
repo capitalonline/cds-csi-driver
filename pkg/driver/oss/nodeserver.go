@@ -10,6 +10,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"k8s.io/klog"
 	"strings"
 )
 
@@ -79,15 +80,16 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 	log.Debugf("NodePublishVolume:: Start mount source [%s:%s] to [%s]", opts.Bucket, opts.Path, opts.NodePublishPath)
 	mntCmd = fmt.Sprintf("s3fs %s:%s %s -o passwd_file=%s -o url=%s %s", opts.Bucket, opts.Path, opts.NodePublishPath, CredentialFile, opts.URL, defaultOtherOpts)
 	log.Infof("mntCmd is: %s", mntCmd)
-	if _, err := utils.RunCommand(mntCmd); err != nil {
-		log.Errorf("Mount oss bucket to mountPath failed, error is: %s", err)
-		utils.SentrySendError(fmt.Errorf("Mount oss bucket to mountPath failed, error is: %s", err))
-		return nil, err
-	}
-
-	//if err := utils.RunSYSCommand(mntCmd); err != nil {
+	//if _, err := utils.RunCommand(mntCmd); err != nil {
+	//	log.Errorf("Mount oss bucket to mountPath failed, error is: %s", err)
+	//	utils.SentrySendError(fmt.Errorf("Mount oss bucket to mountPath failed, error is: %s", err))
 	//	return nil, err
 	//}
+
+	if err := utils.RunSYSCommand(mntCmd); err != nil {
+		klog.Errorf("failed to run sys command: %+v", err)
+		return nil, err
+	}
 
 	// recheck oss mount result
 	if !utils.Mounted(opts.NodePublishPath) {
