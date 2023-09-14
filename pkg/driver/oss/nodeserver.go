@@ -85,20 +85,6 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 	//	return nil, err
 	//}
 
-	//parts := strings.Fields(mntCmd)
-	//if len(parts) < 1 {
-	//	log.Errorf("Invalid command line: %+v", mntCmd)
-	//	return nil, fmt.Errorf("invalid command line: %+v", mntCmd)
-	//}
-
-	//cmd := exec.Command("sh", "-c", mntCmd)
-	//cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	//err := cmd.Run()
-	//if err != nil {
-	//	log.Errorf("Command failed: %v", err)
-	//	return nil, fmt.Errorf("command failed: %v", err)
-	//}
-
 	if err := utils.RunS3FSCommand(mntCmd); err != nil {
 		return nil, err
 	}
