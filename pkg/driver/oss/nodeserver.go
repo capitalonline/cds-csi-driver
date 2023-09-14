@@ -71,27 +71,23 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 		return nil, errors.New("AuthType verify error, not support, it should to be saveAkFile")
 	}
 
-	pathCmd := fmt.Sprintf("mkdir -p %s && chmod 777 %s", opts.NodePublishPath, opts.NodePublishPath)
-	if err := utils.RunSYSCommand(pathCmd); err != nil {
-		return nil, err
+	if err := utils.CreateDir(opts.NodePublishPath, 0777); err != nil {
+		return nil, fmt.Errorf("NodePublishVolume:: oss, unable to create directory: %s", opts.NodePublishPath)
 	}
-	//if err := utils.CreateDir(opts.NodePublishPath, 0777); err != nil {
-	//	return nil, fmt.Errorf("NodePublishVolume:: oss, unable to create directory: %s", opts.NodePublishPath)
-	//}
 
 	var mntCmd string
 	log.Debugf("NodePublishVolume:: Start mount source [%s:%s] to [%s]", opts.Bucket, opts.Path, opts.NodePublishPath)
 	mntCmd = fmt.Sprintf("s3fs %s:%s %s -o passwd_file=%s -o url=%s %s", opts.Bucket, opts.Path, opts.NodePublishPath, CredentialFile, opts.URL, defaultOtherOpts)
 	log.Infof("mntCmd is: %s", mntCmd)
-	//if _, err := utils.RunCommand(mntCmd); err != nil {
-	//	log.Errorf("Mount oss bucket to mountPath failed, error is: %s", err)
-	//	utils.SentrySendError(fmt.Errorf("Mount oss bucket to mountPath failed, error is: %s", err))
-	//	return nil, err
-	//}
-
-	if err := utils.RunSYSCommand(mntCmd); err != nil {
+	if _, err := utils.RunCommand(mntCmd); err != nil {
+		log.Errorf("Mount oss bucket to mountPath failed, error is: %s", err)
+		utils.SentrySendError(fmt.Errorf("Mount oss bucket to mountPath failed, error is: %s", err))
 		return nil, err
 	}
+
+	//if err := utils.RunSYSCommand(mntCmd); err != nil {
+	//	return nil, err
+	//}
 
 	// recheck oss mount result
 	if !utils.Mounted(opts.NodePublishPath) {
