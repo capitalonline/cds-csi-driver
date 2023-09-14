@@ -79,11 +79,26 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 	log.Debugf("NodePublishVolume:: Start mount source [%s:%s] to [%s]", opts.Bucket, opts.Path, opts.NodePublishPath)
 	mntCmd = fmt.Sprintf("s3fs %s:%s %s -o passwd_file=%s -o url=%s %s", opts.Bucket, opts.Path, opts.NodePublishPath, CredentialFile, opts.URL, defaultOtherOpts)
 	log.Debugf("mntCmd is: %s", mntCmd)
-	if _, err := utils.RunCommand(mntCmd); err != nil {
-		log.Errorf("Mount oss bucket to mountPath failed, error is: %s", err)
-		utils.SentrySendError(fmt.Errorf("Mount oss bucket to mountPath failed, error is: %s", err))
-		return nil, err
-	}
+	//if _, err := utils.RunCommand(mntCmd); err != nil {
+	//	log.Errorf("Mount oss bucket to mountPath failed, error is: %s", err)
+	//	utils.SentrySendError(fmt.Errorf("Mount oss bucket to mountPath failed, error is: %s", err))
+	//	return nil, err
+	//}
+
+    parts := strings.Fields(mntCmd)
+    if len(parts) < 1 {
+        log.Errorf("Invalid command line: %+v", mntCmd)
+        return nil, fmt.Errorf("Invalid command line: %+v", mntCmd)
+    }
+
+    cmd := exec.Command(parts[0], parts[1:]...)
+    cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+    err := cmd.Run()
+    if err != nil {
+        log.Errorf("Command failed: %v", err)
+        return nil, fmt.Errorf("Command failed: %v", err)
+    }
+
 	// recheck oss mount result
 	if !utils.Mounted(opts.NodePublishPath) {
 		log.Errorf("Remote bucket path [%s:%s] is not exist, please create it firstly", opts.Bucket, opts.Path)
