@@ -10,7 +10,6 @@ import (
 	"google.golang.org/grpc/status"
 	"io/ioutil"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/klog"
 	"net"
 	"os"
 	"os/exec"
@@ -173,19 +172,14 @@ func RunCommand(cmd string) (string, error) {
 // CreateDir create the target directory with error handling
 func CreateDir(target string, mode int) error {
 	fi, err := os.Lstat(target)
-	klog.Infof("111xxxxxxxxxxxxxx %s", target)
 
 	if os.IsNotExist(err) {
-		klog.Infof("222xxxxxxxxxxxxxx %s", target)
 		if err := os.MkdirAll(target, os.FileMode(mode)); err != nil {
-			klog.Infof("333xxxxxxxxxxxxxx %s", target)
 			return err
 		}
-		klog.Infof("444xxxxxxxxxxxxxx %s", target)
 	} else if err != nil {
 		return err
 	}
-	klog.Infof("555xxxxxxxxxxxxxx %s", target)
 
 	if fi != nil && !fi.IsDir() {
 		return fmt.Errorf("%s already exist but it's not a directory", target)
@@ -356,7 +350,7 @@ func FsInfo(path string) (int64, int64, int64, int64, int64, int64, error) {
 	return available, capacity, usage, inodes, inodesFree, inodesUsed, nil
 }
 
-func RunS3FSCommand(cmd string) error {
+func RunSYSCommand(cmd string) error {
 	conn, err := net.Dial("unix", SockFile)
 	if err != nil {
 		panic(err)
