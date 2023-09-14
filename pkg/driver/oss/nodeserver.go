@@ -10,9 +10,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"os/exec"
 	"strings"
-	"syscall"
 )
 
 func NewNodeServer(d *OssDriver) *NodeServer {
@@ -79,7 +77,7 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 
 	var mntCmd string
 	log.Debugf("NodePublishVolume:: Start mount source [%s:%s] to [%s]", opts.Bucket, opts.Path, opts.NodePublishPath)
-	mntCmd = fmt.Sprintf("sh && s3fs %s:%s %s -o passwd_file=%s -o url=%s %s &", opts.Bucket, opts.Path, opts.NodePublishPath, CredentialFile, opts.URL, defaultOtherOpts)
+	mntCmd = fmt.Sprintf("s3fs %s:%s %s -o passwd_file=%s -o url=%s %s", opts.Bucket, opts.Path, opts.NodePublishPath, CredentialFile, opts.URL, defaultOtherOpts)
 	log.Infof("mntCmd is: %s", mntCmd)
 	//if _, err := utils.RunCommand(mntCmd); err != nil {
 	//	log.Errorf("Mount oss bucket to mountPath failed, error is: %s", err)
@@ -93,12 +91,16 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 	//	return nil, fmt.Errorf("invalid command line: %+v", mntCmd)
 	//}
 
-	cmd := exec.Command("sh", "-c", mntCmd)
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	err := cmd.Run()
-	if err != nil {
-		log.Errorf("Command failed: %v", err)
-		return nil, fmt.Errorf("command failed: %v", err)
+	//cmd := exec.Command("sh", "-c", mntCmd)
+	//cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	//err := cmd.Run()
+	//if err != nil {
+	//	log.Errorf("Command failed: %v", err)
+	//	return nil, fmt.Errorf("command failed: %v", err)
+	//}
+
+	if err := utils.RunS3FSCommand(mntCmd); err != nil {
+		return nil, err
 	}
 
 	// recheck oss mount result

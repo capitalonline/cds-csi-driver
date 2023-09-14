@@ -25,6 +25,7 @@ import (
 const (
 	NodeMetaDataFile = "/host/etc/cds/node-meta"
 	CloudInitDevSize = 8 * 1024
+	SockFile         = "/var/run/oss-server.sock"
 )
 
 // Metrics represents the used and available bytes of the Volume.
@@ -347,4 +348,28 @@ func FsInfo(path string) (int64, int64, int64, int64, int64, int64, error) {
 	inodesUsed := inodes - inodesFree
 
 	return available, capacity, usage, inodes, inodesFree, inodesUsed, nil
+}
+
+func RunS3FSCommand(cmd string) error {
+	conn, err := net.Dial("unix", SockFile)
+	if err != nil {
+		panic(err)
+	}
+	defer conn.Close()
+
+	if _, err = conn.Write([]byte(cmd)); err != nil {
+		return fmt.Errorf("failed to write: %+v", err)
+	}
+
+	buf := make([]byte, 1024)
+	n, err := conn.Read(buf)
+	if err != nil {
+		return fmt.Errorf("failed to read conn: %+v", err)
+	}
+
+	if string(buf[:n]) == "Success" {
+		return nil
+	}
+
+	return fmt.Errorf("failed to run cmd: %+v", cmd)
 }
