@@ -49,26 +49,23 @@ func main() {
 }
 
 func handleConnection(conn net.Conn) {
-	buf := make([]byte, 1024)
+	buf := make([]byte, 2048)
 	n, err := conn.Read(buf)
 	if err != nil {
 		panic(err)
 	}
 
 	fmt.Println(string(buf[:n]))
-	cmd := exec.Command("sh", "-c", string(buf[:n]))
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Setpgid: true,
-	}
 
 	codeStr := "Success"
+
+	cmd := exec.Command("sh", "-c", string(buf[:n]))
 	if _, err = cmd.CombinedOutput(); err != nil {
 		fmt.Println(err)
 		codeStr = "Fail"
 	}
 
-	_, err = conn.Write([]byte(codeStr))
-	if err != nil {
+	if _, err = conn.Write([]byte(codeStr)); err != nil {
 		fmt.Println(err)
 	}
 }

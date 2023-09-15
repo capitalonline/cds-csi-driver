@@ -11,7 +11,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/klog"
-	"os"
 	"strings"
 )
 
@@ -75,15 +74,6 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 
 	if err := utils.CreateDir(opts.NodePublishPath, 0777); err != nil {
 		return nil, fmt.Errorf("NodePublishVolume:: oss, unable to create directory: %s", opts.NodePublishPath)
-	}
-
-	_, err := os.Lstat(opts.NodePublishPath)
-	if err == nil {
-		klog.Infof("xxxxxxxxxxxxxxx")
-	}
-
-	if err != nil {
-		klog.Errorf("xxxxxxxxxxxxxxcccc  %+v", err)
 	}
 
 	var mntCmd string
