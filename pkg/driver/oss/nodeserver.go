@@ -63,7 +63,7 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 	// save AK and AKS
 	if opts.AuthType == "saveAkFile" {
 		// save ak file: bucket:ak_id:ak_secret to /etc/s3pass
-		if err := opts.saveOssCredential(CredentialFile); err != nil {
+		if err := opts.saveOssCredential(LocalCredentialFile); err != nil {
 			log.Debugf("save ak file: bucket:ak_id:ak_secret failed")
 			return nil, err
 		}
