@@ -138,6 +138,21 @@ spec:
       labels:
         app: oss-csi-cds-node
     spec:
+      initContainers:
+      - name: install-oss-server
+        image: registry-bj.capitalonline.net/cck/oss-server:v1.0.0                
+        imagePullPolicy: Always
+        command: 
+        - /bin/sh
+        - -c
+        - /install-oss.sh
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - mountPath: /srv/
+          name: local-srv
+        - mountPath: /host/config/system/
+          name: systemd
       containers:
       - args:
         - --endpoint=$(CSI_ENDPOINT)
@@ -163,6 +178,9 @@ spec:
           name: host-log
         - mountPath: /host/etc
           name: etc
+        - mountPath: /var/run
+          mountPropagation: Bidirectional
+          name: run
       - args:
         - --v=5
         - --csi-address=$(ADDRESS)
@@ -216,6 +234,18 @@ spec:
       - hostPath:
           path: /etc
         name: etc
+      - hostPath:
+          path: /var/run/
+          type: DirectoryOrCreate
+        name: run
+      - hostPath:
+          path: /srv/
+          type: DirectoryOrCreate
+        name: local-srv
+      - hostPath:
+          path: /usr/lib/systemd/system/
+          type: ""
+        name: systemd
   updateStrategy:
     type: RollingUpdate
 ---
