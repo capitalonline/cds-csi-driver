@@ -2,5 +2,5 @@ bases:
 - ../../base
 
 images:
-- name: registry-bj.capitalonline.net/eks/cds-csi-driver-eks
-  newTag: v1.0.1
+- name: registry-bj.capitalonline.net/cck/cds-csi-driver
+  newTag: v2.1.1
