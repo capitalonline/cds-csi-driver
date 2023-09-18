@@ -393,7 +393,7 @@ spec:
                 configMapKeyRef:
                   name: cds-properties
                   key: openapi_host
-          image: registry-bj.capitalonline.net/cck/cds-csi-driver:v2.1.1
+          image: registry-bj.capitalonline.net/cck/cds-csi-driver:v2.1.2
           imagePullPolicy: Always
           name: eks-disk-csi-node-server
           securityContext:
