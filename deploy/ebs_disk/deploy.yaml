@@ -240,7 +240,7 @@ spec:
                 configMapKeyRef:
                   key: oversea
                   name: cds-properties
-          image: registry-bj.capitalonline.net/cck/cds-csi-driver:v2.1.1
+          image: registry-bj.capitalonline.net/cck/cds-csi-driver:v2.1.2
           imagePullPolicy: Always
           livenessProbe:
             exec:
@@ -366,7 +366,7 @@ spec:
                   name: cds-properties
             - name: API_HOST
               value: http://api.capitalonline.net
-          image: registry-bj.capitalonline.net/cck/cds-csi-driver:v2.1.1
+          image: registry-bj.capitalonline.net/cck/cds-csi-driver:v2.1.2
           imagePullPolicy: Always
           name: ebs-disk-csi-node-server
           securityContext:
