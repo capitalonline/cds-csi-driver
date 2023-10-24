@@ -15,6 +15,14 @@ kubectl create -f https://raw.githubusercontent.com/capitalonline/cds-csi-driver
 To deploy the CSI OSS driver to your k8s, simply run:
 
 ```bash
+# need install s3fs in host
+# ubuntu OS
+apt install s3fs -y
+
+# centos OS
+yum install s3fs -y
+
+# install csi 
 kubectl create -f https://raw.githubusercontent.com/capitalonline/cds-csi-driver/master/deploy/oss/deploy.yaml
 ```
 
