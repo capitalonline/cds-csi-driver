@@ -140,7 +140,7 @@ spec:
     spec:
       initContainers:
       - name: install-oss-server
-        image: registry-bj.capitalonline.net/cck/oss-server:v1.0.0                
+        image: registry-bj.capitalonline.net/cck/oss-server:v1.0.1
         imagePullPolicy: Always
         command: 
         - /bin/sh
