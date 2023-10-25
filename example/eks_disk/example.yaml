@@ -1,0 +1,59 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: test-sc-retain
+parameters:
+  fsType: ext4
+  storageType: SSD
+  azId: CN_Suqian_B     # 这里填azId
+provisioner: eks-disk.csi.cds.net
+reclaimPolicy: Retain
+volumeBindingMode: WaitForFirstConsumer
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: test-pvc-rwmany-sc-retain
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: test-sc-retain
+  resources:
+    requests:
+      storage: 80Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-pod-pvc-rwmany-sc-retain-single-volume
+  namespace: default
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values:
+                      - nginx
+              topologyKey: "kubernetes.io/hostname"
+      containers:
+        - name: "nginx-test"
+          image: "nginx:latest"
+          volumeMounts:
+            - name: volume1
+              mountPath: "/test_path1"
+      volumes:
+        - name: volume1
+          persistentVolumeClaim:
+            claimName: test-pvc-rwmany-sc-retain
