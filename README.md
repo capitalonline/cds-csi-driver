@@ -295,6 +295,45 @@ Kindly Remind:
 
 ​	If not, please apply your `ebs-disk.csi.cds.net` csi driver's `csi-provisioner` in k8s with following:
 
+## To use the EKS-DISK driver
+
+Examples can be found [here](!https://github.com/capitalonline/cds-csi-driver/tree/master/example/ebs_disk)
+
+### Dynamic Pv
+
+sc.yaml
+
+```yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: test-sc-retain
+parameters:
+  fsType: ext4
+  storageType: SSD
+  azId: CN_Suqian_B
+provisioner: eks-disk.csi.cds.net
+reclaimPolicy: Retain
+volumeBindingMode: WaitForFirstConsumer    
+```
+
+Description:
+
+| Key               | Value                | Required | Description                                                  |
+| ----------------- | -------------------- | -------- | ------------------------------------------------------------ |
+| fsType            | [ xfs\|ext4 ]        | yes      | Linux filesystem type                                        |
+| storageType       | [ SSD ]              | yes      | Only support `ssd_disk`                                      |
+| azId              | Eg. " CN_Suqian_B"   | yes      | Cluster's az_id.                                             |
+| provisioner       | eks-disk.csi.cds.net | yes      | Disk driver which installed default.                         |
+| reclaimPolicy     | [ Delete\|Retain ]   | yes      | `Delete` means that PV will be deleted with PVC delete<br/>`Retain` means that PV will be retained when PVC delete |
+| volumeBindingMode | WaitForFirstConsumer | yes      | Only suport `WaitForFirstConsumer` pollicy for disk.csi.cds.net driver. |
+
+Kindly Remind:
+
+​	For disk storage, recommending using `volumeBindingMode:` `WaitForFirstConsumer ` in SC.yaml.
+
+​	If not, please apply your `eks-disk.csi.cds.net` csi driver's `csi-provisioner` in k8s with following:
+
 
 ## To use the Disk driver 
 
@@ -420,5 +459,4 @@ Kindly Remind:
 ​	For disk storage, recommending using `volumeBindingMode:` `WaitForFirstConsumer ` in SC.yaml.
 
 ​	If not, please apply your `ccs-disk.csi.cds.net` csi driver's `csi-provisioner` in k8s with following:
-
 
