@@ -172,7 +172,6 @@ spec:
           privileged: true
         volumeMounts:
         - mountPath: /var/lib/kubelet/
-          mountPropagation: Bidirectional
           name: kubelet-dir
         - mountPath: /var/log/
           name: host-log
