@@ -37,7 +37,6 @@ spec:
         volumeMounts:
         - name: kubelet-dir
           mountPath: /var/lib/kubelet/
-          mountPropagation: "Bidirectional"
         - name: host-log
           mountPath: /var/log/
         - name: etc
