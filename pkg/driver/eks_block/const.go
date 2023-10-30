@@ -1,5 +1,7 @@
 package eks_block
 
+import "time"
+
 const (
 	HighDisk         = "high_disk"
 	SsdDisk          = "ssd_disk"
@@ -41,4 +43,8 @@ const (
 	UnPublishing = "unPublishing"
 	UnStaing     = "UnStaing"
 	Ok           = "ok"
+)
+
+const (
+	PatchPVInterval = 60 * time.Second //3 * time.Minute
 )

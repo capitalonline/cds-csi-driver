@@ -1,5 +1,7 @@
 package ebs_disk
 
+import "time"
+
 const (
 	mountPointMode   = 0777
 	DefaultFsTypeXfs = "xfs"
@@ -12,6 +14,7 @@ const (
 	ebsSsdDisk       = "SSD"
 
 	DriverEbsDiskTypeName = "ebs-disk.csi.cds.net"
+	PatchPVInterval       = 60 * time.Second
 )
 
 const (
