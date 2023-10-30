@@ -52,7 +52,10 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 	log.Debugf("NodePublishVolume:: parsed PublishOptions options: %+v", opts)
 
 	// directly return if the target mountPath has been mounted
-	if utils.Mounted(opts.NodePublishPath) {
+	cmdMnt := fmt.Sprintf("mount | grep %s | grep -v grep", opts.NodePublishPath)
+	if err := utils.RunSYSCommand(cmdMnt); err != nil {
+		klog.Errorf("failed to run sys command: %+v", err)
+	} else {
 		log.Debugf("NodePublishVolume:: oss, mountPath: %s is mounted", opts.NodePublishPath)
 		return &csi.NodePublishVolumeResponse{}, nil
 	}
@@ -92,12 +95,14 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 	}
 
 	// recheck oss mount result
-	if !utils.Mounted(opts.NodePublishPath) {
+	cmdMnt = fmt.Sprintf("mount | grep %s | grep -v grep", opts.NodePublishPath)
+	if err := utils.RunSYSCommand(cmdMnt); err != nil {
+		klog.Errorf("failed to run sys command: %+v", err)
 		log.Errorf("Remote bucket path [%s:%s] is not exist, please create it firstly", opts.Bucket, opts.Path)
 		utils.SentrySendError(fmt.Errorf("Remote bucket path [%s:%s] is not exist, please create it firstly", opts.Bucket, opts.Path))
-		errMsg := fmt.Sprintf("Remote bucket path [%s:%s] is not exist, please create it firstly", opts.Bucket, opts.Path)
-		return nil, errors.New(errMsg)
+		return nil, err
 	}
+
 	log.Infof("NodePublishVolume:: Mount Oss successful, volumeID:%s, oss: [%s:%s], targetPath:%s", req.VolumeId, opts.NodePublishPath, opts.Path, opts.NodePublishPath)
 	return &csi.NodePublishVolumeResponse{}, nil
 }
@@ -107,14 +112,18 @@ func (n *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpub
 
 	// skip the unmount if the path is not mounted
 	mountPoint := req.TargetPath
-	if !utils.Mounted(mountPoint) {
+
+	cmdMnt := fmt.Sprintf("mount | grep %s | grep -v grep", mountPoint)
+	if err := utils.RunSYSCommand(cmdMnt); err != nil {
+		klog.Errorf("failed to run sys command: %+v", err)
 		log.Warnf("NodeUnpublishVolume:: oss, unmount mountpoint not found, skipping: %s", mountPoint)
 		return &csi.NodeUnpublishVolumeResponse{}, nil
 	}
 
 	// unmount the volume, use force umount on network not reachable or no other pod used
 	unmoutCmd := fmt.Sprintf("umount %s", mountPoint)
-	if _, err := utils.RunCommand(unmoutCmd); err != nil {
+	if err := utils.RunSYSCommand(unmoutCmd); err != nil {
+		klog.Errorf("failed to run sys command: %+v", err)
 		return nil, fmt.Errorf("NodeUnpublishVolume:: oss, Umount oss bucket fail: %s", err.Error())
 	}
 

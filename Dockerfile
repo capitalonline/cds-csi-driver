@@ -10,8 +10,8 @@ RUN cd /go/src/github.com/capitalonline/cds-csi-driver && go mod tidy && make co
 
 FROM alpine:3.6
 
-ARG S3FS_VERSION=v1.82
-
+#ARG S3FS_VERSION=v1.82
+#
 RUN apk --no-cache update && apk --no-cache add --virtual build-dependencies \
     build-base alpine-sdk \
     fuse fuse-dev \
@@ -21,16 +21,16 @@ RUN apk --no-cache update && apk --no-cache add --virtual build-dependencies \
     ca-certificates \
     udev e2fsprogs xfsprogs nvme-cli
 
-RUN git clone https://github.com/s3fs-fuse/s3fs-fuse.git && \
-    cd s3fs-fuse \
-    git checkout tags/${S3FS_VERSION} && \
-    ./autogen.sh && \
-    ./configure --prefix=/usr && \
-    make && \
-    make install && \
-    s3fs --version && \
-    cd ../ && \
-    rm -rf s3fs-fuse
+#RUN git clone https://github.com/s3fs-fuse/s3fs-fuse.git && \
+#    cd s3fs-fuse \
+#    git checkout tags/${S3FS_VERSION} && \
+#    ./autogen.sh && \
+#    ./configure --prefix=/usr && \
+#    make && \
+#    make install && \
+#    s3fs --version && \
+#    cd ../ && \
+#    rm -rf s3fs-fuse
 
 COPY --from=build-env /cds-csi-driver /cds-csi-driver
 
