@@ -592,7 +592,7 @@ func patchTopologyOfPVs(clientSet *kubernetes.Clientset) {
 
 		//skip if the PV is not created by this driver
 		if pv.Spec.PersistentVolumeSource.CSI.Driver != DriverEbsDiskTypeName {
-			break
+			continue
 		}
 
 		//creat labels if the pv doesn't have any labels yet
@@ -601,7 +601,7 @@ func patchTopologyOfPVs(clientSet *kubernetes.Clientset) {
 		} else {
 			// skip if the topology has been patched
 			if pv.Labels[TopologyZoneKey] == zone && pv.Labels[TopologyRegionKey] == region {
-				break
+				continue
 			}
 		}
 
