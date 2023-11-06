@@ -270,7 +270,8 @@ metadata:
   name: ebs-disk-csi-cds-sc
 parameters:
   fsType: ext4
-  azId: SR_SaoPaulo_A
+  region: SR_SaoPaulo
+  zone: SR_SaoPaulo_A
   storageType: SSD
 provisioner: ebs-disk.csi.cds.net
 reclaimPolicy: Delete
@@ -284,7 +285,8 @@ Description:
 |-------------------|----------------------|----------|--------------------------------------------------------------------------------------------------------------------|
 | fsType            | [ xfs\|ext4 ]        | yes      | Linux filesystem type                                                                                              |
 | storageType       | [ ssd_disk ]         | yes      | Only support `ssd_disk`.<br />                                                                                     |
-| azId              | Eg. "SR_SaoPaulo_A"  | yes      | Cluster's az_id.                                                                                                   |
+| zong              | Eg. "SR_SaoPaulo_A"  | yes      | Cluster's az code.                                                                                                   |
+| region            | Eg. "SR_SaoPaulo"    | yes      | Cluster's region code |
 | provisioner       | ebs-disk.csi.cds.net | yes      | Disk driver which installed default.                                                                               |
 | reclaimPolicy     | [ Delete\|Retain ]   | yes      | `Delete` means that PV will be deleted with PVC delete<br/>`Retain` means that PV will be retained when PVC delete |
 | volumeBindingMode | WaitForFirstConsumer | yes      | Only suport `WaitForFirstConsumer` pollicy for disk.csi.cds.net driver.                                            |
@@ -311,7 +313,8 @@ metadata:
 parameters:
   fsType: ext4
   storageType: SSD
-  azId: CN_Suqian_B
+  region: CN_Suqian
+  zone: CN_Suqian_B
 provisioner: eks-disk.csi.cds.net
 reclaimPolicy: Retain
 volumeBindingMode: WaitForFirstConsumer    
@@ -323,7 +326,8 @@ Description:
 | ----------------- | -------------------- | -------- | ------------------------------------------------------------ |
 | fsType            | [ xfs\|ext4 ]        | yes      | Linux filesystem type                                        |
 | storageType       | [ SSD ]              | yes      | Only support `ssd_disk`                                      |
-| azId              | Eg. " CN_Suqian_B"   | yes      | Cluster's az_id.                                             |
+| zone              | Eg. " CN_Suqian_B"   | yes      | Cluster's az code.                                             |
+| region            | Eg. " CN_Suqian"   | yes      | Cluster's region code.                                             |
 | provisioner       | eks-disk.csi.cds.net | yes      | Disk driver which installed default.                         |
 | reclaimPolicy     | [ Delete\|Retain ]   | yes      | `Delete` means that PV will be deleted with PVC delete<br/>`Retain` means that PV will be retained when PVC delete |
 | volumeBindingMode | WaitForFirstConsumer | yes      | Only suport `WaitForFirstConsumer` pollicy for disk.csi.cds.net driver. |
