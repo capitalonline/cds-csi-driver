@@ -270,7 +270,6 @@ metadata:
   name: ebs-disk-csi-cds-sc
 parameters:
   fsType: ext4
-  azId: SR_SaoPaulo_A
   region: SR_SaoPaulo
   zone: SR_SaoPaulo_A
   storageType: SSD
