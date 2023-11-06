@@ -4,6 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
+	"sync"
+	"time"
+
 	cdsDisk "github.com/capitalonline/cck-sdk-go/pkg/eks/ebs"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	csicommon "github.com/kubernetes-csi/drivers/pkg/csi-common"
@@ -14,9 +18,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"strings"
-	"sync"
-	"time"
 )
 
 // the map of req.Name and csi.Volume.
@@ -58,6 +59,9 @@ func NewControllerServer(d *DiskDriver) *ControllerServer {
 	if err != nil {
 		log.Fatalf("NewControllerServer:: Failed to create kubernetes client: %v", err)
 	}
+
+	log.Infof("String thread to path pv topology every %s", PatchPVInterval)
+	go patchTopologyOfPVsPeriodically(clientset)
 
 	return &ControllerServer{
 		Client:                  clientset,
@@ -131,14 +135,14 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 	log.Infof("CreateVolume: diskRequestGB is: %d", diskRequestGB)
 
 	diskVol, err := parseDiskVolumeOptions(req)
-	res, err := describeDiskQuota(diskVol.AzId)
+	res, err := describeDiskQuota(diskVol.Zone)
 	if err != nil || res == nil || len(res.Data.QuotaList) == 0 {
 		log.Errorf("CreateVolume: error when describeDiskQuota,err: %v , res:%v", err, res)
 		return nil, err
 	}
 	if diskRequestGB > int64(res.Data.QuotaList[0].FreeQuota) {
 		quota := res.Data.QuotaList[0].FreeQuota
-		msg := fmt.Sprintf("az %s free quota is: %d,less than requested %d", diskVol.AzId, quota, diskRequestGB)
+		msg := fmt.Sprintf("az %s free quota is: %d,less than requested %d", diskVol.Zone, quota, diskRequestGB)
 		log.Error(msg)
 		return nil, status.Error(codes.InvalidArgument, msg)
 	}
@@ -149,7 +153,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 
 	// do request to create ebs disk
 	// diskName, diskType, diskSiteID, diskZoneID string, diskSize, diskIops int
-	createRes, err := createEbsDisk(pvName, diskVol.StorageType, diskVol.AzId, int(diskRequestGB), 0)
+	createRes, err := createEbsDisk(pvName, diskVol.StorageType, diskVol.Zone, int(diskRequestGB), 0)
 	if err != nil {
 		log.Errorf("CreateVolume: createDisk error, err is: %s", err.Error())
 		return nil, fmt.Errorf("CreateVolume: createDisk error, err is: %s", err.Error())
@@ -173,7 +177,8 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 	volumeContext := map[string]string{
 		"fsType":      diskVol.FsType,
 		"storageType": diskVol.StorageType,
-		"azId":        diskVol.AzId,
+		"region":      diskVol.Region,
+		"zone":        diskVol.Zone,
 	}
 
 	tmpVol := &csi.Volume{
@@ -183,7 +188,8 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 		AccessibleTopology: []*csi.Topology{
 			{
 				Segments: map[string]string{
-					TopologyZoneKey: "",
+					TopologyRegionKey: diskVol.Region,
+					TopologyZoneKey: diskVol.Zone,
 				},
 			},
 		},
@@ -694,9 +700,9 @@ func detachDisk(diskID string) (string, error) {
 	return res.Data.EventId, nil
 }
 
-func describeDiskQuota(azId string) (*cdsDisk.DescribeDiskQuotaResponse, error) {
+func describeDiskQuota(zone string) (*cdsDisk.DescribeDiskQuotaResponse, error) {
 
-	res, err := cdsDisk.DescribeDiskQuota(azId)
+	res, err := cdsDisk.DescribeDiskQuota(zone)
 
 	if err != nil {
 		log.Errorf("deleteDisk: cdsDisk.describeDiskQuota api error, err is: %s", err)
@@ -727,4 +733,47 @@ func deleteNodeId(nodeId, taskID string) {
 
 func (c *ControllerServer) ControllerExpandVolume(context.Context, *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "")
+}
+
+func patchTopologyOfPVsPeriodically(clientSet *kubernetes.Clientset) {
+	for {
+		patchTopologyOfPVs(clientSet)
+		time.Sleep(PatchPVInterval)
+	}
+
+}
+func patchTopologyOfPVs(clientSet *kubernetes.Clientset) {
+	pvs, err := clientSet.CoreV1().PersistentVolumes().List(metav1.ListOptions{})
+	if err != nil {
+		log.Errorf("Failed to patch the topology of PVs: cannot list all pvs: %s", err)
+	}
+
+	for _, pv := range pvs.Items {
+		region := pv.Spec.PersistentVolumeSource.CSI.VolumeAttributes["region"]
+		zone := pv.Spec.PersistentVolumeSource.CSI.VolumeAttributes["zone"]
+
+		//skip if the PV is not created by this driver
+		if pv.Spec.PersistentVolumeSource.CSI.Driver != DriverEbsDiskTypeName {
+			continue
+		}
+
+		//creat labels if the pv doesn't have any labels yet
+		if pv.Labels == nil {
+			pv.Labels = make(map[string]string)
+		} else {
+			// skip if the topology has been patched
+			if pv.Labels[TopologyZoneKey] == zone && pv.Labels[TopologyRegionKey] == region {
+				continue
+			}
+		}
+
+		log.Infof("Patching the topology of PV %s with region=%s->%s, zone=%s->%s", pv.Name, pv.Labels[TopologyRegionKey], region, pv.Labels[TopologyZoneKey], zone)
+		pv.Labels[TopologyRegionKey] = region
+		pv.Labels[TopologyZoneKey] = zone
+		_, err = clientSet.CoreV1().PersistentVolumes().Update(&pv)
+		if err != nil {
+			log.Errorf("Failed to patch the topology of PV %s: %s", pv.Name, err)
+		}
+		log.Infof("PV %s has been patched", pv.Name)
+	}
 }

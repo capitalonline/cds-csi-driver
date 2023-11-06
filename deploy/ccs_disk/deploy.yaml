@@ -248,7 +248,7 @@ spec:
             configMapKeyRef:
               key: oversea
               name: cds-properties
-        image: registry-bj.capitalonline.net/cck/cds-csi-driver:v2.1.2
+        image: registry-bj.capitalonline.net/cck/cds-csi-driver:v2.1.3
         imagePullPolicy: Always
         livenessProbe:
           exec:
@@ -396,7 +396,7 @@ spec:
             configMapKeyRef:
               key: oversea
               name: cds-properties
-        image: registry-bj.capitalonline.net/cck/cds-csi-driver:v2.1.2
+        image: registry-bj.capitalonline.net/cck/cds-csi-driver:v2.1.3
         imagePullPolicy: Always
         name: ccs-disk-csi-node-server
         resources: {}

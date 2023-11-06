@@ -4,7 +4,8 @@ metadata:
   name: disk-csi-csd-sc
 parameters:
   fsType: ext4
-  azId: SR_SaoPaulo_A
+  region: CN_Suqian
+  zone: CN_Suqian_B
   storageType: SSD
 provisioner: ebs-disk.csi.cds.net
 reclaimPolicy: Delete

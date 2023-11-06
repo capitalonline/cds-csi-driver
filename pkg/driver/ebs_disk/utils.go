@@ -14,10 +14,14 @@ func parseDiskVolumeOptions(req *csi.CreateVolumeRequest) (*EbsVolumeArgs, error
 
 	volOptions := req.GetParameters()
 
-	// regionID
-	diskVolArgs.AzId, ok = volOptions["azId"]
+	// set region and zone
+	diskVolArgs.Region, ok = volOptions["region"]
 	if !ok {
-		return nil, fmt.Errorf("azId cannot be empty")
+		return nil, fmt.Errorf("region cannot be empty")
+	}
+	diskVolArgs.Zone, ok = volOptions["zone"]
+	if !ok {
+		return nil, fmt.Errorf("zone cannot be empty")
 	}
 
 	// fsType

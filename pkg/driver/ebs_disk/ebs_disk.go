@@ -2,7 +2,7 @@ package ebs_disk
 
 import (
 	"github.com/capitalonline/cds-csi-driver/pkg/common"
-	"github.com/kubernetes-csi/drivers/pkg/csi-common"
+	csicommon "github.com/kubernetes-csi/drivers/pkg/csi-common"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -10,6 +10,7 @@ import (
 const (
 	driverName            = "ebs-disk.csi.cds.net"
 	csiVersion            = "1.0.0"
+	TopologyRegionKey     = "topology.kubernetes.io/region"
 	TopologyZoneKey       = "topology.kubernetes.io/zone"
 	DiskFeatureSSD        = "SSD"
 	BillingMethodPrePaid  = "1"

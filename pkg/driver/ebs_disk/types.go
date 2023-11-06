@@ -34,5 +34,6 @@ type DiskVolumeArgs struct {
 type EbsVolumeArgs struct {
 	StorageType string `json:"storageType"`
 	FsType      string `json:"fsType"`
-	AzId        string `json:"azId"`
+	Region      string `json:"region"`
+	Zone        string `json:"zone"`
 }
