@@ -279,9 +279,12 @@ volumeBindingMode: WaitForFirstConsumer
 allowVolumeExpansion: true
 allowedTopologies:
 - matchLabelExpressions:
+  - key: topology.kubernetes.io/region
+    values:
+    - SR_SaoPaulo
   - key: topology.kubernetes.io/zone
     values:
-    - CN_Suqian_B
+    - SR_SaoPaulo_A
 ```
 
 Description:
