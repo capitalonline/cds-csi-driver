@@ -277,6 +277,11 @@ provisioner: ebs-disk.csi.cds.net
 reclaimPolicy: Delete
 volumeBindingMode: WaitForFirstConsumer
 allowVolumeExpansion: true
+allowedTopologies:
+- matchLabelExpressions:
+  - key: topology.kubernetes.io/zone
+    values:
+    - CN_Suqian_B
 ```
 
 Description:
@@ -290,6 +295,7 @@ Description:
 | provisioner       | ebs-disk.csi.cds.net | yes      | Disk driver which installed default.                                                                               |
 | reclaimPolicy     | [ Delete\|Retain ]   | yes      | `Delete` means that PV will be deleted with PVC delete<br/>`Retain` means that PV will be retained when PVC delete |
 | volumeBindingMode | WaitForFirstConsumer | yes      | Only suport `WaitForFirstConsumer` pollicy for disk.csi.cds.net driver.                                            |
+| allowedTopologies | matchLabelExpressions | no      | Only suport `topology.kubernetes.io/zone`, `topology.kubernetes.io/region` pollicy for disk.csi.cds.net driver.                                            |
 
 Kindly Remind:
 

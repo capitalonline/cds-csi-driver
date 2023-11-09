@@ -10,6 +10,11 @@ parameters:
 provisioner: ebs-disk.csi.cds.net
 reclaimPolicy: Delete
 volumeBindingMode: WaitForFirstConsumer
+allowedTopologies:
+- matchLabelExpressions:
+  - key: topology.kubernetes.io/zone
+    values:
+    - CN_Suqian_B
 ---
 kind: PersistentVolumeClaim
 apiVersion: v1
