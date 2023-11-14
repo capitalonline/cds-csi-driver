@@ -628,13 +628,12 @@ func patchTopologyOfPVs(clientSet *kubernetes.Clientset, topologyInfoList []cdsD
 	pvs, err := clientSet.CoreV1().PersistentVolumes().List(metav1.ListOptions{})
 	if err != nil {
 		log.Errorf("Failed to patch the topology of PVs: cannot list all pvs: %s", err)
+		return
 	}
 	if len(pvs.Items) == 0 {
 		log.Info("There is no pv found in the cluster. Skip the patch")
 		return
 	}
-
-	var region, zone string
 
 	topologyInfoMap := make(map[string]cdsDisk.TopologyInfo)
 	for _, topologyInfo := range topologyInfoList {
@@ -647,13 +646,13 @@ func patchTopologyOfPVs(clientSet *kubernetes.Clientset, topologyInfoList []cdsD
 			continue
 		}
 
+		var region, zone string
+
 		topologyInfo, ok := topologyInfoMap[diskID]
 		if ok {
 			region = topologyInfo.Region
 			zone = topologyInfo.Zone
 		} else {
-			region = ""
-			zone = ""
 			continue
 		}
 
@@ -683,13 +682,12 @@ func patchTopologyOfNodes(clientSet *kubernetes.Clientset, topologyInfoList []cd
 	nodes, err := clientSet.CoreV1().Nodes().List(metav1.ListOptions{})
 	if err != nil {
 		log.Errorf("Failed to patch the topology of Nodes: cannot list all nodes: %s", err)
+		return
 	}
 	if len(nodes.Items) == 0 {
 		log.Info("There is no node found in the cluster. Skip the patch")
 		return
 	}
-
-	var region, zone string
 
 	topologyInfoMap := make(map[string]cdsDisk.TopologyInfo)
 	for _, topologyInfo := range topologyInfoList {
@@ -702,13 +700,13 @@ func patchTopologyOfNodes(clientSet *kubernetes.Clientset, topologyInfoList []cd
 			continue
 		}
 
+		var region, zone string
+
 		topologyInfo, ok := topologyInfoMap[nodeID]
 		if ok {
 			region = topologyInfo.Region
 			zone = topologyInfo.Zone
 		} else {
-			region = ""
-			zone = ""
 			continue
 		}
 
