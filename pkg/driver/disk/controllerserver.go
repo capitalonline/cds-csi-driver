@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	v12 "k8s.io/api/core/v1"
+	"os"
 	"strconv"
 	"time"
 
@@ -48,6 +49,14 @@ func NewControllerServer(d *DiskDriver) *ControllerServer {
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		log.Fatalf("NewControllerServer:: Failed to create kubernetes client: %v", err)
+	}
+
+	clusterId := os.Getenv("K8S_CLUSTER_ID")
+	if clusterId == "" {
+		log.Info("ClusterID is empty. Skip the topology synchronization")
+	} else {
+		log.Infof("Found ClusterID: %s. Running the synchronization of topology", clusterId)
+		go PatchTopologyOfPVsPeriodically(clientset, clusterId)
 	}
 
 	return &ControllerServer{
@@ -578,4 +587,151 @@ func describeTaskStatus(taskID string) error {
 	}
 
 	return fmt.Errorf("task time out, running more than 20 minutes")
+}
+
+func PatchTopologyOfPVsPeriodically(clientSet *kubernetes.Clientset, clusterId string) {
+	for {
+		log.Info("Starting the topology patch")
+		diskTopologyList, nodeTopologyList := getRemoteTopologyInfo(clusterId)
+
+		log.Infof("The topology of Disk return by CDS is %s", diskTopologyList)
+		if len(diskTopologyList) == 0 {
+			log.Info("Skip patching PV topology because remote server returns an empty value")
+		} else {
+			patchTopologyOfPVs(clientSet, diskTopologyList)
+		}
+
+		log.Infof("The topology of Node return by CDS is %s", nodeTopologyList)
+		if len(nodeTopologyList) == 0 {
+			log.Info("Skip patching Node topology because remote server returns an empty value")
+		} else {
+			patchTopologyOfNodes(clientSet, nodeTopologyList)
+		}
+
+		log.Info("Done with topology patch")
+		time.Sleep(PatchPVInterval)
+	}
+}
+
+func getRemoteTopologyInfo(clusterId string) ([]cdsDisk.TopologyInfo, []cdsDisk.TopologyInfo) {
+	res, err := cdsDisk.DescribeClusterNodePvInfo(&cdsDisk.DescribeClusterNodePvInfoArgs{
+		ClusterID: clusterId,
+	})
+	if err != nil {
+		log.Errorf("describeRemoteToplogyInfo: cdsDisk.DescribeClusterNodePvInfo api error, err is: %s", err)
+		return []cdsDisk.TopologyInfo{}, []cdsDisk.TopologyInfo{}
+	}
+	return res.Data.DiskTopology, res.Data.NodeTopology
+}
+
+func patchTopologyOfPVs(clientSet *kubernetes.Clientset, topologyInfoList []cdsDisk.TopologyInfo) {
+	pvs, err := clientSet.CoreV1().PersistentVolumes().List(metav1.ListOptions{})
+	if err != nil {
+		log.Errorf("Failed to patch the topology of PVs: cannot list all pvs: %s", err)
+	}
+	if len(pvs.Items) == 0 {
+		log.Info("There is no pv found in the cluster. Skip the patch")
+		return
+	}
+
+	var region, zone string
+
+	topologyInfoMap := make(map[string]cdsDisk.TopologyInfo)
+	for _, topologyInfo := range topologyInfoList {
+		topologyInfoMap[topologyInfo.ID] = topologyInfo
+	}
+
+	for _, pv := range pvs.Items {
+		diskID := pv.Spec.CSI.VolumeHandle
+		if diskID == "" {
+			continue
+		}
+
+		topologyInfo, ok := topologyInfoMap[diskID]
+		if ok {
+			region = topologyInfo.Region
+			zone = topologyInfo.Zone
+		} else {
+			region = ""
+			zone = ""
+			continue
+		}
+
+		//creat labels if the pv doesn't have any labels yet
+		if pv.Labels == nil {
+			pv.Labels = make(map[string]string)
+		} else {
+			// skip if the topology has been patched
+			if pv.Labels[TopologyZoneKey] == zone && pv.Labels[TopologyRegionKey] == region {
+				log.Infof("The toplogy of PV %s is set correctly: region=%s, zone=%s", pv.Name, region, zone)
+				continue
+			}
+		}
+
+		log.Infof("Patching the topology of PV %s with region=%s->%s, zone=%s->%s", pv.Name, pv.Labels[TopologyRegionKey], region, pv.Labels[TopologyZoneKey], zone)
+		pv.Labels[TopologyRegionKey] = region
+		pv.Labels[TopologyZoneKey] = zone
+		_, err = clientSet.CoreV1().PersistentVolumes().Update(&pv)
+		if err != nil {
+			log.Errorf("Failed to patch the topology of PV %s: %s", pv.Name, err)
+		}
+		log.Infof("PV %s has been patched", pv.Name)
+	}
+}
+
+func patchTopologyOfNodes(clientSet *kubernetes.Clientset, topologyInfoList []cdsDisk.TopologyInfo) {
+	nodes, err := clientSet.CoreV1().Nodes().List(metav1.ListOptions{})
+	if err != nil {
+		log.Errorf("Failed to patch the topology of Nodes: cannot list all nodes: %s", err)
+	}
+	if len(nodes.Items) == 0 {
+		log.Info("There is no node found in the cluster. Skip the patch")
+		return
+	}
+
+	var region, zone string
+
+	topologyInfoMap := make(map[string]cdsDisk.TopologyInfo)
+	for _, topologyInfo := range topologyInfoList {
+		topologyInfoMap[topologyInfo.ID] = topologyInfo
+	}
+
+	for _, node := range nodes.Items {
+		nodeID := node.Spec.ProviderID
+		if nodeID == "" {
+			continue
+		}
+
+		topologyInfo, ok := topologyInfoMap[nodeID]
+		if ok {
+			region = topologyInfo.Region
+			zone = topologyInfo.Zone
+		} else {
+			region = ""
+			zone = ""
+			continue
+		}
+
+		//creat labels if the node doesn't have any labels yet
+		if node.Labels == nil {
+			node.Labels = make(map[string]string)
+		} else {
+			// skip if the topology has been patched
+			if node.Labels[TopologyZoneKey] == zone && node.Labels[TopologyRegionKey] == region {
+				log.Infof("The toplogy of Node %s is set correctly: region=%s, zone=%s", nodeID, region, zone)
+				continue
+			}
+		}
+
+		log.Infof("Patching the topology of Node %s with region=%s->%s, zone=%s->%s", node.Name, node.Labels[TopologyRegionKey], region, node.Labels[TopologyZoneKey], zone)
+		node.Labels[TopologyRegionKey] = region
+		node.Labels[TopologyZoneKey] = zone
+		_, err = clientSet.CoreV1().Nodes().Update(&node)
+		if err != nil {
+			log.Errorf("Failed to patch the topology of Node %s: %s", node.Name, err)
+		} else {
+			log.Infof("Node %s has been patched", node.Name)
+		}
+
+	}
 }

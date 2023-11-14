@@ -50,6 +50,11 @@ spec:
             configMapKeyRef:
               name: cds-properties
               key: oversea
+        - name: K8S_CLUSTER_ID
+          valueFrom:
+            configMapKeyRef:
+              name: cds-properties
+              key: k8s_cluster_id
         securityContext:
           privileged: true
         volumeMounts:

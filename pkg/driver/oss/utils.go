@@ -27,7 +27,7 @@ func (opts *OssOpts) parsOssOpts() error {
 }
 
 // save ak file: bucket:ak_id:ak_secret
-func  (opts *OssOpts)saveOssCredential(akFile string) error {
+func (opts *OssOpts) saveOssCredential(akFile string) error {
 	newContentStr := opts.AkID + ":" + opts.AkSecret + "\n"
 	if err := ioutil.WriteFile(akFile, []byte(newContentStr), 0600); err != nil {
 		log.Errorf("Save Credential File failed, %s, %s", newContentStr, err)
