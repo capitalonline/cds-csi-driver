@@ -71,17 +71,6 @@ spec:
           requests:
             cpu: 100m
             memory: 100Mi
-        livenessProbe:
-          exec:
-            command:
-            - sh
-            - -c
-            - ps -ef | grep cds-csi-driver | grep disk.csi.cds.net | grep -v grep
-          failureThreshold: 8
-          initialDelaySeconds: 15
-          periodSeconds: 10
-          successThreshold: 1
-          timeoutSeconds: 15
       - name: csi-provisioner
         image: registry-bj.capitalonline.net/cck/csi-provisioner:v1.5.0
         args:

@@ -227,19 +227,13 @@ spec:
             configMapKeyRef:
               key: oversea
               name: cds-properties
+        - name: K8S_CLUSTER_ID
+          valueFrom:
+            configMapKeyRef:
+              name: cds-properties
+              key: k8s_cluster_id
         image: registry-bj.capitalonline.net/cck/cds-csi-driver:v2.0.4
         imagePullPolicy: Always
-        livenessProbe:
-          exec:
-            command:
-            - sh
-            - -c
-            - ps -ef | grep cds-csi-driver | grep disk.csi.cds.net | grep -v grep
-          failureThreshold: 8
-          initialDelaySeconds: 15
-          periodSeconds: 10
-          successThreshold: 1
-          timeoutSeconds: 15
         name: csi-controller-server
         resources:
           limits:
