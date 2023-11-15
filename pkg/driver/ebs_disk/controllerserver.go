@@ -189,7 +189,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 			{
 				Segments: map[string]string{
 					TopologyRegionKey: diskVol.Region,
-					TopologyZoneKey: diskVol.Zone,
+					TopologyZoneKey:   diskVol.Zone,
 				},
 			},
 		},
@@ -569,6 +569,9 @@ func describeTaskStatus(taskID string) error {
 	for i := 1; i < 120; i++ {
 		res, err := cdsDisk.DescribeTaskStatus(taskID)
 		if err != nil {
+			if res != nil && res.Code == ErrAccountNotFound {
+				time.Sleep(time.Second * 10)
+			}
 			log.Errorf("task api error, err is: %s", err)
 			return fmt.Errorf("apiError")
 		}
