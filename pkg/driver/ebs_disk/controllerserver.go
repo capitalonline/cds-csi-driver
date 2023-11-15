@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	cckAlarm "github.com/capitalonline/cck-sdk-go/pkg/cck/alarm"
 	cdsDisk "github.com/capitalonline/cck-sdk-go/pkg/eks/ebs"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	csicommon "github.com/kubernetes-csi/drivers/pkg/csi-common"
@@ -49,6 +50,8 @@ var diskEventIdMap = new(sync.Map)
 var AttachDetachMap = new(sync.Map)
 
 var DiskMultiTaskMap = new(sync.Map)
+
+var alarmMap = new(sync.Map)
 
 func NewControllerServer(d *DiskDriver) *ControllerServer {
 	config, err := rest.InClusterConfig()
@@ -565,15 +568,32 @@ func createEbsDisk(diskName, diskType, diskZoneID string, diskSize, diskIops int
 
 func describeTaskStatus(taskID string) error {
 	log.Infof("describeTaskStatus: taskID is: %s", taskID)
-
+	var errCount int
 	for i := 1; i < 120; i++ {
 		res, err := cdsDisk.DescribeTaskStatus(taskID)
 		if err != nil {
-			if res != nil && res.Code == ErrAccountNotFound {
-				time.Sleep(time.Second * 10)
+			errCount += 1
+			if res == nil || res.Code != ErrAccountNotFound {
+				log.Errorf("task api error, err is: %s", err)
+				return fmt.Errorf("apiError")
 			}
-			log.Errorf("task api error, err is: %s", err)
-			return fmt.Errorf("apiError")
+			if _, ok := alarmMap.Load(taskID); !ok && errCount > 3 {
+				alarmRes, err := sendAlarm(&cckAlarm.SendAlarmArgs{
+					Msg:        fmt.Sprintf("自建集群csi查询任务连续失败超过3次, 任务id:%s,请求错误码：%s, 错误信息：%s", taskID, res.Code, res.Message),
+					Hostname:   "容器重要告警",
+					AlarmType:  "eks",
+					AlarmGroup: "容器",
+					Ip:         "",
+				})
+				if err != nil || (alarmRes != nil && alarmRes.Code != "Success") {
+					log.Errorf("send alarm ,err: %s, res:%#v", err.Error(), alarmRes)
+				}
+				alarmMap.Store(taskID, nil)
+			}
+
+			time.Sleep(time.Second * 10)
+			continue
+
 		}
 		switch res.Data.EventStatus {
 		case "finish", "success":
@@ -779,4 +799,8 @@ func patchTopologyOfPVs(clientSet *kubernetes.Clientset) {
 		}
 		log.Infof("PV %s has been patched", pv.Name)
 	}
+}
+
+func sendAlarm(args *cckAlarm.SendAlarmArgs) (*cckAlarm.SendAlarmResponse, error) {
+	return cckAlarm.SendAlarm(args)
 }

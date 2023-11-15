@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	cckAlarm "github.com/capitalonline/cck-sdk-go/pkg/cck/alarm"
 	"net/http"
 	"time"
 
@@ -192,7 +193,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 			{
 				Segments: map[string]string{
 					TopologyRegionKey: diskVol.Region,
-					TopologyZoneKey: diskVol.Zone,
+					TopologyZoneKey:   diskVol.Zone,
 				},
 			},
 		},
@@ -406,6 +407,18 @@ func waitTaskFinish(taskID string) error {
 		resp, err := describeTaskStatus(taskID)
 		if err != nil {
 			count++
+			if _, ok := alarmMap.Load(taskID); !ok && count > 3 {
+				alarmRes, err := sendAlarm(&cckAlarm.SendAlarmArgs{
+					Msg:        fmt.Sprintf("eks-csi 查询任务连续失败超过3次, 任务id:%s,请求错误码：%s, 错误信息：%s", taskID, resp.Code, resp.Msg),
+					Hostname:   "容器重要告警",
+					AlarmType:  "eks",
+					AlarmGroup: "容器",
+				})
+				if err != nil || (alarmRes != nil && alarmRes.Code != "Success") {
+					log.Errorf("send alarm ,err: %s, res:%#v", err.Error(), alarmRes)
+				}
+				alarmMap.Store(taskID, nil)
+			}
 			continue
 		}
 		taskStatus := resp.Data.TaskStatus
@@ -614,4 +627,8 @@ func patchTopologyOfPVs(clientSet *kubernetes.Clientset) {
 		}
 		log.Infof("PV %s has been patched", pv.Name)
 	}
+}
+
+func sendAlarm(args *cckAlarm.SendAlarmArgs) (*cckAlarm.SendAlarmResponse, error) {
+	return cckAlarm.SendAlarm(args)
 }
