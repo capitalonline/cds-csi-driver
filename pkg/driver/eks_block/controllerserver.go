@@ -6,6 +6,7 @@ import (
 	"fmt"
 	cckAlarm "github.com/capitalonline/cck-sdk-go/pkg/cck/alarm"
 	"net/http"
+	"os"
 	"time"
 
 	api "github.com/capitalonline/cds-csi-driver/pkg/driver/eks_block/api"
@@ -640,5 +641,6 @@ func (c *ControllerServer) sendAlarm(args *cckAlarm.SendAlarmArgs) (*cckAlarm.Se
 			break
 		}
 	}
+	args.ClusterId = os.Getenv("CDS_CLUSTER_ID")
 	return cckAlarm.SendAlarm(args)
 }
