@@ -579,6 +579,8 @@ func describeTaskStatus(taskID string) error {
 			}
 			if _, ok := alarmMap.Load(taskID); !ok && errCount > 3 {
 				alarmRes, err := sendAlarm(&cckAlarm.SendAlarmArgs{
+					ClusterId:  "ebs-csi",
+					Site:       "unknown",
 					Msg:        fmt.Sprintf("自建集群csi查询任务连续失败超过3次, 任务id:%s,请求错误码：%s, 错误信息：%s", taskID, res.Code, res.Message),
 					Hostname:   "容器重要告警",
 					AlarmType:  "eks",
