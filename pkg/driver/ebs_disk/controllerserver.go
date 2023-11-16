@@ -590,7 +590,7 @@ func describeTaskStatus(taskID string) error {
 			return fmt.Errorf("taskError")
 		case "doing", "init":
 			log.Debugf("task:%s is running, sleep 10s", taskID)
-			time.Sleep(time.Second * time.Duration(rand.Intn(11)+10))
+			time.Sleep(time.Second * time.Duration(rand.Intn(6)+5))
 		default:
 			// TODO while ebs add a new code?
 			return fmt.Errorf("unkonw task status:%s ,taskId: %s", res.Data.EventStatus, taskID)
