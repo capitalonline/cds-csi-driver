@@ -3,7 +3,7 @@ module github.com/capitalonline/cds-csi-driver
 go 1.18
 
 require (
-	github.com/capitalonline/cck-sdk-go v2.2.3+incompatible
+	github.com/capitalonline/cck-sdk-go v2.3.3+incompatible
 	github.com/container-storage-interface/spec v1.2.0
 	github.com/getsentry/sentry-go v0.22.0
 	github.com/kubernetes-csi/drivers v1.0.2
@@ -23,7 +23,7 @@ require (
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b // indirect
 	github.com/golang/protobuf v1.3.2 // indirect
 	github.com/google/gofuzz v1.0.0 // indirect
-	github.com/google/uuid v1.3.0 // indirect
+	github.com/google/uuid v1.4.0 // indirect
 	github.com/googleapis/gnostic v0.2.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/kubernetes-csi/csi-lib-utils v0.7.0 // indirect
