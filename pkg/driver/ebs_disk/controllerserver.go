@@ -568,31 +568,16 @@ func createEbsDisk(diskName, diskType, diskZoneID string, diskSize, diskIops int
 
 func describeTaskStatus(taskID string) error {
 	log.Infof("describeTaskStatus: taskID is: %s", taskID)
-	var errCount int
 	for i := 1; i < 120; i++ {
 		res, err := cdsDisk.DescribeTaskStatus(taskID)
 		if err != nil {
-			errCount += 1
-			if res == nil || res.Code != ErrAccountNotFound {
+			// network error
+			if res == nil || res.Code == "" {
 				log.Errorf("task api error, err is: %s", err)
 				return fmt.Errorf("apiError")
 			}
-			if _, ok := alarmMap.Load(taskID); !ok && errCount > 3 {
-				alarmRes, err := sendAlarm(&cckAlarm.SendAlarmArgs{
-					ClusterId:  "ebs-csi",
-					Site:       "unknown",
-					Msg:        fmt.Sprintf("自建集群csi查询任务连续失败超过3次, 任务id:%s,请求错误码：%s, 错误信息：%s", taskID, res.Code, res.Message),
-					Hostname:   "容器重要告警",
-					AlarmType:  "eks",
-					AlarmGroup: "容器",
-					Ip:         "",
-				})
-				if err != nil || (alarmRes != nil && alarmRes.Code != "Success") {
-					log.Errorf("send alarm ,err: %s, res:%#v", err.Error(), alarmRes)
-				}
-				alarmMap.Store(taskID, nil)
-			}
-
+			msg := fmt.Sprintf("自建集群csi查询任务失败, 任务id:%s,请求错误码：%s, 错误信息：%s", taskID, res.Code, res.Message)
+			_, _ = sendAlarm(taskID, msg)
 			time.Sleep(time.Second * 10)
 			continue
 		}
@@ -759,6 +744,37 @@ func (c *ControllerServer) ControllerExpandVolume(context.Context, *csi.Controll
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
-func sendAlarm(args *cckAlarm.SendAlarmArgs) (*cckAlarm.SendAlarmResponse, error) {
-	return cckAlarm.SendAlarm(args)
+func sendAlarm(alarmKey, msg string) (*cckAlarm.SendAlarmResponse, error) {
+	if _, ok := alarmMap.Load(msg); ok {
+		return nil, nil
+	}
+
+	req := &cckAlarm.SendAlarmArgs{
+		ClusterId:  "ebs-csi",
+		Site:       "unknown",
+		Msg:        msg,
+		Hostname:   "容器重要告警",
+		AlarmType:  "eks",
+		AlarmGroup: "容器",
+		Ip:         "",
+	}
+	resp, err := cckAlarm.SendAlarm(req)
+	if err != nil || (resp != nil && resp.Code != "Success") {
+		log.Errorf("send alarm ,err: %s, res:%#v", err.Error(), req)
+		return nil, err
+	}
+	alarmMap.Store(alarmKey, nil)
+	go deleteAlarm(alarmKey)
+	return resp, nil
+}
+
+func deleteAlarm(key string) {
+	timer := time.NewTimer(time.Minute * 30)
+	for {
+		select {
+		case <-timer.C:
+			alarmMap.Delete(key)
+		default:
+		}
+	}
 }
