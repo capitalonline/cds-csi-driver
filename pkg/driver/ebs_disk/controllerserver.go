@@ -571,13 +571,13 @@ func describeTaskStatus(taskID string) error {
 	for i := 1; i < 120; i++ {
 		res, err := cdsDisk.DescribeTaskStatus(taskID)
 		if err != nil {
-			// network error
-			if res == nil || res.Code == "" {
-				log.Errorf("task api error, err is: %s", err)
-				return fmt.Errorf("apiError")
+			msg := fmt.Sprintf("自建集群csi查询任务失败, 任务id:%s , err:%s", taskID, err.Error())
+			// not network error
+			if res != nil && res.Code != "" {
+				msg = msg + fmt.Sprintf(" 请求错误码：%s, 错误信息：%s", res.Code, res.Message)
 			}
-			msg := fmt.Sprintf("自建集群csi查询任务失败, 任务id:%s,请求错误码：%s, 错误信息：%s", taskID, res.Code, res.Message)
 			_, _ = sendAlarm(taskID, msg)
+			log.Errorf("task api error, err is: %s", err)
 			time.Sleep(time.Second * 10)
 			continue
 		}
@@ -590,6 +590,7 @@ func describeTaskStatus(taskID string) error {
 			log.Debugf("task:%s is running, sleep 10s", taskID)
 			time.Sleep(10 * time.Second)
 		default:
+			// TODO while ebs add a new code?
 			return fmt.Errorf("unkonw task status:%s ,taskId: %s", res.Data.EventStatus, taskID)
 		}
 	}
@@ -745,6 +746,7 @@ func (c *ControllerServer) ControllerExpandVolume(context.Context, *csi.Controll
 }
 
 func sendAlarm(alarmKey, msg string) (*cckAlarm.SendAlarmResponse, error) {
+	// already alarmed, ignore
 	if _, ok := alarmMap.Load(msg); ok {
 		return nil, nil
 	}
@@ -770,11 +772,6 @@ func sendAlarm(alarmKey, msg string) (*cckAlarm.SendAlarmResponse, error) {
 
 func deleteAlarm(key string) {
 	timer := time.NewTimer(time.Minute * 30)
-	for {
-		select {
-		case <-timer.C:
-			alarmMap.Delete(key)
-		default:
-		}
-	}
+	<-timer.C
+	alarmMap.Delete(key)
 }
