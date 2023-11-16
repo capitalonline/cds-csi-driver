@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	cckAlarm "github.com/capitalonline/cck-sdk-go/pkg/cck/alarm"
 	cdsDisk "github.com/capitalonline/cck-sdk-go/pkg/eks/ebs"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	csicommon "github.com/kubernetes-csi/drivers/pkg/csi-common"
@@ -48,6 +49,8 @@ var diskEventIdMap = new(sync.Map)
 var AttachDetachMap = new(sync.Map)
 
 var DiskMultiTaskMap = new(sync.Map)
+
+var alarmMap = new(sync.Map)
 
 func NewControllerServer(d *DiskDriver) *ControllerServer {
 	config, err := rest.InClusterConfig()
@@ -131,6 +134,11 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 	log.Infof("CreateVolume: diskRequestGB is: %d", diskRequestGB)
 
 	diskVol, err := parseDiskVolumeOptions(req)
+	// fix diskVol is nil
+	if err != nil {
+		log.Errorf("CreateVolume: error when parseDiskVolumeOptions,err: %v ", err)
+		return nil, err
+	}
 	res, err := describeDiskQuota(diskVol.AzId)
 	if err != nil || res == nil || len(res.Data.QuotaList) == 0 {
 		log.Errorf("CreateVolume: error when describeDiskQuota,err: %v , res:%v", err, res)
@@ -560,12 +568,33 @@ func createEbsDisk(diskName, diskType, diskZoneID string, diskSize, diskIops int
 
 func describeTaskStatus(taskID string) error {
 	log.Infof("describeTaskStatus: taskID is: %s", taskID)
-
+	var errCount int
 	for i := 1; i < 120; i++ {
 		res, err := cdsDisk.DescribeTaskStatus(taskID)
 		if err != nil {
-			log.Errorf("task api error, err is: %s", err)
-			return fmt.Errorf("apiError")
+			errCount += 1
+			if res == nil || res.Code != ErrAccountNotFound {
+				log.Errorf("task api error, err is: %s", err)
+				return fmt.Errorf("apiError")
+			}
+			if _, ok := alarmMap.Load(taskID); !ok && errCount > 3 {
+				alarmRes, err := sendAlarm(&cckAlarm.SendAlarmArgs{
+					ClusterId:  "ebs-csi",
+					Site:       "unknown",
+					Msg:        fmt.Sprintf("自建集群csi查询任务连续失败超过3次, 任务id:%s,请求错误码：%s, 错误信息：%s", taskID, res.Code, res.Message),
+					Hostname:   "容器重要告警",
+					AlarmType:  "eks",
+					AlarmGroup: "容器",
+					Ip:         "",
+				})
+				if err != nil || (alarmRes != nil && alarmRes.Code != "Success") {
+					log.Errorf("send alarm ,err: %s, res:%#v", err.Error(), alarmRes)
+				}
+				alarmMap.Store(taskID, nil)
+			}
+
+			time.Sleep(time.Second * 10)
+			continue
 		}
 		switch res.Data.EventStatus {
 		case "finish", "success":
@@ -728,4 +757,8 @@ func deleteNodeId(nodeId, taskID string) {
 
 func (c *ControllerServer) ControllerExpandVolume(context.Context, *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "")
+}
+
+func sendAlarm(args *cckAlarm.SendAlarmArgs) (*cckAlarm.SendAlarmResponse, error) {
+	return cckAlarm.SendAlarm(args)
 }
