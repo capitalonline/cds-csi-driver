@@ -15,6 +15,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"math/rand"
 	"strings"
 	"sync"
 	"time"
@@ -568,6 +569,7 @@ func createEbsDisk(diskName, diskType, diskZoneID string, diskSize, diskIops int
 
 func describeTaskStatus(taskID string) error {
 	log.Infof("describeTaskStatus: taskID is: %s", taskID)
+	rand.Seed(time.Now().UnixNano())
 	for i := 1; i < 120; i++ {
 		res, err := cdsDisk.DescribeTaskStatus(taskID)
 		if err != nil {
@@ -578,7 +580,7 @@ func describeTaskStatus(taskID string) error {
 			}
 			_, _ = sendAlarm(taskID, msg)
 			log.Errorf("task api error, err is: %s", err)
-			time.Sleep(time.Second * 10)
+			time.Sleep(time.Second * time.Duration(rand.Intn(11)+10))
 			continue
 		}
 		switch res.Data.EventStatus {
@@ -588,7 +590,7 @@ func describeTaskStatus(taskID string) error {
 			return fmt.Errorf("taskError")
 		case "doing", "init":
 			log.Debugf("task:%s is running, sleep 10s", taskID)
-			time.Sleep(10 * time.Second)
+			time.Sleep(time.Second * time.Duration(rand.Intn(11)+10))
 		default:
 			// TODO while ebs add a new code?
 			return fmt.Errorf("unkonw task status:%s ,taskId: %s", res.Data.EventStatus, taskID)
