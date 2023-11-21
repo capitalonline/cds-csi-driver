@@ -189,7 +189,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 			{
 				Segments: map[string]string{
 					TopologyRegionKey: diskVol.Region,
-					TopologyZoneKey: diskVol.Zone,
+					TopologyZoneKey:   diskVol.Zone,
 				},
 			},
 		},

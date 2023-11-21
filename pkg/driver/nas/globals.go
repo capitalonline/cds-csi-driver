@@ -1,6 +1,5 @@
 package nas
 
-
 import "sync"
 
 var (

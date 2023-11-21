@@ -109,5 +109,4 @@ func main() {
 	default:
 		log.Fatalf("unsupported driver type: %s", driverName)
 	}
-
 }
