@@ -232,7 +232,7 @@ spec:
             configMapKeyRef:
               name: cds-properties
               key: k8s_cluster_id
-        image: registry-bj.capitalonline.net/cck/cds-csi-driver:v2.0.4
+        image: registry-bj.capitalonline.net/cck/cds-csi-driver:v2.1.4
         imagePullPolicy: Always
         name: csi-controller-server
         resources:
@@ -341,7 +341,7 @@ spec:
             configMapKeyRef:
               key: oversea
               name: cds-properties
-        image: registry-bj.capitalonline.net/cck/cds-csi-driver:v2.0.4
+        image: registry-bj.capitalonline.net/cck/cds-csi-driver:v2.1.4
         imagePullPolicy: Always
         name: disk-csi-node-server
         securityContext:
