@@ -587,6 +587,13 @@ func patchTopologyOfPVs(clientSet *kubernetes.Clientset) {
 	}
 
 	for _, pv := range pvs.Items {
+		if pv.Spec.PersistentVolumeSource.CSI == nil {
+			continue
+		}
+		if pv.Spec.PersistentVolumeSource.CSI.VolumeAttributes == nil {
+			continue
+		}
+
 		region := pv.Spec.PersistentVolumeSource.CSI.VolumeAttributes["region"]
 		zone := pv.Spec.PersistentVolumeSource.CSI.VolumeAttributes["zone"]
 
