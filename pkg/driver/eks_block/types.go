@@ -36,4 +36,5 @@ type EbsVolumeArgs struct {
 	FsType      string `json:"fsType"`
 	Region      string `json:"region"`
 	Zone        string `json:"zone"`
+	SubjectId   string `json:"subjectId"`
 }

@@ -44,6 +44,7 @@ func parseDiskVolumeOptions(req *csi.CreateVolumeRequest) (*EbsVolumeArgs, error
 	if diskVolArgs.StorageType != ebsSsdDisk {
 		return nil, fmt.Errorf("illegal required parameter type, only support [ssd], input is: %s", diskVolArgs.StorageType)
 	}
+	diskVolArgs.SubjectId = volOptions["subjectId"]
 
 	return diskVolArgs, nil
 }
