@@ -14,6 +14,7 @@ type CreateBlockRequest struct {
 	DiskName          string `json:"DiskName"`
 	FsType            string `json:"FsType"`
 	CreateSource      string `json:"CreateSource"`
+	SubjectId         string `json:"SubjectId"`
 	AvailableZoneCode string `json:"AvailableZoneCode"`
 }
 
