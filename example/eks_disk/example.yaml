@@ -1,14 +1,21 @@
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: test-sc-retain
+  name: test-sc-delete
 parameters:
   fsType: ext4
   storageType: SSD
-  azId: CN_Suqian_B     # 这里填azId
+  zone: CN_Suqian_B # 可用区Code
+  region: CN_Suqian # 区域Code
+  subjectId: "00000"  # 测试金项目id，客户在试用时填写，具体的id值请联系管理员
 provisioner: eks-disk.csi.cds.net
-reclaimPolicy: Retain
+reclaimPolicy: Delete
 volumeBindingMode: WaitForFirstConsumer
+allowedTopologies:
+  - matchLabelExpressions:
+      - key: topology.kubernetes.io/zone
+        values:
+          - CN_Suqian_B  # 可用区Code
 ---
 kind: PersistentVolumeClaim
 apiVersion: v1
