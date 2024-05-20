@@ -27,6 +27,7 @@ rules:
   - update
   - create
   - delete
+  - patch
 - apiGroups:
   - ""
   resources:
@@ -44,6 +45,8 @@ rules:
   - get
   - list
   - watch
+  - update
+  - patch
 - apiGroups:
   - storage.k8s.io
   resources:
@@ -52,6 +55,8 @@ rules:
   - get
   - list
   - watch
+  - update
+  - patch
 - apiGroups:
   - ""
   resources:
@@ -102,6 +107,8 @@ rules:
   - get
   - list
   - watch
+  - update
+  - patch
 - apiGroups:
   - storage.k8s.io
   resources:
@@ -111,6 +118,17 @@ rules:
   - list
   - watch
   - update
+  - patch
+- apiGroups:
+  - storage.k8s.io
+  resources:
+  - volumeattachments/status
+  verbs:
+  - get
+  - list
+  - watch
+  - update
+  - patch
 - apiGroups:
   - snapshot.storage.k8s.io
   resources:
@@ -232,8 +250,8 @@ spec:
             configMapKeyRef:
               name: cds-properties
               key: k8s_cluster_id
-        image: registry-bj.capitalonline.net/cck/cds-csi-driver:v2.1.4
-        imagePullPolicy: Always
+        image: capitalonline/cds-csi-driver:v2.1.4
+        imagePullPolicy: IfNotPresent
         name: csi-controller-server
         resources:
           limits:
@@ -257,7 +275,7 @@ spec:
         env:
         - name: ADDRESS
           value: /socketDir/csi.sock
-        image: registry-bj.capitalonline.net/cck/csi-provisioner:v1.5.0
+        image: capitalonline/csi-provisioner:v3.5.0
         name: csi-provisioner
         volumeMounts:
         - mountPath: /socketDir
@@ -265,7 +283,7 @@ spec:
       - args:
         - --csi-address=/csi/csi.sock
         - --health-port=9811
-        image: registry-bj.capitalonline.net/cck/csi-livenessprobe:v2.0.0
+        image: capitalonline/csi-livenessprobe:v2.11.0
         name: liveness-probe
         volumeMounts:
         - mountPath: /csi
@@ -274,11 +292,11 @@ spec:
         - --csi-address=$(ADDRESS)
         - --v=5
         - --leader-election=true
-        - --leader-election-type=leases
+#        - --leader-election-type=leases
         env:
         - name: ADDRESS
           value: /var/lib/csi/sockets/pluginproxy/csi.sock
-        image: registry-bj.capitalonline.net/cck/csi-attacher:v1.2.0
+        image: capitalonline/csi-attacher:v4.4.0
         name: csi-attacher
         volumeMounts:
         - mountPath: /var/lib/csi/sockets/pluginproxy/
@@ -286,12 +304,15 @@ spec:
       hostNetwork: true
       hostPID: true
       nodeSelector:
-        node.cck.net/role.infra: "True"
+        node-role.kubernetes.io/control-plane: ""
       priorityClassName: system-cluster-critical
       serviceAccount: disk-cds-csi-sa
       tolerations:
-      - key: null
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/control-plane
         operator: Exists
+      - effect: NoSchedule
+        key: node-role.cck.net/infra
       volumes:
       - emptyDir: {}
         name: socket-dir
@@ -341,8 +362,8 @@ spec:
             configMapKeyRef:
               key: oversea
               name: cds-properties
-        image: registry-bj.capitalonline.net/cck/cds-csi-driver:v2.1.4
-        imagePullPolicy: Always
+        image: capitalonline/cds-csi-driver:v2.1.4
+        imagePullPolicy: IfNotPresent
         name: disk-csi-node-server
         securityContext:
           allowPrivilegeEscalation: true
@@ -369,8 +390,8 @@ spec:
           value: /var/lib/kubelet/plugins/disk.csi.cds.net/csi.sock
         - name: DRIVER_REG_SOCK_PATH
           value: /var/lib/kubelet/plugins/disk.csi.cds.net/csi.sock
-        image: registry-bj.capitalonline.net/cck/csi-node-driver-registrar:v1.2.0
-        imagePullPolicy: Always
+        image: capitalonline/csi-node-driver-registrar:v2.9.0
+        imagePullPolicy: IfNotPresent
         lifecycle:
           preStop:
             exec:
@@ -387,7 +408,7 @@ spec:
       - args:
         - --csi-address=/var/lib/kubelet/plugins/disk.csi.cds.net/csi.sock
         - --health-port=9812
-        image: registry-bj.capitalonline.net/cck/csi-livenessprobe:v2.0.0
+        image: capitalonline/csi-livenessprobe:v2.11.0
         name: disk-liveness-probe
         volumeMounts:
         - mountPath: /var/lib/kubelet/
@@ -397,7 +418,11 @@ spec:
       priorityClassName: system-node-critical
       serviceAccount: disk-cds-csi-sa
       tolerations:
-      - operator: Exists
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/control-plane
+        operator: Exists
+      - effect: NoSchedule
+        key: node-role.cck.net/infra
       volumes:
       - hostPath:
           path: /var/lib/kubelet
@@ -419,7 +444,7 @@ spec:
   updateStrategy:
     type: RollingUpdate
 ---
-apiVersion: storage.k8s.io/v1beta1
+apiVersion: storage.k8s.io/v1
 kind: CSIDriver
 metadata:
   name: disk.csi.cds.net

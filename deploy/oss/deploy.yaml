@@ -9,107 +9,113 @@ kind: ClusterRole
 metadata:
   name: oss-cds-csi-cluster-role
 rules:
-- apiGroups:
-  - ""
-  resources:
-  - secrets
-  verbs:
-  - get
-  - list
-- apiGroups:
-  - ""
-  resources:
-  - persistentvolumes
-  verbs:
-  - get
-  - list
-  - watch
-  - update
-  - create
-  - delete
-- apiGroups:
-  - ""
-  resources:
-  - persistentvolumeclaims
-  verbs:
-  - get
-  - list
-  - watch
-  - update
-- apiGroups:
-  - storage.k8s.io
-  resources:
-  - storageclasses
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - storage.k8s.io
-  resources:
-  - csinodes
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - events
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-- apiGroups:
-  - ""
-  resources:
-  - endpoints
-  verbs:
-  - get
-  - watch
-  - list
-  - delete
-  - update
-  - create
-- apiGroups:
-  - ""
-  resources:
-  - configmaps
-  verbs:
-  - get
-  - watch
-  - list
-  - delete
-  - update
-  - create
-- apiGroups:
-  - ""
-  resources:
-  - nodes
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - csi.storage.k8s.io
-  resources:
-  - csinodeinfos
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - apiextensions.k8s.io
-  resources:
-  - customresourcedefinitions
-  verbs:
-  - create
-  - list
-  - watch
-  - delete
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+    verbs:
+      - get
+      - list
+  - apiGroups:
+      - ""
+    resources:
+      - persistentvolumes
+    verbs:
+      - get
+      - list
+      - watch
+      - update
+      - create
+      - delete
+  - apiGroups:
+      - ""
+    resources:
+      - persistentvolumeclaims
+    verbs:
+      - get
+      - list
+      - watch
+      - update
+  - apiGroups:
+      - storage.k8s.io
+    resources:
+      - storageclasses
+    verbs:
+      - get
+      - list
+      - watch
+      - update
+      - patch
+  - apiGroups:
+      - storage.k8s.io
+    resources:
+      - csinodes
+    verbs:
+      - get
+      - list
+      - watch
+      - update
+      - patch
+  - apiGroups:
+      - ""
+    resources:
+      - events
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+  - apiGroups:
+      - ""
+    resources:
+      - endpoints
+    verbs:
+      - get
+      - watch
+      - list
+      - delete
+      - update
+      - create
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+    verbs:
+      - get
+      - watch
+      - list
+      - delete
+      - update
+      - create
+  - apiGroups:
+      - ""
+    resources:
+      - nodes
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - csi.storage.k8s.io
+    resources:
+      - csinodeinfos
+    verbs:
+      - get
+      - list
+      - watch
+      - update
+      - patch
+  - apiGroups:
+      - apiextensions.k8s.io
+    resources:
+      - customresourcedefinitions
+    verbs:
+      - create
+      - list
+      - watch
+      - delete
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -120,9 +126,9 @@ roleRef:
   kind: ClusterRole
   name: oss-cds-csi-cluster-role
 subjects:
-- kind: ServiceAccount
-  name: oss-cds-csi-sa
-  namespace: kube-system
+  - kind: ServiceAccount
+    name: oss-cds-csi-sa
+    namespace: kube-system
 ---
 apiVersion: apps/v1
 kind: DaemonSet
@@ -139,116 +145,116 @@ spec:
         app: oss-csi-cds-node
     spec:
       initContainers:
-      - name: install-oss-server
-        image: registry-bj.capitalonline.net/cck/oss-server:v1.0.1
-        imagePullPolicy: Always
-        command: 
-        - /bin/sh
-        - -c
-        - /install-oss.sh
-        securityContext:
-          privileged: true
-        volumeMounts:
-        - mountPath: /srv/
-          name: local-srv
-        - mountPath: /host/config/system/
-          name: systemd
+        - name: install-oss-server
+          image: capitalonline/oss-server:v1.0.1
+          imagePullPolicy: Always
+          command:
+            - /bin/sh
+            - -c
+            - /install-oss.sh
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - mountPath: /srv/
+              name: local-srv
+            - mountPath: /host/config/system/
+              name: systemd
       containers:
-      - args:
-        - --endpoint=$(CSI_ENDPOINT)
-        - --v=5
-        - --driver=oss.csi.cds.net
-        env:
-        - name: CSI_ENDPOINT
-          value: unix://var/lib/kubelet/plugins/oss.csi.cds.net/csi.sock
-        image: registry-bj.capitalonline.net/cck/cds-csi-driver:v2.1.3
-        imagePullPolicy: Always
-        name: oss-csi-node-server
-        securityContext:
-          allowPrivilegeEscalation: true
-          capabilities:
-            add:
-            - SYS_ADMIN
-          privileged: true
-        volumeMounts:
-        - mountPath: /var/lib/kubelet/
-          name: kubelet-dir
-        - mountPath: /var/log/
-          name: host-log
-        - mountPath: /host/etc
-          name: etc
-        - mountPath: /var/run
-          mountPropagation: Bidirectional
-          name: run
-      - args:
-        - --v=5
-        - --csi-address=$(ADDRESS)
-        - --kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)
-        env:
-        - name: ADDRESS
-          value: /var/lib/kubelet/plugins/oss.csi.cds.net/csi.sock
-        - name: DRIVER_REG_SOCK_PATH
-          value: /var/lib/kubelet/plugins/oss.csi.cds.net/csi.sock
-        image: registry-bj.capitalonline.net/cck/csi-node-driver-registrar:v1.2.0
-        imagePullPolicy: Always
-        lifecycle:
-          preStop:
-            exec:
-              command:
-              - /bin/sh
-              - -c
-              - rm -rf /registration/oss.csi.cds.net /registration/oss.csi.cds.net-reg.sock
-        name: oss-driver-registrar
-        volumeMounts:
-        - mountPath: /var/lib/kubelet/
-          name: kubelet-dir
-        - mountPath: /registration/
-          name: registration-dir
-      - args:
-        - --csi-address=/var/lib/kubelet/plugins/oss.csi.cds.net/csi.sock
-        - --health-port=9808
-        image: registry-bj.capitalonline.net/cck/csi-livenessprobe:v2.0.0
-        name: oss-liveness-probe
-        volumeMounts:
-        - mountPath: /var/lib/kubelet/
-          name: kubelet-dir
+        - args:
+            - --endpoint=$(CSI_ENDPOINT)
+            - --v=5
+            - --driver=oss.csi.cds.net
+          env:
+            - name: CSI_ENDPOINT
+              value: unix://var/lib/kubelet/plugins/oss.csi.cds.net/csi.sock
+          image: capitalonline/cds-csi-driver:v2.1.2
+          imagePullPolicy: Always
+          name: oss-csi-node-server
+          securityContext:
+            allowPrivilegeEscalation: true
+            capabilities:
+              add:
+                - SYS_ADMIN
+            privileged: true
+          volumeMounts:
+            - mountPath: /var/lib/kubelet/
+              name: kubelet-dir
+            - mountPath: /var/log/
+              name: host-log
+            - mountPath: /host/etc
+              name: etc
+            - mountPath: /var/run
+              mountPropagation: Bidirectional
+              name: run
+        - args:
+            - --v=5
+            - --csi-address=$(ADDRESS)
+            - --kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)
+          env:
+            - name: ADDRESS
+              value: /var/lib/kubelet/plugins/oss.csi.cds.net/csi.sock
+            - name: DRIVER_REG_SOCK_PATH
+              value: /var/lib/kubelet/plugins/oss.csi.cds.net/csi.sock
+          image: capitalonline/csi-node-driver-registrar:v2.9.0
+          imagePullPolicy: Always
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - rm -rf /registration/oss.csi.cds.net /registration/oss.csi.cds.net-reg.sock
+          name: oss-driver-registrar
+          volumeMounts:
+            - mountPath: /var/lib/kubelet/
+              name: kubelet-dir
+            - mountPath: /registration/
+              name: registration-dir
+        - args:
+            - --csi-address=/var/lib/kubelet/plugins/oss.csi.cds.net/csi.sock
+            - --health-port=9808
+          image: capitalonline/csi-livenessprobe:v2.11.0
+          name: oss-liveness-probe
+          volumeMounts:
+            - mountPath: /var/lib/kubelet/
+              name: kubelet-dir
       hostNetwork: true
       hostPID: true
       priorityClassName: system-node-critical
       serviceAccount: oss-cds-csi-sa
       tolerations:
-      - operator: Exists
+        - operator: Exists
       volumes:
-      - hostPath:
-          path: /var/lib/kubelet
-          type: Directory
-        name: kubelet-dir
-      - hostPath:
-          path: /var/lib/kubelet/plugins_registry
-          type: DirectoryOrCreate
-        name: registration-dir
-      - hostPath:
-          path: /var/log/
-        name: host-log
-      - hostPath:
-          path: /etc
-        name: etc
-      - hostPath:
-          path: /var/run/
-          type: DirectoryOrCreate
-        name: run
-      - hostPath:
-          path: /srv/
-          type: DirectoryOrCreate
-        name: local-srv
-      - hostPath:
-          path: /usr/lib/systemd/system/
-          type: ""
-        name: systemd
+        - hostPath:
+            path: /var/lib/kubelet
+            type: Directory
+          name: kubelet-dir
+        - hostPath:
+            path: /var/lib/kubelet/plugins_registry
+            type: DirectoryOrCreate
+          name: registration-dir
+        - hostPath:
+            path: /var/log/
+          name: host-log
+        - hostPath:
+            path: /etc
+          name: etc
+        - hostPath:
+            path: /var/run/
+            type: DirectoryOrCreate
+          name: run
+        - hostPath:
+            path: /srv/
+            type: DirectoryOrCreate
+          name: local-srv
+        - hostPath:
+            path: /usr/lib/systemd/system/
+            type: ""
+          name: systemd
   updateStrategy:
     type: RollingUpdate
 ---
-apiVersion: storage.k8s.io/v1beta1
+apiVersion: storage.k8s.io/v1
 kind: CSIDriver
 metadata:
   name: oss.csi.cds.net
