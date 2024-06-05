@@ -106,18 +106,6 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 		return nil, status.Errorf(codes.InvalidArgument, msg)
 	}
 
-	res, err := describeBlockLimit(diskVol.Zone)
-	if err != nil || res == nil || res.Data.MaxRestVolume == 0 {
-		log.Errorf("CreateVolume: error when describeDiskQuota,err: %v , res:%v", err, res)
-		return nil, err
-	}
-	if diskRequestGB > int64(res.Data.MaxRestVolume) {
-		quota := res.Data.MaxRestVolume
-		msg := fmt.Sprintf("az %s free quota is: %d,less than requested %d", diskVol.Zone, quota, diskRequestGB)
-		log.Error(msg)
-		return nil, status.Error(codes.InvalidArgument, msg)
-	}
-
 	if _, ok := CacheLockMap.LoadOrStore(pvName, struct{}{}); ok {
 		return nil, fmt.Errorf("当前pv有其它操作正在进行，请稍后再试")
 	}
@@ -158,6 +146,18 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 	}
 
 	log.Infof("CreateVolume: diskRequestGB is: %d", diskRequestGB)
+
+	res, err := describeBlockLimit(diskVol.Zone)
+	if err != nil || res == nil || res.Data.MaxRestVolume == 0 {
+		log.Errorf("CreateVolume: error when describeDiskQuota,err: %v , res:%v", err, res)
+		return nil, err
+	}
+	if diskRequestGB > int64(res.Data.MaxRestVolume) {
+		quota := res.Data.MaxRestVolume
+		msg := fmt.Sprintf("az %s free quota is: %d,less than requested %d", diskVol.Zone, quota, diskRequestGB)
+		log.Error(msg)
+		return nil, status.Error(codes.InvalidArgument, msg)
+	}
 
 	createRes, err := createBlock(pvName, int(diskRequestGB), diskVol.Zone, diskVol.FsType, diskVol.SubjectId)
 	if err != nil || createRes.Data == nil {
