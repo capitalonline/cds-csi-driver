@@ -731,8 +731,41 @@ func deleteNodeId(nodeId, taskID string) {
 	}
 }
 
-func (c *ControllerServer) ControllerExpandVolume(context.Context, *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "")
+func (c *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
+	log.Infof("ControllerExpandVolume:: Starting expand disk with: %v", req)
+	volSizeBytes := req.GetCapacityRange().GetRequiredBytes()
+	requestGB := int((volSizeBytes + 1024*1024*1024 - 1) / (1024 * 1024 * 1024))
+
+	disk, err := findDiskByVolumeID(req.VolumeId)
+	if err != nil {
+		log.Errorf("ControllerExpandVolume: findDiskByVolumeID error, err is: %s", err.Error())
+		return nil, err
+	}
+
+	if disk != nil && disk.Code == "InvalidParameter" && strings.Contains(disk.Message, "云盘信息不存在") {
+		log.Warnf("ControllerExpandVolume: disk had been deleted by InvalidParameter")
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	switch disk.Data.DiskInfo.Status {
+	case "mounting", "unmounting", "updating", "creating_snapshot", "recovering":
+		return nil, fmt.Errorf("ControllerExpandVolume: disk's status is %s ,can't expand volumeID: %s", disk.Data.DiskInfo.Status, req.VolumeId)
+	}
+
+	/*
+		if requestGB == disk.Size {
+			log.Infof("ControllerExpandVolume:: expect size is same with current: %s, size: %dGi", req.VolumeId, requestGB)
+			return &csi.ControllerExpandVolumeResponse{CapacityBytes: volSizeBytes, NodeExpansionRequired: true}, nil
+		}
+		if requestGB < disk.Size {
+			log.Infof("ControllerExpandVolume:: expect size is less than current: %d, expected: %d, disk: %s", disk.Size, requestGB, req.VolumeId)
+			return &csi.ControllerExpandVolumeResponse{CapacityBytes: volSizeBytes, NodeExpansionRequired: true}, nil
+		}
+	*/
+
+	log.Infof("ControllerExpandVolume:: Success to resize volume: %s from %dG to %dG", req.VolumeId, disk.Data.DiskInfo.Size, requestGB)
+	//log.Infof("ControllerExpandVolume:: Success to resize volume: %s from %dG to %dG, RequestID: %s", req.VolumeId, disk.Data.DiskInfo.Size, requestGB, response.RequestId)
+	return &csi.ControllerExpandVolumeResponse{CapacityBytes: volSizeBytes, NodeExpansionRequired: true}, nil
 }
 
 func patchTopologyOfPVsPeriodically(clientSet *kubernetes.Clientset) {
