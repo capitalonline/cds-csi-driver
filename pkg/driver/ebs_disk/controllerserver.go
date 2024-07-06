@@ -581,7 +581,7 @@ func (c *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.
 
 	if requestGB < diskSize {
 		log.Infof("ControllerExpandVolume:: expect size is less than current: %d, expected: %d, disk: %s", diskSize, requestGB, req.VolumeId)
-		return &csi.ControllerExpandVolumeResponse{CapacityBytes: volSizeBytes, NodeExpansionRequired: true}, nil
+		return &csi.ControllerExpandVolumeResponse{CapacityBytes: volSizeBytes, NodeExpansionRequired: false}, nil
 	}
 
 	if _, err = expandEbsDisk(diskID, requestGB); err != nil {
