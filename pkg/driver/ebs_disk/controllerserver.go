@@ -620,7 +620,7 @@ func (c *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.
 
 	// Check if autoSnapshot is enabled
 
-	resizeRes, err := expandEbsDisk(diskID, diskSize)
+	resizeRes, err := expandEbsDisk(diskID, requestGB)
 	if err != nil {
 		log.Errorf("ControllerExpandVolume:: resize got error: %s", err.Error())
 		return nil, status.Errorf(codes.Internal, "resize disk %s get error: %s", diskID, err.Error())
