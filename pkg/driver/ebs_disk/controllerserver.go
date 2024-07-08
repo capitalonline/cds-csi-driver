@@ -604,10 +604,7 @@ func (c *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.
 		return nil, status.Error(codes.Internal, "expand disk find disk not exist "+diskID)
 	}
 
-	switch res.Data.DiskInfo.Status {
-	case "running":
-		return nil, fmt.Errorf("ControllerExpandVolume: disk [mounted], can't expend volumeID: %s", diskID)
-	default:
+	if res.Data.DiskInfo.Status != "running" {
 		return nil, fmt.Errorf("ControllerExpandVolume: disk's status is %s ,can't expend volumeID: %s", res.Data.DiskInfo.Status, diskID)
 	}
 
