@@ -774,7 +774,6 @@ func (c *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.
 
 	// Check if autoSnapshot is enabled
 
-	// do resize
 	resizeRes, err := expandEbsDisk(diskID, diskSize)
 	if err != nil {
 		log.Errorf("ControllerExpandVolume:: resize got error: %s", err.Error())
@@ -857,6 +856,16 @@ func patchTopologyOfPVs(clientSet *kubernetes.Clientset) {
 	}
 }
 
-func expandEbsDisk(diskId string, diskSize int) (*cdsDisk.CreateEbsResp, error) {
-	return new(cdsDisk.CreateEbsResp), nil
+func expandEbsDisk(diskID string, diskSize int) (*cdsDisk.ExtendDiskResponse, error) {
+	log.Infof("expandEbsDisk: diskID: %s", diskID)
+	res, err := cdsDisk.ExtendDisk(&cdsDisk.ExtendDiskArgs{
+		DiskId:       diskID,
+		ExtendedSize: diskSize,
+	})
+
+	if err != nil {
+		log.Errorf("detachDisk: cdsDisk.detachDisk api error, err is: %s", err)
+		return nil, err
+	}
+	return res, nil
 }
