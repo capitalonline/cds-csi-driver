@@ -52,6 +52,13 @@ var DiskMultiTaskMap = new(sync.Map)
 
 var diskExpandingMap = new(sync.Map)
 
+var diskEventMap = new(sync.Map)
+
+type TaskRecord struct {
+	ID        string
+	StartTime time.Time
+}
+
 func NewControllerServer(d *DiskDriver) *ControllerServer {
 	config, err := rest.InClusterConfig()
 	if err != nil {
@@ -545,6 +552,101 @@ func (c *ControllerServer) ValidateVolumeCapabilities(ctx context.Context, req *
 	}, nil
 }
 
+func (c *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
+	log.Infof("ControllerExpandVolume:: Starting expand disk with: %v", req)
+
+	// check resize conditions
+	volSizeBytes := int64(req.GetCapacityRange().GetRequiredBytes())
+	requestGB := int((volSizeBytes + 1024*1024*1024 - 1) / (1024 * 1024 * 1024))
+	diskID := req.VolumeId
+
+	//if value, ok := diskExpandingMap[diskID]; ok {
+	if v, ok := diskExpandingMap.LoadOrStore(diskID, "creating"); ok {
+		value, _ := v.(string)
+		switch value {
+		case "creating":
+			log.Warnf("CreateVolume: Disk Volume(%s)'s is in creating, please wait", diskID)
+			return nil, fmt.Errorf("ControllerExpandVolume: disk Volume(%s) is in expanding, please wait", diskID)
+		case "expending":
+			e, ok := diskEventMap.Load(diskID)
+			if !ok {
+				return nil, fmt.Errorf("ControllerExpandVolume: extend Volume(%s) is error", diskID)
+			}
+			event, ok := e.(TaskRecord)
+			if !ok {
+				return nil, fmt.Errorf("ControllerExpandVolume: disk Volume(%s) is in expanding, please wait", diskID)
+			}
+			if time.Now().Sub(event.StartTime) < time.Minute*20 {
+				log.Warnf("CreateVolume: Disk Volume(%s)'s is in creating, please wait", diskID)
+				return nil, fmt.Errorf("ControllerExpandVolume: disk Volume(%s) is in expanding, please wait", diskID)
+			}
+			err := queryExtendResult(req, event.ID)
+			if err != nil {
+				log.Errorf("ControllerExpandVolume: describeTaskStatus task result failed, err is: %s", err.Error())
+				diskProcessingMap.Store(event.ID, "error")
+				return nil, err
+			}
+			diskEventMap.Delete(diskID)
+			diskExpandingMap.Delete(diskID)
+			return &csi.ControllerExpandVolumeResponse{CapacityBytes: volSizeBytes, NodeExpansionRequired: true}, nil
+		}
+		return nil, fmt.Errorf("ControllerExpandVolume: disk Volume(%s) is in %s, please wait", diskID, v)
+	}
+
+	res, err := findDiskByVolumeID(diskID)
+	if err != nil {
+		log.Errorf("ControllerExpandVolume:: find disk(%s) with error: %s", diskID, err.Error())
+		return nil, fmt.Errorf("ControllerPublishVolume: findDiskByVolumeID api error, err is: %s", err)
+	}
+
+	if res == nil {
+		log.Errorf("ControllerExpandVolume: expand disk find disk not exist: %s", diskID)
+		return nil, status.Error(codes.Internal, "expand disk find disk not exist "+diskID)
+	}
+
+	switch res.Data.DiskInfo.Status {
+	case "running":
+		return nil, fmt.Errorf("ControllerExpandVolume: disk [mounted], can't expend volumeID: %s", diskID)
+	default:
+		return nil, fmt.Errorf("ControllerExpandVolume: disk's status is %s ,can't expend volumeID: %s", res.Data.DiskInfo.Status, diskID)
+	}
+
+	diskSize := res.Data.DiskInfo.Size
+	if requestGB == diskSize {
+		log.Infof("ControllerExpandVolume:: expect size is same with current: %s, size: %dGi", req.VolumeId, requestGB)
+		return &csi.ControllerExpandVolumeResponse{CapacityBytes: volSizeBytes, NodeExpansionRequired: true}, nil
+	}
+	if requestGB < diskSize {
+		log.Infof("ControllerExpandVolume:: expect size is less than current: %d, expected: %d, disk: %s", diskSize, requestGB, req.VolumeId)
+		return &csi.ControllerExpandVolumeResponse{CapacityBytes: volSizeBytes, NodeExpansionRequired: true}, nil
+	}
+
+	// Check if autoSnapshot is enabled
+
+	resizeRes, err := expandEbsDisk(diskID, diskSize)
+	if err != nil {
+		log.Errorf("ControllerExpandVolume:: resize got error: %s", err.Error())
+		return nil, status.Errorf(codes.Internal, "resize disk %s get error: %s", diskID, err.Error())
+	}
+
+	taskId := resizeRes.Data.EventId
+	diskExpandingMap.Store(diskID, "expanding")
+	diskEventMap.Store(diskID, TaskRecord{
+		ID:        taskId,
+		StartTime: time.Now(),
+	})
+
+	if err = queryExtendResult(req, taskId); err != nil {
+		return nil, err
+	}
+
+	diskEventMap.Delete(diskID)
+	diskExpandingMap.Delete(diskID)
+	log.Infof("ControllerExpandVolume:: Success to resize volume: %s from %dG to %dG", req.VolumeId, diskSize, requestGB)
+	return &csi.ControllerExpandVolumeResponse{CapacityBytes: volSizeBytes, NodeExpansionRequired: true}, nil
+
+}
+
 func createEbsDisk(diskName, diskType, diskZoneID string, diskSize, diskIops int) (*cdsDisk.CreateEbsResp, error) {
 	log.Infof("createDisk: diskName: %s, diskType: %s,  diskZoneID: %s, diskSize: %d, diskIops: %d", diskName, diskType, diskZoneID, diskSize, diskIops)
 	res, err := cdsDisk.CreateEbs(&cdsDisk.CreateEbsReq{
@@ -733,84 +835,30 @@ func deleteNodeId(nodeId, taskID string) {
 	}
 }
 
-func (c *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
-	log.Infof("ControllerExpandVolume:: Starting expand disk with: %v", req)
-
-	// check resize conditions
+func queryExtendResult(req *csi.ControllerExpandVolumeRequest, taskID string) error {
+	var err error
 	volSizeBytes := int64(req.GetCapacityRange().GetRequiredBytes())
 	requestGB := int((volSizeBytes + 1024*1024*1024 - 1) / (1024 * 1024 * 1024))
-	diskID := req.VolumeId
-
-	//if value, ok := diskExpandingMap[diskID]; ok {
-	if v, ok := diskExpandingMap.LoadOrStore(diskID, "creating"); ok {
-		value, _ := v.(string)
-		if value == "creating" {
-			log.Warnf("CreateVolume: Disk Volume(%s)'s is in creating, please wait", diskID)
-			return nil, fmt.Errorf("ControllerExpandVolume: disk Volume(%s) is in expanding, please wait", diskID)
-		}
-		return nil, fmt.Errorf("ControllerExpandVolume: disk Volume(%s) is in %s, please wait", diskID, v)
-	}
-
-	res, err := findDiskByVolumeID(diskID)
-	if err != nil {
-		log.Errorf("ControllerExpandVolume:: find disk(%s) with error: %s", diskID, err.Error())
-		return nil, fmt.Errorf("ControllerPublishVolume: findDiskByVolumeID api error, err is: %s", err)
-	}
-
-	if res == nil {
-		log.Errorf("ControllerExpandVolume: expand disk find disk not exist: %s", diskID)
-		return nil, status.Error(codes.Internal, "expand disk find disk not exist "+diskID)
-	}
-
-	diskSize := res.Data.DiskInfo.Size
-	if requestGB == diskSize {
-		log.Infof("ControllerExpandVolume:: expect size is same with current: %s, size: %dGi", req.VolumeId, requestGB)
-		return &csi.ControllerExpandVolumeResponse{CapacityBytes: volSizeBytes, NodeExpansionRequired: true}, nil
-	}
-	if requestGB < diskSize {
-		log.Infof("ControllerExpandVolume:: expect size is less than current: %d, expected: %d, disk: %s", diskSize, requestGB, req.VolumeId)
-		return &csi.ControllerExpandVolumeResponse{CapacityBytes: volSizeBytes, NodeExpansionRequired: true}, nil
-	}
-
-	// Check if autoSnapshot is enabled
-
-	resizeRes, err := expandEbsDisk(diskID, diskSize)
-	if err != nil {
-		log.Errorf("ControllerExpandVolume:: resize got error: %s", err.Error())
-		return nil, status.Errorf(codes.Internal, "resize disk %s get error: %s", diskID, err.Error())
-	}
-
-	taskId := resizeRes.Data.EventId
-	//diskExpandingMap[diskID] = "expanding"
-	diskExpandingMap.Store(diskID, "expanding")
-
-	// check create ebs disk event
-	err = describeTaskStatus(taskId)
+	err = describeTaskStatus(taskID)
 	if err != nil {
 		log.Errorf("createDisk: describeTaskStatus task result failed, err is: %s", err.Error())
-		//diskProcessingMap[diskID] = "error"
-		diskProcessingMap.Store(diskID, "error")
-		return nil, err
+		diskProcessingMap.Store(taskID, "error")
+		return err
 	}
 
-	// clean creating disk
-	//delete(diskProcessingMap, diskID)
-	diskProcessingMap.Delete(diskID)
+	diskProcessingMap.Delete(taskID)
 
-	checkDisk, err := findDiskByVolumeID(diskID)
+	checkDisk, err := findDiskByVolumeID(taskID)
 	if err != nil {
 		log.Errorf("ControllerExpandVolume:: find disk failed with error: %+v", err)
-		return nil, status.Errorf(codes.Internal, "resize disk %s get error: %s", diskID, err.Error())
+		return status.Errorf(codes.Internal, "resize disk %s get error: %s", taskID, err.Error())
 	}
 
 	if requestGB != checkDisk.Data.DiskInfo.Size {
 		log.Infof("ControllerExpandVolume:: resize disk err with excepted size: %vGB, actual size: %vGB", requestGB, checkDisk.Data.DiskInfo.Size)
-		return nil, status.Errorf(codes.Internal, "resize disk err with excepted size: %vGB, actual size: %vGB", requestGB, checkDisk.Data.DiskInfo.Size)
+		return status.Errorf(codes.Internal, "resize disk err with excepted size: %vGB, actual size: %vGB", requestGB, checkDisk.Data.DiskInfo.Size)
 	}
-
-	log.Infof("ControllerExpandVolume:: Success to resize volume: %s from %dG to %dG", req.VolumeId, diskSize, requestGB)
-	return &csi.ControllerExpandVolumeResponse{CapacityBytes: volSizeBytes, NodeExpansionRequired: true}, nil
-
+	return nil
 }
 
 func patchTopologyOfPVsPeriodically(clientSet *kubernetes.Clientset) {
