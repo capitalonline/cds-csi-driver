@@ -845,7 +845,7 @@ func queryExtendResult(req *csi.ControllerExpandVolumeRequest, taskID string) er
 
 	diskProcessingMap.Delete(taskID)
 
-	checkDisk, err := findDiskByVolumeID(taskID)
+	checkDisk, err := findDiskByVolumeID(req.VolumeId)
 	if err != nil {
 		log.Errorf("ControllerExpandVolume:: find disk failed with error: %+v", err)
 		return status.Errorf(codes.Internal, "resize disk %s get error: %s", taskID, err.Error())
