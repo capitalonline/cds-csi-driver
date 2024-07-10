@@ -855,7 +855,7 @@ func expandEbsDisk(diskID string, diskSize int) (*cdsDisk.ExtendDiskResponse, er
 	})
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to extend disk %s by OpenAPI %s", diskID, err.Error())
 	}
 	log.Infof("expend disk %s, eventId %s", diskID, res.Data.EventId)
 	return res, nil

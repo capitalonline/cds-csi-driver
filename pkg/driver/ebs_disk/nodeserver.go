@@ -628,13 +628,12 @@ func (n *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVo
 	}
 	deviceName, err := findDeviceNameByOrderId(fmt.Sprintf("%s%d", OrderHead, diskOrder))
 	if err != nil {
-		log.Errorf("NodeStageVolume: findDeviceNameByUuid error, err is: %s", err.Error())
-		return nil, err
+		return nil, fmt.Errorf("get disk %s device name failed, err: %s", diskID, err.Error())
 	}
 
 	_, err = utils.RunCommand(fmt.Sprintf("resize2fs %s", deviceName))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("resize2fs %s failed, err: %s", deviceName, err)
 	}
 
 	deviceCapacity := getBlockDeviceCapacity(deviceName)
