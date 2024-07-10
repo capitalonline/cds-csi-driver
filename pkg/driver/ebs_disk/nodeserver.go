@@ -9,11 +9,14 @@ import (
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"io"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -598,6 +601,57 @@ func (n *NodeServer) GetPvFormat(diskId string) bool {
 	return false
 }
 
-func (n *NodeServer) NodeExpandVolume(context.Context, *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "")
+func (ns *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (
+	*csi.NodeExpandVolumeResponse, error) {
+	log.Infof("NodeExpandVolume: node expand volume: %v", req)
+
+	requestBytes := req.GetCapacityRange().GetRequiredBytes()
+
+	diskID := req.GetVolumeId()
+
+	res, err := findDiskByVolumeID(diskID)
+	if err != nil {
+		return nil, fmt.Errorf("query disk by OpenAPI failed,err:%s", err.Error())
+	}
+	diskOrder := res.Data.DiskInfo.Order
+	ecsId := res.Data.DiskInfo.EcsId
+	// 查询失败
+	if diskOrder == 0 || res.Data.DiskInfo.EcsId == "" {
+		return nil, fmt.Errorf("OpenAPI return invalid disk data,disk order:%d,EcsId:%s", diskOrder, ecsId)
+	}
+	deviceName, err := findDeviceNameByOrderId(fmt.Sprintf("%s%d", OrderHead, diskOrder))
+	if err != nil {
+		log.Errorf("NodeStageVolume: findDeviceNameByUuid error, err is: %s", err.Error())
+		return nil, err
+	}
+
+	_, err = utils.RunCommand(fmt.Sprintf("resize2fs %s", deviceName))
+	if err != nil {
+		return nil, err
+	}
+
+	deviceCapacity := getBlockDeviceCapacity(deviceName)
+	if requestBytes > 0 && deviceCapacity < requestBytes {
+		return nil, status.Errorf(codes.Aborted, "requested %v, but actual block size %v is smaller. Not updated yet?",
+			resource.NewQuantity(requestBytes, resource.BinarySI), resource.NewQuantity(deviceCapacity, resource.BinarySI))
+	}
+
+	return &csi.NodeExpandVolumeResponse{
+		CapacityBytes: deviceCapacity,
+	}, nil
+}
+
+func getBlockDeviceCapacity(devicePath string) int64 {
+
+	file, err := os.Open(devicePath)
+	if err != nil {
+		log.Errorf("getBlockDeviceCapacity:: failed to open devicePath: %v", devicePath)
+		return 0
+	}
+	pos, err := file.Seek(0, io.SeekEnd)
+	if err != nil {
+		log.Errorf("getBlockDeviceCapacity:: failed to read devicePath: %v", devicePath)
+		return 0
+	}
+	return pos
 }

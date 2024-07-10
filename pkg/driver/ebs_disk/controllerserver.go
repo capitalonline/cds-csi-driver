@@ -849,15 +849,14 @@ func patchTopologyOfPVs(clientSet *kubernetes.Clientset) {
 }
 
 func expandEbsDisk(diskID string, diskSize int) (*cdsDisk.ExtendDiskResponse, error) {
-	log.Infof("expandEbsDisk: diskID: %s", diskID)
 	res, err := cdsDisk.ExtendDisk(&cdsDisk.ExtendDiskArgs{
 		DiskId:       diskID,
 		ExtendedSize: diskSize,
 	})
 
 	if err != nil {
-		log.Errorf("detachDisk: cdsDisk.detachDisk api error, err is: %s", err)
 		return nil, err
 	}
+	log.Infof("expend disk %s, eventId %s", diskID, res.Data.EventId)
 	return res, nil
 }
