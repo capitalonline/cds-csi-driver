@@ -792,7 +792,7 @@ func queryExtendResult(req *csi.ControllerExpandVolumeRequest, taskID string) er
 
 	diskProcessingMap.Delete(taskID)
 
-	checkDisk, err := findDiskByVolumeID(taskID)
+	checkDisk, err := findDiskByVolumeID(req.VolumeId)
 	if err != nil {
 		log.Errorf("ControllerExpandVolume:: find disk failed with error: %+v", err)
 		return status.Errorf(codes.Internal, "resize disk %s get error: %s", taskID, err.Error())
@@ -849,15 +849,14 @@ func patchTopologyOfPVs(clientSet *kubernetes.Clientset) {
 }
 
 func expandEbsDisk(diskID string, diskSize int) (*cdsDisk.ExtendDiskResponse, error) {
-	log.Infof("expandEbsDisk: diskID: %s", diskID)
 	res, err := cdsDisk.ExtendDisk(&cdsDisk.ExtendDiskArgs{
 		DiskId:       diskID,
 		ExtendedSize: diskSize,
 	})
 
 	if err != nil {
-		log.Errorf("detachDisk: cdsDisk.detachDisk api error, err is: %s", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to extend disk %s by OpenAPI %s", diskID, err.Error())
 	}
+	log.Infof("expend disk %s, eventId %s", diskID, res.Data.EventId)
 	return res, nil
 }
