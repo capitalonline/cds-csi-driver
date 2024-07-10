@@ -76,8 +76,15 @@ func (n *NodeServer) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCa
 		},
 	}
 
+	expendCap := &csi.NodeServiceCapability{
+		Type: &csi.NodeServiceCapability_Rpc{
+			Rpc: &csi.NodeServiceCapability_RPC{
+				Type: csi.NodeServiceCapability_RPC_EXPAND_VOLUME,
+			},
+		},
+	}
 	// Disk Metric enable config
-	nodeSvcCap := []*csi.NodeServiceCapability{nodeCap}
+	nodeSvcCap := []*csi.NodeServiceCapability{nodeCap, expendCap}
 
 	return &csi.NodeGetCapabilitiesResponse{
 		Capabilities: nodeSvcCap,
@@ -601,7 +608,7 @@ func (n *NodeServer) GetPvFormat(diskId string) bool {
 	return false
 }
 
-func (ns *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (
+func (n *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (
 	*csi.NodeExpandVolumeResponse, error) {
 	log.Infof("NodeExpandVolume: node expand volume: %v", req)
 
