@@ -14,9 +14,11 @@ rules:
       - ""
     resources:
       - secrets
+      - pods
     verbs:
       - get
       - list
+      - watch
   - apiGroups:
       - ""
     resources:
@@ -33,6 +35,7 @@ rules:
       - ""
     resources:
       - persistentvolumeclaims
+      - persistentvolumeclaims/status
     verbs:
       - get
       - list
@@ -240,7 +243,7 @@ spec:
                 configMapKeyRef:
                   key: oversea
                   name: cds-properties
-          image: registry-bj.capitalonline.net/cck/cds-csi-driver:v2.1.3
+          image: harbor-dev.yun-paas.com/test/cds-csi-driver:v2.1.6
           imagePullPolicy: Always
           livenessProbe:
             exec:
@@ -301,10 +304,28 @@ spec:
           volumeMounts:
             - mountPath: /var/lib/csi/sockets/pluginproxy/
               name: socket-dir
+        - args:
+            - --v=5
+            - --csi-address=$(ADDRESS)
+            - --http-endpoint=:8080
+            - --retry-interval-max=3s
+          env:
+            - name: ADDRESS
+              value: /var/lib/csi/sockets/pluginproxy/csi.sock
+          name: csi-resizer
+          image: registry.k8s.io/sig-storage/csi-resizer:v1.9.0
+          imagePullPolicy: "IfNotPresent"
+          ports:
+            - containerPort: 8080
+              name: http-endpoint
+              protocol: TCP
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /var/lib/csi/sockets/pluginproxy/
       hostNetwork: true
       hostPID: true
       nodeSelector:
-        node-role.kubernetes.io/master: ''
+        node-role.kubernetes.io/control-plane: ""
       priorityClassName: system-cluster-critical
       serviceAccount: ebs-disk-cds-csi-sa
       tolerations:
@@ -312,6 +333,9 @@ spec:
           operator: Exists
           effect: NoSchedule
         - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.eks.net/infra
           operator: Exists
           effect: NoSchedule
 
@@ -366,7 +390,7 @@ spec:
                   name: cds-properties
             - name: API_HOST
               value: http://api.capitalonline.net
-          image: registry-bj.capitalonline.net/cck/cds-csi-driver:v2.1.3
+          image: harbor-dev.yun-paas.com/test/cds-csi-driver:v2.1.6
           imagePullPolicy: Always
           name: ebs-disk-csi-node-server
           securityContext:
