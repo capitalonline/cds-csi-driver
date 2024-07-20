@@ -50,10 +50,6 @@ var AttachDetachMap = new(sync.Map)
 
 var DiskMultiTaskMap = new(sync.Map)
 
-var diskExpandingMap = new(sync.Map)
-
-var diskEventMap = new(sync.Map)
-
 type TaskRecord struct {
 	ID        string
 	StartTime time.Time
@@ -779,39 +775,13 @@ func deleteNodeId(nodeId, taskID string) {
 	}
 }
 
-func queryExtendResult(req *csi.ControllerExpandVolumeRequest, taskID string) error {
-	var err error
-	volSizeBytes := int64(req.GetCapacityRange().GetRequiredBytes())
-	requestGB := int((volSizeBytes + 1024*1024*1024 - 1) / (1024 * 1024 * 1024))
-	err = describeTaskStatus(taskID)
-	if err != nil {
-		log.Errorf("createDisk: describeTaskStatus task result failed, err is: %s", err.Error())
-		diskProcessingMap.Store(taskID, "error")
-		return err
-	}
-
-	diskProcessingMap.Delete(taskID)
-
-	checkDisk, err := findDiskByVolumeID(req.VolumeId)
-	if err != nil {
-		log.Errorf("ControllerExpandVolume:: find disk failed with error: %+v", err)
-		return status.Errorf(codes.Internal, "resize disk %s get error: %s", taskID, err.Error())
-	}
-
-	if requestGB != checkDisk.Data.DiskInfo.Size {
-		log.Infof("ControllerExpandVolume:: resize disk err with excepted size: %vGB, actual size: %vGB", requestGB, checkDisk.Data.DiskInfo.Size)
-		return status.Errorf(codes.Internal, "resize disk err with excepted size: %vGB, actual size: %vGB", requestGB, checkDisk.Data.DiskInfo.Size)
-	}
-	return nil
-}
-
 func patchTopologyOfPVsPeriodically(clientSet *kubernetes.Clientset) {
 	for {
 		patchTopologyOfPVs(clientSet)
 		time.Sleep(PatchPVInterval)
 	}
-
 }
+
 func patchTopologyOfPVs(clientSet *kubernetes.Clientset) {
 	pvs, err := clientSet.CoreV1().PersistentVolumes().List(metav1.ListOptions{})
 	if err != nil {
