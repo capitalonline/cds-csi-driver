@@ -6,6 +6,7 @@ import (
 	"github.com/capitalonline/cds-csi-driver/pkg/driver/utils"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/kubernetes-csi/drivers/pkg/csi-common"
+	diskUtil "github.com/shirou/gopsutil/disk"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -630,10 +631,21 @@ func (n *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVo
 	if err != nil {
 		return nil, fmt.Errorf("get disk %s device name failed, err: %s", diskID, err.Error())
 	}
-
-	_, err = utils.RunCommand(fmt.Sprintf("resize2fs %s", deviceName))
+	fsType, err := getBlockDeviceFsType(deviceName)
 	if err != nil {
-		return nil, fmt.Errorf("resize2fs %s failed, err: %s", deviceName, err)
+		return nil, fmt.Errorf("get disk %s file system type failed, err: %s", diskID, err.Error())
+	}
+	cmd := fmt.Sprintf("resize2fs %s", deviceName)
+	switch fsType {
+	case DefaultFsTypeXfs:
+		cmd = fmt.Sprintf("xfs_growfs %s", deviceName)
+	case FsTypeExt3, FsTypeExt4:
+	default:
+		return nil, fmt.Errorf("file system %s not supported", fsType)
+	}
+	_, err = utils.RunCommand(cmd)
+	if err != nil {
+		return nil, fmt.Errorf("resize fs %s failed, err: %s", deviceName, err)
 	}
 
 	deviceCapacity := getBlockDeviceCapacity(deviceName)
@@ -660,4 +672,17 @@ func getBlockDeviceCapacity(devicePath string) int64 {
 		return 0
 	}
 	return pos
+}
+
+func getBlockDeviceFsType(devicePath string) (string, error) {
+	partitions, err := diskUtil.Partitions(false)
+	if err != nil {
+		return "", err
+	}
+	for _, partition := range partitions {
+		if partition.Device == devicePath {
+			return partition.Fstype, nil
+		}
+	}
+	return "", fmt.Errorf("cannot get device")
 }
