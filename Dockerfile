@@ -21,7 +21,7 @@ RUN apk --no-cache update && apk --no-cache add --virtual build-dependencies \
     ca-certificates \
     udev e2fsprogs  nvme-cli \
     e2fsprogs-extra \
-    xfsprogs
+    xfsprogs-extra
 
 #RUN git clone https://github.com/s3fs-fuse/s3fs-fuse.git && \
 #    cd s3fs-fuse \
