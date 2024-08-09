@@ -562,7 +562,7 @@ func (c *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.
 		return nil, fmt.Errorf("expand disk find disk not exist: %s", diskID)
 	}
 
-	if res.Data.DiskInfo.Status != "running" {
+	if res.Data.DiskInfo.Status != "running" && res.Data.DiskInfo.Status != "waiting" {
 		return nil, fmt.Errorf("ControllerExpandVolume: disk's status is %s ,can't expend volumeID: %s", res.Data.DiskInfo.Status, diskID)
 	}
 
@@ -578,12 +578,15 @@ func (c *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.
 			return nil, fmt.Errorf("ecs %s status is not running", res.Data.DiskInfo.EcsId)
 		}
 	}
-	volSizeBytes := int64(req.GetCapacityRange().GetRequiredBytes())
-	requestGB := int((volSizeBytes + 1024*1024*1024 - 1) / (1024 * 1024 * 1024))
+	volSizeBytes := req.GetCapacityRange().GetRequiredBytes()
+	requestGB := int(volSizeBytes / (1024 * 1024 * 1024))
 
 	diskSize := res.Data.DiskInfo.Size
 	if requestGB == diskSize {
 		log.Infof("ControllerExpandVolume:: expect size is same with current: %s, size: %dGi", req.VolumeId, requestGB)
+		if res.Data.DiskInfo.Status == "waiting" {
+			return &csi.ControllerExpandVolumeResponse{CapacityBytes: volSizeBytes, NodeExpansionRequired: false}, nil
+		}
 		return &csi.ControllerExpandVolumeResponse{CapacityBytes: volSizeBytes, NodeExpansionRequired: true}, nil
 	}
 
