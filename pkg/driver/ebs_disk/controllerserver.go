@@ -584,9 +584,6 @@ func (c *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.
 	diskSize := res.Data.DiskInfo.Size
 	if requestGB == diskSize {
 		log.Infof("ControllerExpandVolume:: expect size is same with current: %s, size: %dGi", req.VolumeId, requestGB)
-		if res.Data.DiskInfo.Status == "waiting" {
-			return &csi.ControllerExpandVolumeResponse{CapacityBytes: volSizeBytes, NodeExpansionRequired: false}, nil
-		}
 		return &csi.ControllerExpandVolumeResponse{CapacityBytes: volSizeBytes, NodeExpansionRequired: true}, nil
 	}
 
