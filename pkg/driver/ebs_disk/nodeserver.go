@@ -350,38 +350,18 @@ func (n *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstage
 		return nil, status.Error(codes.InvalidArgument, "NodeUnstageVolume: step 1, req.StagingTargetPath cant not be empty")
 	}
 
-	// Step 2: umount disk device from node global path
-	if value, ok := diskUnStagingMap.Load(unStagingPath); ok {
-		switch value {
-		case UnStaing:
-			log.Warnf("NodeUnstageVolume: volumeID: %s in is unstaging process, please wait", volumeID)
-			return nil, fmt.Errorf("NodeUnstageVolume: volumeID: %s in is unstaging process, please wait", volumeID)
-		case ErrorStatus:
-			log.Errorf("NodeUnstageVolume: volumeID: %s unstaging process error", volumeID)
-			return nil, fmt.Errorf("NodeUnstageVolume: volumeID: %s unstaging process error", volumeID)
-		case Ok:
-			log.Warnf("NodeUnstageVolume: volumeID: %s unstaging process succeed, return context", volumeID)
-			return &csi.NodeUnstageVolumeResponse{}, nil
-		}
-	}
-
 	if !utils.FileExisted(unStagingPath) {
 		diskStagingMap.Delete(unStagingPath)
 		log.Warnf("NodeUnstageVolume: unStagingPath is not exist, should must be already unmount, retrun directly")
 		return &csi.NodeUnstageVolumeResponse{}, nil
 	}
 
-	diskUnStagingMap.Store(unStagingPath, UnStaing)
 	err := unMountDiskDeviceFromNodeGlobalPath(volumeID, unStagingPath)
 	if err != nil {
-		diskUnStagingMap.Store(unStagingPath, ErrorStatus)
 		log.Errorf("NodeUnstageVolume: step 2, unMountDiskDeviceFromNodeGlobalPath failed, err is: %s", err)
 		return nil, fmt.Errorf("NodeUnstageVolume: step 2, unMountDiskDeviceFromNodeGlobalPath failed, err is: %s", err)
 	}
-	diskUnStagingMap.Delete(unStagingPath)
-	diskStagingMap.Delete(unStagingPath)
 	log.Infof("NodeUnstageVolume: Successfully!")
-
 	return &csi.NodeUnstageVolumeResponse{}, nil
 }
 
@@ -501,6 +481,10 @@ func bindMountGlobalPathToPodPath(volumeID, stagingTargetPath, podPath string) e
 
 func unMountDiskDeviceFromNodeGlobalPath(volumeID, unStagingPath string) error {
 	log.Infof("unMountDeviceFromNodeGlobalPath: volumeID is: %s, unStagingPath: %s", volumeID, unStagingPath)
+
+	if _, err := utils.RunCommand(fmt.Sprintf("mountpoint %s", unStagingPath)); err == nil {
+		return nil
+	}
 
 	cmdUnstagingPath := fmt.Sprintf("umount %s", unStagingPath)
 	if _, err := utils.RunCommand(cmdUnstagingPath); err != nil {
