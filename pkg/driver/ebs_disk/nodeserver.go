@@ -676,14 +676,14 @@ func getBlockDeviceFsType(devicePath string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("blkid %s failed,err:%v", devicePath, err)
 	}
-	if len(output) == 0 {
+	typeStr := strings.Split(output, " ")
+	if len(typeStr) == 0 {
 		return "", fmt.Errorf("cannot get device")
 	}
 	re := regexp.MustCompile(`TYPE="([^"]+)"`)
 	mathResult := re.FindStringSubmatch(output)
-	if len(mathResult) == 0 {
-		log.Warnf("invalid blkid result:%s", output)
+	if len(mathResult) <= 1 {
 		return "", fmt.Errorf("cannot get file system type")
 	}
-	return mathResult[0], nil
+	return mathResult[1], nil
 }
