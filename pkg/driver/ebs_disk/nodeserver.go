@@ -2,6 +2,7 @@ package ebs_disk
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/capitalonline/cds-csi-driver/pkg/driver/utils"
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -661,6 +662,8 @@ func getBlockDeviceCapacity(devicePath string) int64 {
 
 func getBlockDeviceFsType(devicePath string) (string, error) {
 	partitions, err := diskUtil.Partitions(false)
+	data, _ := json.Marshal(partitions)
+	log.Infof("获取到的设备信息%s", string(data))
 	if err != nil {
 		return "", err
 	}
