@@ -483,6 +483,7 @@ func unMountDiskDeviceFromNodeGlobalPath(volumeID, unStagingPath string) error {
 	log.Infof("unMountDeviceFromNodeGlobalPath: volumeID is: %s, unStagingPath: %s", volumeID, unStagingPath)
 
 	if output, _ := utils.RunCommand(fmt.Sprintf("mountpoint %s", unStagingPath)); strings.Contains(output, "is not a mountpoint") {
+		log.Infof("path %s is not a mountpoint", unStagingPath)
 		return nil
 	}
 
