@@ -482,7 +482,9 @@ func bindMountGlobalPathToPodPath(volumeID, stagingTargetPath, podPath string) e
 func unMountDiskDeviceFromNodeGlobalPath(volumeID, unStagingPath string) error {
 	log.Infof("unMountDeviceFromNodeGlobalPath: volumeID is: %s, unStagingPath: %s", volumeID, unStagingPath)
 
-	if output, _ := utils.RunCommand(fmt.Sprintf("mountpoint %s", unStagingPath)); strings.Contains(output, "is not a mountpoint") {
+	output, err := utils.RunCommand(fmt.Sprintf("mountpoint %s", unStagingPath))
+	log.Infof("output is: %s,err:%v", output, err)
+	if err != nil && strings.Contains(err.Error(), "is not a mountpoint") {
 		log.Infof("path %s is not a mountpoint", unStagingPath)
 		return nil
 	}
@@ -681,7 +683,7 @@ func getBlockDeviceFsType(devicePath string) (string, error) {
 		return "", fmt.Errorf("cannot get device")
 	}
 	re := regexp.MustCompile(`TYPE="([^"]+)"`)
-	mathResult := re.FindStringSubmatch(output)
+	mathResult := re.FindStringSubmatch(typeStr[len(typeStr)-1])
 	if len(mathResult) <= 1 {
 		return "", fmt.Errorf("cannot get file system type")
 	}
