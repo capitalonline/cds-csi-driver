@@ -482,7 +482,7 @@ func bindMountGlobalPathToPodPath(volumeID, stagingTargetPath, podPath string) e
 func unMountDiskDeviceFromNodeGlobalPath(volumeID, unStagingPath string) error {
 	log.Infof("unMountDeviceFromNodeGlobalPath: volumeID is: %s, unStagingPath: %s", volumeID, unStagingPath)
 
-	if _, err := utils.RunCommand(fmt.Sprintf("mountpoint %s", unStagingPath)); err == nil {
+	if output, _ := utils.RunCommand(fmt.Sprintf("mountpoint %s", unStagingPath)); strings.Contains(output, "is not a mountpoint") {
 		return nil
 	}
 
