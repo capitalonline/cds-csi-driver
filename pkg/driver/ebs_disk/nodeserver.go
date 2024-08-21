@@ -2,12 +2,10 @@ package ebs_disk
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"github.com/capitalonline/cds-csi-driver/pkg/driver/utils"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/kubernetes-csi/drivers/pkg/csi-common"
-	diskUtil "github.com/shirou/gopsutil/disk"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -19,6 +17,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -661,16 +660,30 @@ func getBlockDeviceCapacity(devicePath string) int64 {
 }
 
 func getBlockDeviceFsType(devicePath string) (string, error) {
-	partitions, err := diskUtil.Partitions(false)
-	data, _ := json.Marshal(partitions)
-	log.Infof("获取到的设备信息%s", string(data))
+	//partitions, err := diskUtil.Partitions(false)
+	//data, _ := json.Marshal(partitions)
+	//log.Infof("获取到的设备信息%s", string(data))
+	//if err != nil {
+	//	return "", err
+	//}
+	//for _, partition := range partitions {
+	//	if partition.Device == devicePath {
+	//		return partition.Fstype, nil
+	//	}
+	//}
+
+	output, err := utils.RunCommand(fmt.Sprintf("blkid %s", devicePath))
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("blkid %s failed,err:%v", devicePath, err)
 	}
-	for _, partition := range partitions {
-		if partition.Device == devicePath {
-			return partition.Fstype, nil
-		}
+	if len(output) == 0 {
+		return "", fmt.Errorf("cannot get device")
 	}
-	return "", fmt.Errorf("cannot get device")
+	re := regexp.MustCompile(`TYPE="([^"]+)"`)
+	mathResult := re.FindStringSubmatch(output)
+	if len(mathResult) == 0 {
+		log.Warnf("invalid blkid result:%s", output)
+		return "", fmt.Errorf("cannot get file system type")
+	}
+	return mathResult[0], nil
 }
