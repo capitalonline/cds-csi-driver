@@ -566,8 +566,11 @@ func (c *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.
 		return nil, fmt.Errorf("ControllerExpandVolume: disk's status is %s ,can't expend volumeID: %s", res.Data.DiskInfo.Status, diskID)
 	}
 
+	req.GetVolumeCapability()
 	if res.Data.DiskInfo.EcsId == "" {
-		return nil, fmt.Errorf("unmounted disk %s is not allowed to be resized", diskID)
+		log.Infof("unmounted disk %s is not allowed to be resized", diskID)
+		return &csi.ControllerExpandVolumeResponse{CapacityBytes: int64(res.Data.DiskInfo.Size), NodeExpansionRequired: false}, nil
+		//return nil, fmt.Errorf("unmounted disk %s is not allowed to be resized", diskID)
 	}
 
 	ecs, err := describeInstances(res.Data.DiskInfo.EcsId)
