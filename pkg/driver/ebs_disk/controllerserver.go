@@ -566,17 +566,19 @@ func (c *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.
 		return nil, fmt.Errorf("ControllerExpandVolume: disk's status is %s ,can't expend volumeID: %s", res.Data.DiskInfo.Status, diskID)
 	}
 
-	if res.Data.DiskInfo.EcsId != "" {
-		ecs, err := describeInstances(res.Data.DiskInfo.EcsId)
-		if err != nil {
-			return nil, fmt.Errorf("failed to describe instances: %v", err)
-		}
-		if ecs == nil {
-			return nil, fmt.Errorf("err query ecs %s", res.Data.DiskInfo.EcsId)
-		}
-		if ecs.Data.Status != "running" {
-			return nil, fmt.Errorf("ecs %s status is not running", res.Data.DiskInfo.EcsId)
-		}
+	if res.Data.DiskInfo.EcsId == "" {
+		return nil, fmt.Errorf("unmounted disk %s is not allowed to be resized", diskID)
+	}
+
+	ecs, err := describeInstances(res.Data.DiskInfo.EcsId)
+	if err != nil {
+		return nil, fmt.Errorf("failed to describe instances: %v", err)
+	}
+	if ecs == nil {
+		return nil, fmt.Errorf("err query ecs %s", res.Data.DiskInfo.EcsId)
+	}
+	if ecs.Data.Status != "running" {
+		return nil, fmt.Errorf("ecs %s status is not running", res.Data.DiskInfo.EcsId)
 	}
 	volSizeBytes := req.GetCapacityRange().GetRequiredBytes()
 	requestGB := int(volSizeBytes / (1024 * 1024 * 1024))
