@@ -837,8 +837,16 @@ func patchTopologyOfPVs(clientSet *kubernetes.Clientset) {
 }
 
 func expandEbsDisk(diskID string, diskSize int) (*cdsDisk.ExtendDiskResponse, error) {
-	if _, ok := diskExpendMap.Load(diskID); ok {
-		return nil, fmt.Errorf("disk %s is expending", diskID)
+	if value, ok := diskExpendMap.Load(diskID); ok {
+		taskId, ok := value.(string)
+		if !ok {
+			return nil, fmt.Errorf("disk %s taskid ivalid %v", diskID, value)
+		}
+		res, err := cdsDisk.DescribeTaskStatus(taskId)
+		if err != nil {
+			return nil, fmt.Errorf("query event %s for disk %s failed", taskId, diskID)
+		}
+		return nil, fmt.Errorf("disk %s is %s", diskID, res.Data.EventStatus)
 	}
 	res, err := cdsDisk.ExtendDisk(&cdsDisk.ExtendDiskArgs{
 		DiskId:       diskID,
@@ -847,7 +855,7 @@ func expandEbsDisk(diskID string, diskSize int) (*cdsDisk.ExtendDiskResponse, er
 	if err != nil {
 		return nil, fmt.Errorf("failed to extend disk %s by OpenAPI %s", diskID, err.Error())
 	}
-	diskExpendMap.Store(diskID, "expending")
+	diskExpendMap.Store(diskID, res.Data.EventId)
 	log.Infof("expend disk %s, eventId %s", diskID, res.Data.EventId)
 	return res, nil
 }
