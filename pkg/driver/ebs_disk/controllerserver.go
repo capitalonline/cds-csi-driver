@@ -50,7 +50,7 @@ var AttachDetachMap = new(sync.Map)
 
 var DiskMultiTaskMap = new(sync.Map)
 
-var diskExpendMap = new(sync.Map)
+var diskExpandMap = new(sync.Map)
 
 func NewControllerServer(d *DiskDriver) *ControllerServer {
 	config, err := rest.InClusterConfig()
@@ -588,7 +588,7 @@ func (c *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.
 	}
 	diskSize := res.Data.DiskInfo.Size
 	if requestGB == diskSize {
-		diskExpendMap.Delete(diskID)
+		diskExpandMap.Delete(diskID)
 		log.Infof("ControllerExpandVolume:: expect size is same with current: %s, size: %dGi", req.VolumeId, requestGB)
 		return &csi.ControllerExpandVolumeResponse{CapacityBytes: volSizeBytes, NodeExpansionRequired: true}, nil
 	}
@@ -837,7 +837,7 @@ func patchTopologyOfPVs(clientSet *kubernetes.Clientset) {
 }
 
 func expandEbsDisk(diskID string, diskSize int) (*cdsDisk.ExtendDiskResponse, error) {
-	if value, ok := diskExpendMap.Load(diskID); ok {
+	if value, ok := diskExpandMap.Load(diskID); ok {
 		taskId, ok := value.(string)
 		if !ok {
 			return nil, fmt.Errorf("disk %s taskid ivalid %v", diskID, value)
@@ -855,7 +855,7 @@ func expandEbsDisk(diskID string, diskSize int) (*cdsDisk.ExtendDiskResponse, er
 	if err != nil {
 		return nil, fmt.Errorf("failed to extend disk %s by OpenAPI %s", diskID, err.Error())
 	}
-	diskExpendMap.Store(diskID, res.Data.EventId)
+	diskExpandMap.Store(diskID, res.Data.EventId)
 	log.Infof("expend disk %s, eventId %s", diskID, res.Data.EventId)
 	return res, nil
 }
