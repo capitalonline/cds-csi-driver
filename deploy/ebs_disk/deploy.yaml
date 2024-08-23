@@ -313,7 +313,7 @@ spec:
             - name: ADDRESS
               value: /var/lib/csi/sockets/pluginproxy/csi.sock
           name: csi-resizer
-          image: registry.k8s.io/sig-storage/csi-resizer:v1.9.0
+          image: registry-bj.capitalonline.net/cck/csi-resizer:v1.9.0
           imagePullPolicy: "IfNotPresent"
           ports:
             - containerPort: 8080
