@@ -588,12 +588,12 @@ func (c *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.
 	}
 	diskSize := res.Data.DiskInfo.Size
 	if requestGB == diskSize {
+		diskExpendMap.Delete(diskID)
 		log.Infof("ControllerExpandVolume:: expect size is same with current: %s, size: %dGi", req.VolumeId, requestGB)
 		return &csi.ControllerExpandVolumeResponse{CapacityBytes: volSizeBytes, NodeExpansionRequired: true}, nil
 	}
 
 	if requestGB < diskSize {
-		diskExpendMap.Delete(diskID)
 		log.Infof("ControllerExpandVolume:: expect size is less than current: %d, expected: %d, disk: %s", diskSize, requestGB, req.VolumeId)
 		return &csi.ControllerExpandVolumeResponse{CapacityBytes: volSizeBytes, NodeExpansionRequired: false}, nil
 	}
