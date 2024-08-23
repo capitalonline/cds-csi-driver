@@ -243,7 +243,7 @@ spec:
                 configMapKeyRef:
                   key: oversea
                   name: cds-properties
-          image: harbor-dev.yun-paas.com/test/cds-csi-driver:v2.1.6
+          image: registry-bj.capitalonline.net/cck/cds-csi-driver:v2.1.6
           imagePullPolicy: Always
           livenessProbe:
             exec:
@@ -326,6 +326,8 @@ spec:
       hostPID: true
       nodeSelector:
         node-role.kubernetes.io/control-plane: ""
+#        k8s version less than 1.23
+#        node-role.kubernetes.io/master: ''
       priorityClassName: system-cluster-critical
       serviceAccount: ebs-disk-cds-csi-sa
       tolerations:
@@ -390,7 +392,7 @@ spec:
                   name: cds-properties
             - name: API_HOST
               value: http://api.capitalonline.net
-          image: harbor-dev.yun-paas.com/test/cds-csi-driver:v2.1.6
+          image: registry-bj.capitalonline.net/cck/cds-csi-driver:v2.1.6
           imagePullPolicy: Always
           name: ebs-disk-csi-node-server
           securityContext:
