@@ -50,11 +50,6 @@ var AttachDetachMap = new(sync.Map)
 
 var DiskMultiTaskMap = new(sync.Map)
 
-type TaskRecord struct {
-	ID        string
-	StartTime time.Time
-}
-
 func NewControllerServer(d *DiskDriver) *ControllerServer {
 	config, err := rest.InClusterConfig()
 	if err != nil {
