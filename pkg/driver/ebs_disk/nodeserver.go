@@ -335,19 +335,31 @@ func (n *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpub
 
 func (n *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
 	log.Infof("NodeUnstageVolume: starting to unstage with req: %+v", req)
-
 	// Step 1: get necessary params
 	volumeID := req.VolumeId
 	unStagingPath := req.GetStagingTargetPath()
-
 	if volumeID == "" {
 		log.Errorf("NodeUnstageVolume:: step 1, req.VolumeID cant not be empty")
 		return nil, status.Error(codes.InvalidArgument, "NodeUnstageVolume:: step 1, req.VolumeID cant not be empty")
 	}
-
 	if unStagingPath == "" {
 		log.Errorf("NodeUnstageVolume: step 1, req.StagingTargetPath cant not be empty")
 		return nil, status.Error(codes.InvalidArgument, "NodeUnstageVolume: step 1, req.StagingTargetPath cant not be empty")
+	}
+
+	// Step 2: umount disk device from node global path
+	if value, ok := diskUnStagingMap.Load(unStagingPath); ok {
+		switch value {
+		case UnStaing:
+			log.Warnf("NodeUnstageVolume: volumeID: %s in is unstaging process, please wait", volumeID)
+			return nil, fmt.Errorf("NodeUnstageVolume: volumeID: %s in is unstaging process, please wait", volumeID)
+		case ErrorStatus:
+			log.Errorf("NodeUnstageVolume: volumeID: %s unstaging process error", volumeID)
+			return nil, fmt.Errorf("NodeUnstageVolume: volumeID: %s unstaging process error", volumeID)
+		case Ok:
+			log.Warnf("NodeUnstageVolume: volumeID: %s unstaging process succeed, return context", volumeID)
+			return &csi.NodeUnstageVolumeResponse{}, nil
+		}
 	}
 
 	if !utils.FileExisted(unStagingPath) {
@@ -356,15 +368,19 @@ func (n *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstage
 		return &csi.NodeUnstageVolumeResponse{}, nil
 	}
 
+	diskUnStagingMap.Store(unStagingPath, UnStaing)
 	err := unMountDiskDeviceFromNodeGlobalPath(volumeID, unStagingPath)
 	if err != nil {
+		diskUnStagingMap.Store(unStagingPath, ErrorStatus)
 		log.Errorf("NodeUnstageVolume: step 2, unMountDiskDeviceFromNodeGlobalPath failed, err is: %s", err)
 		return nil, fmt.Errorf("NodeUnstageVolume: step 2, unMountDiskDeviceFromNodeGlobalPath failed, err is: %s", err)
 	}
+	diskUnStagingMap.Delete(unStagingPath)
+	diskStagingMap.Delete(unStagingPath)
 	log.Infof("NodeUnstageVolume: Successfully!")
+
 	return &csi.NodeUnstageVolumeResponse{}, nil
 }
-
 func findDeviceNameByOrderId(orderId string) (deviceName string, err error) {
 	log.Infof("findDeviceNameByUuid: disk order id is: %s", orderId)
 	cmdScan := fmt.Sprintf("ls /dev/disk/by-id/%s -lh", orderId)
@@ -647,8 +663,8 @@ func (n *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVo
 }
 
 func getBlockDeviceCapacity(devicePath string) int64 {
-
 	file, err := os.Open(devicePath)
+	defer file.Close()
 	if err != nil {
 		log.Errorf("getBlockDeviceCapacity:: failed to open devicePath: %v", devicePath)
 		return 0
@@ -662,17 +678,6 @@ func getBlockDeviceCapacity(devicePath string) int64 {
 }
 
 func getBlockDeviceFsType(devicePath string) (string, error) {
-	//partitions, err := diskUtil.Partitions(false)
-	//data, _ := json.Marshal(partitions)
-	//log.Infof("获取到的设备信息%s", string(data))
-	//if err != nil {
-	//	return "", err
-	//}
-	//for _, partition := range partitions {
-	//	if partition.Device == devicePath {
-	//		return partition.Fstype, nil
-	//	}
-	//}
 
 	output, err := utils.RunCommand(fmt.Sprintf("blkid %s", devicePath))
 	if err != nil {
