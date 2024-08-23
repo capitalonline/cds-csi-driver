@@ -664,11 +664,11 @@ func (n *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVo
 
 func getBlockDeviceCapacity(devicePath string) int64 {
 	file, err := os.Open(devicePath)
-	defer file.Close()
 	if err != nil {
 		log.Errorf("getBlockDeviceCapacity:: failed to open devicePath: %v", devicePath)
 		return 0
 	}
+	defer file.Close()
 	pos, err := file.Seek(0, io.SeekEnd)
 	if err != nil {
 		log.Errorf("getBlockDeviceCapacity:: failed to read devicePath: %v", devicePath)
