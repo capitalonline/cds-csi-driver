@@ -584,7 +584,7 @@ func (c *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.
 	requestGB := int(volSizeBytes / (1024 * 1024 * 1024))
 
 	if requestGB%8 != 0 {
-		return nil, fmt.Errorf("the expanded capacity must be a multiple of 8")
+		return nil, fmt.Errorf("the expanded capacity must be a multiple of 8, recived %d", requestGB)
 	}
 	diskSize := res.Data.DiskInfo.Size
 	if requestGB == diskSize {
