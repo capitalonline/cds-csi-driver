@@ -306,6 +306,11 @@ Kindly Remind:
 
 ​	If not, please apply your `ebs-disk.csi.cds.net` csi driver's `csi-provisioner` in k8s with following:
 
+Disk expansion:
+```shell
+kubectl patch pvc disk-csi-cds-pvc -p '{"spec":{"resources":{"requests":{"storage":"32Gi"}}}}'
+```
+
 ## To use the EKS-DISK driver
 
 Examples can be found [here](!https://github.com/capitalonline/cds-csi-driver/tree/master/example/ebs_disk)
