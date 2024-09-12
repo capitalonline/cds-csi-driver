@@ -99,14 +99,17 @@ func (n *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 		log.Errorf("NodeStageVolume: find disk uuid failed, err is: %s", err)
 		return nil, err
 	}
-	if res.Data.BlockId == "" || res.Data.Order == 0 {
+	if res.Data.BlockId == "" || (res.Data.Order == 0 && res.Data.MountPath == "") {
 		log.Errorf("NodeStageVolume: find disk order id failed")
 		return nil, fmt.Errorf("NodeStageVolume: find disk order id failed")
 	}
-	deviceName, err := findDeviceNameByOrderId(fmt.Sprintf("%s%d", OrderHead, res.Data.Order))
-	if err != nil {
-		log.Errorf("NodeStageVolume: findDeviceNameByUuid error, err is: %s", err.Error())
-		return nil, err
+	var deviceName = res.Data.MountPath
+	if res.Data.Order != 0 {
+		deviceName, err = findDeviceNameByOrderId(fmt.Sprintf("%s%d", OrderHead, res.Data.Order))
+		if err != nil {
+			log.Errorf("NodeStageVolume: findDeviceNameByUuid error, err is: %s", err.Error())
+			return nil, err
+		}
 	}
 	log.Infof("NodeStageVolume: findDeviceNameByVolumeID succeed, deviceName is: %s", deviceName)
 	fsType := req.GetVolumeContext()["fsType"]
@@ -218,10 +221,13 @@ func (n *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 
 	// check if disk formatted or not, return error if not formatted
 	if _, ok := diskFormattedMap.Load(volumeID); ok || n.GetPvFormat(volumeID) {
-		deviceName, err := findDeviceNameByOrderId(fmt.Sprintf("%s%d", OrderHead, res.Data.Order))
-		if err != nil {
-			log.Errorf("NodePublishVolume: findDeviceNameByUuid error, err is: %s", err.Error())
-			return nil, err
+		var deviceName = res.Data.MountPath
+		if res.Data.Order != 0 {
+			deviceName, err = findDeviceNameByOrderId(fmt.Sprintf("%s%d", OrderHead, res.Data.Order))
+			if err != nil {
+				log.Errorf("NodePublishVolume: findDeviceNameByUuid error, err is: %s", err.Error())
+				return nil, err
+			}
 		}
 
 		// staging record exist and record staging path is equal to new staging path

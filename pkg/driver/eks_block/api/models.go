@@ -279,6 +279,7 @@ type DescribeBlockInfoResponseData struct {
 	IsFormat    int    `json:"IsFormat"`
 	FsType      string `json:"FsType"`
 	DiskFeature string `json:"DiskFeature"`
+	MountPath   string `json:"MountPath"`
 }
 
 func (resp *DescribeBlockInfoResponse) ToJsonString() string {
