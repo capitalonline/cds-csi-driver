@@ -377,9 +377,56 @@ func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *c
 	return &csi.ControllerUnpublishVolumeResponse{}, nil
 }
 
-// ControllerExpandVolume 扩容，这期不做
-func (c *ControllerServer) ControllerExpandVolume(context.Context, *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "")
+// ControllerExpandVolume 扩容
+func (c *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
+	diskID := req.VolumeId
+	res, err := describeBlockInfo(diskID, "")
+	if err != nil {
+		return nil, fmt.Errorf("ControllerExpandVolume:: expand volume failed: %s", err)
+	}
+	if res == nil || res.Data.BlockId == "" {
+		return nil, fmt.Errorf("ControllerExpandVolume:: api return invalid response:%v", res)
+	}
+	if res.Data.Status != DiskStatusRunning && res.Data.Status != DiskStatusWaiting {
+		return nil, fmt.Errorf("ControllerExpandVolume:: block current status is %s, can not expand", res.Data.Status)
+	}
+	if res.Data.NodeId == "" {
+		log.Infof("ControllerExpandVolume:: unmounted disk %s is not allowed to be resized", diskID)
+		return &csi.ControllerExpandVolumeResponse{CapacityBytes: int64(res.Data.DiskSize * (1024 * 1024 * 1024)), NodeExpansionRequired: false}, nil
+	}
+
+	nodeStatus, err := describeNodeStatus(ctx, c, res.Data.NodeId)
+	if err != nil {
+		return nil, fmt.Errorf("ControllerExpandVolume:: failed to get node status %v", err)
+	}
+	if nodeStatus != StatusEcsRunning {
+		return nil, fmt.Errorf("ControllerExpandVolume:: node %s is not running", res.Data.NodeId)
+	}
+
+	volSizeBytes := req.GetCapacityRange().GetRequiredBytes()
+	requestGB := int(volSizeBytes / (1024 * 1024 * 1024))
+
+	if requestGB%8 != 0 {
+		return nil, fmt.Errorf("ControllerExpandVolume:: the expanded capacity must be a multiple of 8, recived %d", requestGB)
+	}
+	diskSize := res.Data.DiskSize
+	if requestGB == diskSize {
+		diskExpandMap.Delete(diskID)
+		log.Infof("ControllerExpandVolume:: expect size is same with current: %s, size: %dGi", req.VolumeId, requestGB)
+		return &csi.ControllerExpandVolumeResponse{CapacityBytes: volSizeBytes, NodeExpansionRequired: true}, nil
+	}
+	if requestGB < diskSize {
+		log.Infof("ControllerExpandVolume:: expect size is less than current: %d, expected: %d, disk: %s", diskSize, requestGB, req.VolumeId)
+		return &csi.ControllerExpandVolumeResponse{CapacityBytes: volSizeBytes, NodeExpansionRequired: false}, nil
+	}
+	response, err := expandBlockSize(diskID, requestGB)
+	if err != nil {
+		return nil, fmt.Errorf("ControllerExpandVolume:: expand by api err: %s", err)
+	}
+	if response == nil {
+		return nil, fmt.Errorf("ControllerExpandVolume:: expand by api return nil")
+	}
+	return nil, fmt.Errorf("ControllerExpandVolume:: disk Volume(%s) is in expanding, please wait", diskID)
 }
 
 func createBlock(diskName string, diskSize int, zone, fs, subjectId string) (*api.CreateBlockResponse, error) {
@@ -572,6 +619,34 @@ func describeNodeMountNum(instancesId string) (*api.DescribeNodeMountNumResponse
 	request := api.NewDescribeNodeMountNumRequest()
 	request.NodeId = instancesId
 	return client.DescribeNodeMountNum(request)
+}
+
+func expandBlockSize(blockId string, size int) (*api.ExpandBlockSizeResponse, error) {
+	if value, ok := diskExpandMap.Load(blockId); ok {
+		taskId, ok := value.(string)
+		if !ok {
+			return nil, fmt.Errorf("disk %s taskid ivalid %v", blockId, value)
+		}
+		res, err := describeTaskStatus(taskId)
+		if err != nil {
+			return nil, fmt.Errorf("query event %s for disk %s failed", taskId, blockId)
+		}
+		return nil, fmt.Errorf("disk %s is %s", blockId, res.Data.TaskStatus)
+	}
+	cpf := profile.NewClientProfileWithMethod(http.MethodPost)
+	client, _ := api.NewClient(eks_client.NewCredential(), "", cpf)
+	request := api.NewExpandBlockSizeRequest()
+	request.BlockId = blockId
+	request.ExpandSize = int64(size)
+	res, err := client.ExpandBlockSize(request)
+	if err != nil {
+		return nil, err
+	}
+	if res == nil {
+		return nil, fmt.Errorf("api return nil")
+	}
+	diskExpandMap.Store(blockId, res.Data.TaskId)
+	return res, nil
 }
 
 func patchTopologyOfPVsPeriodically(clientSet *kubernetes.Clientset) {

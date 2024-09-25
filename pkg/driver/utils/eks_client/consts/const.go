@@ -21,6 +21,7 @@ const (
 	ActionUpdateBlockFormat    = "UpdateBlockFormat"
 	ActionDescribeBlockInfo    = "DescribeBlockInfo"
 	ActionDescribeNodeMountNum = "DescribeNodeMountNum"
+	ActionExpandBlockSize      = "ExpandBlockSize"
 )
 
 const (

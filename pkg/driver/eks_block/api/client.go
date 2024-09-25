@@ -225,3 +225,26 @@ func (c *Client) DescribeNodeMountNum(request *DescribeNodeMountNumRequest) (res
 	err = c.Send(request, response)
 	return
 }
+
+func NewExpandBlockSizeRequest() (request *ExpandBlockSizeRequest) {
+	request = &ExpandBlockSizeRequest{
+		BaseRequest: &cdshttp.BaseRequest{},
+	}
+	request.Init().WithApiInfo(consts.ServiceEKS, consts.ApiVersion, consts.ActionExpandBlockSize)
+	request.SetDomain(consts.ApiHost)
+	return
+}
+
+func NewExpandBlockSizeResponse() (response *ExpandBlockSizeResponse) {
+	response = &ExpandBlockSizeResponse{BaseResponse: &cdshttp.BaseResponse{}}
+	return
+}
+
+func (c *Client) ExpandBlockSize(request *ExpandBlockSizeRequest) (response *ExpandBlockSizeResponse, err error) {
+	if request == nil {
+		request = NewExpandBlockSizeRequest()
+	}
+	response = NewExpandBlockSizeResponse()
+	err = c.Send(request, response)
+	return
+}
