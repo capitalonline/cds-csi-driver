@@ -66,8 +66,16 @@ func (n *NodeServer) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCa
 		},
 	}
 
+	expendCap := &csi.NodeServiceCapability{
+		Type: &csi.NodeServiceCapability_Rpc{
+			Rpc: &csi.NodeServiceCapability_RPC{
+				Type: csi.NodeServiceCapability_RPC_EXPAND_VOLUME,
+			},
+		},
+	}
+
 	// Disk Metric enable config
-	nodeSvcCap := []*csi.NodeServiceCapability{nodeCap}
+	nodeSvcCap := []*csi.NodeServiceCapability{nodeCap, expendCap}
 
 	return &csi.NodeGetCapabilitiesResponse{
 		Capabilities: nodeSvcCap,
