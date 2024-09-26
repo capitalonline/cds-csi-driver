@@ -31,6 +31,7 @@ const (
 	ebsSsdDisk            = "SSD"
 	DriverEbsDiskTypeName = "eks-disk.csi.cds.net"
 	BillingMethodPostPaid = "0"
+	NodeReady             = "True"
 )
 
 func NewControllerServer(d *DiskDriver) *ControllerServer {
@@ -399,8 +400,8 @@ func (c *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.
 	if err != nil {
 		return nil, fmt.Errorf("ControllerExpandVolume:: failed to get node status %v", err)
 	}
-	if nodeStatus != StatusEcsRunning {
-		return nil, fmt.Errorf("ControllerExpandVolume:: node %s is not running", res.Data.NodeId)
+	if nodeStatus != NodeReady {
+		return nil, fmt.Errorf("ControllerExpandVolume:: node %s is not running,status:%s ", res.Data.NodeId, nodeStatus)
 	}
 
 	volSizeBytes := req.GetCapacityRange().GetRequiredBytes()
