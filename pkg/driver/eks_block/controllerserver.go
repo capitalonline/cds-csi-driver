@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	api "github.com/capitalonline/cds-csi-driver/pkg/driver/eks_block/api"
@@ -395,15 +396,15 @@ func (c *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.
 		log.Infof("ControllerExpandVolume:: unmounted disk %s is not allowed to be resized", diskID)
 		return &csi.ControllerExpandVolumeResponse{CapacityBytes: int64(res.Data.DiskSize * (1024 * 1024 * 1024)), NodeExpansionRequired: false}, nil
 	}
+	describeRes, err := describeNodeMountNum(res.Data.NodeId)
 
-	nodeStatus, err := describeNodeStatus(ctx, c, res.Data.NodeId)
 	if err != nil {
 		return nil, fmt.Errorf("ControllerExpandVolume:: failed to get node status %v", err)
 	}
-	if nodeStatus != NodeReady {
-		return nil, fmt.Errorf("ControllerExpandVolume:: node %s is not running,status:%s ", res.Data.NodeId, nodeStatus)
+	if describeRes.Data.NodeStatus != StatusEcsRunning {
+		time.Sleep(time.Second * 30)
+		return nil, fmt.Errorf("ControllerExpandVolume:: node %s is not running,status:%s ", res.Data.NodeId, describeRes.Data.NodeStatus)
 	}
-
 	volSizeBytes := req.GetCapacityRange().GetRequiredBytes()
 	requestGB := int(volSizeBytes / (1024 * 1024 * 1024))
 
@@ -426,6 +427,11 @@ func (c *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.
 	}
 	if response == nil {
 		return nil, fmt.Errorf("ControllerExpandVolume:: expand by api return nil")
+	}
+	// node updating
+	if strings.Contains(response.Msg, "NodeUpdatingError") {
+		time.Sleep(time.Second * 30)
+		return nil, fmt.Errorf("ControllerExpandVolume:: disk %s expand faild, node %s is updating, will retury 30s later", diskID, res.Data.NodeId)
 	}
 	return nil, fmt.Errorf("ControllerExpandVolume:: disk Volume(%s) is in expanding, please wait", diskID)
 }
