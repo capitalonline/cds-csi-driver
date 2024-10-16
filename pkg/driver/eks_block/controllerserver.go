@@ -414,6 +414,19 @@ func (c *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.
 	if requestGB > MaxBlockSize {
 		return nil, fmt.Errorf("ControllerExpandVolume:: the expanded capacity can not more than %d, received %d", MaxBlockSize, requestGB)
 	}
+	limitRes, err := describeBlockLimit(res.Data.AvailableZoneCode)
+	if err != nil || res == nil {
+		log.Errorf("ControllerExpandVolume:: error when describeDiskQuota,err: %v , res:%v", err, res)
+		return nil, err
+	}
+
+	if (requestGB - res.Data.DiskSize) > limitRes.Data.MaxRestVolume {
+		quota := limitRes.Data.MaxRestVolume
+		msg := fmt.Sprintf("az %s free quota is: %d,less than requested %d", res.Data.AvailableZoneCode, quota, requestGB)
+		log.Error(msg)
+		return nil, status.Error(codes.InvalidArgument, msg)
+	}
+
 	diskSize := res.Data.DiskSize
 	if requestGB == diskSize {
 		diskExpandMap.Delete(diskID)
@@ -424,7 +437,7 @@ func (c *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.
 		log.Infof("ControllerExpandVolume:: expect size is less than current: %d, expected: %d, disk: %s", diskSize, requestGB, req.VolumeId)
 		return &csi.ControllerExpandVolumeResponse{CapacityBytes: volSizeBytes, NodeExpansionRequired: false}, nil
 	}
-	response, err := expandBlockSize(diskID, requestGB)
+	response, err := expandBlockSize(diskID, res.Data.NodeId, requestGB)
 	if err != nil {
 		return nil, fmt.Errorf("ControllerExpandVolume:: expand by api err: %s", err)
 	}
@@ -631,7 +644,7 @@ func describeNodeMountNum(instancesId string) (*api.DescribeNodeMountNumResponse
 	return client.DescribeNodeMountNum(request)
 }
 
-func expandBlockSize(blockId string, size int) (*api.ExpandBlockSizeResponse, error) {
+func expandBlockSize(blockId, nodeId string, size int) (*api.ExpandBlockSizeResponse, error) {
 	if value, ok := diskExpandMap.Load(blockId); ok {
 		taskId, ok := value.(string)
 		if !ok {
@@ -648,6 +661,7 @@ func expandBlockSize(blockId string, size int) (*api.ExpandBlockSizeResponse, er
 	request := api.NewExpandBlockSizeRequest()
 	request.BlockId = blockId
 	request.ExpandSize = int64(size)
+	request.MountNodeId = nodeId
 	res, err := client.ExpandBlockSize(request)
 	if err != nil {
 		return nil, err
