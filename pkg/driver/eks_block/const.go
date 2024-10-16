@@ -48,3 +48,7 @@ const (
 const (
 	PatchPVInterval = 60 * time.Second //3 * time.Minute
 )
+
+const (
+	MaxBlockSize = 4000
+)
