@@ -96,6 +96,13 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 	volSizeBytes := req.GetCapacityRange().GetRequiredBytes()
 	diskRequestGB := req.CapacityRange.RequiredBytes / (1024 * 1024 * 1024)
 
+	if diskRequestGB%80 != 0 {
+		return nil, fmt.Errorf("CreateVolume:: the capacity must be a multiple of 80, recived %dGi", diskRequestGB)
+	}
+	if diskRequestGB > MaxBlockSize {
+		return nil, fmt.Errorf("CreateVolume:: the expanded capacity can not more than %dGi, received %dGi", MaxBlockSize, diskRequestGB)
+	}
+
 	diskVol, err := parseDiskVolumeOptions(req)
 	if err != nil {
 		log.Errorf("CreateVolume: error parameters from input, err is: %s", err.Error())
@@ -412,17 +419,16 @@ func (c *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.
 		return nil, fmt.Errorf("ControllerExpandVolume:: the expanded capacity must be a multiple of 80, recived %d", requestGB)
 	}
 	if requestGB > MaxBlockSize {
-		return nil, fmt.Errorf("ControllerExpandVolume:: the expanded capacity can not more than %d, received %d", MaxBlockSize, requestGB)
+		return nil, fmt.Errorf("ControllerExpandVolume:: the expanded capacity can not more than %dGi, received %dGi", MaxBlockSize, requestGB)
 	}
 	limitRes, err := describeBlockLimit(res.Data.AvailableZoneCode)
 	if err != nil || res == nil {
-		log.Errorf("ControllerExpandVolume:: error when describeDiskQuota,err: %v , res:%v", err, res)
-		return nil, err
+		return nil, fmt.Errorf("ControllerExpandVolume:: error when describeDiskQuota,err: %v , res:%v", err, res)
 	}
 
 	if (requestGB - res.Data.DiskSize) > limitRes.Data.MaxRestVolume {
 		quota := limitRes.Data.MaxRestVolume
-		msg := fmt.Sprintf("az %s free quota is: %d,less than requested %d", res.Data.AvailableZoneCode, quota, requestGB)
+		msg := fmt.Sprintf("az %s free quota is: %dGi,less than requested %dGi", res.Data.AvailableZoneCode, quota, requestGB)
 		log.Error(msg)
 		return nil, status.Error(codes.InvalidArgument, msg)
 	}
@@ -434,7 +440,7 @@ func (c *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.
 		return &csi.ControllerExpandVolumeResponse{CapacityBytes: volSizeBytes, NodeExpansionRequired: true}, nil
 	}
 	if requestGB < diskSize {
-		log.Infof("ControllerExpandVolume:: expect size is less than current: %d, expected: %d, disk: %s", diskSize, requestGB, req.VolumeId)
+		log.Infof("ControllerExpandVolume:: expect size is less than current: %dGi, expected: %dGi, disk: %s", diskSize, requestGB, req.VolumeId)
 		return &csi.ControllerExpandVolumeResponse{CapacityBytes: volSizeBytes, NodeExpansionRequired: false}, nil
 	}
 	response, err := expandBlockSize(diskID, res.Data.NodeId, requestGB)
