@@ -12,9 +12,13 @@ import (
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"io"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"net/http"
+	"os"
+	"regexp"
 	"strings"
 	"sync"
 )
@@ -62,8 +66,16 @@ func (n *NodeServer) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCa
 		},
 	}
 
+	expendCap := &csi.NodeServiceCapability{
+		Type: &csi.NodeServiceCapability_Rpc{
+			Rpc: &csi.NodeServiceCapability_RPC{
+				Type: csi.NodeServiceCapability_RPC_EXPAND_VOLUME,
+			},
+		},
+	}
+
 	// Disk Metric enable config
-	nodeSvcCap := []*csi.NodeServiceCapability{nodeCap}
+	nodeSvcCap := []*csi.NodeServiceCapability{nodeCap, expendCap}
 
 	return &csi.NodeGetCapabilitiesResponse{
 		Capabilities: nodeSvcCap,
@@ -360,6 +372,55 @@ func (n *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstage
 	return &csi.NodeUnstageVolumeResponse{}, nil
 }
 
+func (n *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
+	log.Infof("NodeExpandVolume: node expand volume: %v", req)
+
+	requestBytes := req.GetCapacityRange().GetRequiredBytes()
+
+	diskID := req.GetVolumeId()
+
+	res, err := describeBlockInfo(diskID, "")
+	if err != nil {
+		return nil, fmt.Errorf("NodeExpandVolume: query disk by OpenAPI failed,err:%s", err.Error())
+	}
+	diskOrder := res.Data.Order
+	ecsId := res.Data.NodeId
+	// 查询失败
+	if diskOrder == 0 || res.Data.NodeId == "" {
+		return nil, fmt.Errorf("NodeExpandVolume: OpenAPI return invalid disk data,disk order:%d,EcsId:%s", diskOrder, ecsId)
+	}
+	deviceName, err := findDeviceNameByOrderId(fmt.Sprintf("%s%d", OrderHead, diskOrder))
+	if err != nil {
+		return nil, fmt.Errorf("NodeExpandVolume: get disk %s device name failed, err: %s", diskID, err.Error())
+	}
+	fsType, err := getBlockDeviceFsType(deviceName)
+	if err != nil {
+		return nil, fmt.Errorf("NodeExpandVolume: get disk %s file system type failed, err: %s", diskID, err.Error())
+	}
+	cmd := fmt.Sprintf("resize2fs %s", deviceName)
+	switch fsType {
+	case DefaultFsTypeXfs:
+		cmd = fmt.Sprintf("xfs_growfs %s", deviceName)
+	case FsTypeExt3, FsTypeExt4:
+	default:
+		return nil, fmt.Errorf("NodeExpandVolume: file system %s not supported", fsType)
+	}
+	_, err = utils.RunCommand(cmd)
+	if err != nil {
+		return nil, fmt.Errorf("resize fs %s failed, err: %s", deviceName, err)
+	}
+
+	deviceCapacity := getBlockDeviceCapacity(deviceName)
+	if requestBytes > 0 && deviceCapacity < requestBytes {
+		return nil, status.Errorf(codes.Aborted, "requested %v, but actual block size %v is smaller. Not updated yet?",
+			resource.NewQuantity(requestBytes, resource.BinarySI), resource.NewQuantity(deviceCapacity, resource.BinarySI))
+	}
+
+	return &csi.NodeExpandVolumeResponse{
+		CapacityBytes: deviceCapacity,
+	}, nil
+}
+
 func findDeviceNameByOrderId(orderId string) (deviceName string, err error) {
 	log.Infof("findDeviceNameByUuid: disk order id is: %s", orderId)
 	cmdScan := fmt.Sprintf("ls /dev/disk/by-id/%s -lh", orderId)
@@ -580,6 +641,35 @@ func (n *NodeServer) GetPvFormat(diskId string) bool {
 	}
 }
 
-func (n *NodeServer) NodeExpandVolume(context.Context, *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "")
+func getBlockDeviceCapacity(devicePath string) int64 {
+	file, err := os.Open(devicePath)
+	if err != nil {
+		log.Errorf("getBlockDeviceCapacity: failed to open devicePath: %v", devicePath)
+		return 0
+	}
+	defer file.Close()
+	pos, err := file.Seek(0, io.SeekEnd)
+	if err != nil {
+		log.Errorf("getBlockDeviceCapacity: failed to read devicePath: %v", devicePath)
+		return 0
+	}
+	return pos
+}
+
+func getBlockDeviceFsType(devicePath string) (string, error) {
+
+	output, err := utils.RunCommand(fmt.Sprintf("blkid %s", devicePath))
+	if err != nil {
+		return "", fmt.Errorf("blkid %s failed,err:%v", devicePath, err)
+	}
+	typeStr := strings.Split(output, " ")
+	if len(typeStr) == 0 {
+		return "", fmt.Errorf("cannot get device")
+	}
+	re := regexp.MustCompile(`TYPE="([^"]+)"`)
+	mathResult := re.FindStringSubmatch(typeStr[len(typeStr)-1])
+	if len(mathResult) <= 1 {
+		return "", fmt.Errorf("cannot get file system type")
+	}
+	return mathResult[1], nil
 }
